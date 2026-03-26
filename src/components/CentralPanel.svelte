@@ -32,6 +32,22 @@
 
   let prevEntryCount = 0;
 
+  // Auto-scroll when a new pending message is added
+  let prevPendingCount = 0;
+  $: {
+    const count = $pendingMessages.length;
+    if (count > prevPendingCount) {
+      requestAnimationFrame(() => {
+        if (logContainer) {
+          logContainer.scrollTop = logContainer.scrollHeight;
+          userScrolledUp = false;
+          showScrollBtn = false;
+        }
+      });
+    }
+    prevPendingCount = count;
+  }
+
   async function loadJournal(sessionId: string) {
     const entries = await getJournal(sessionId);
     // If new entries appeared, clear pending messages (they've been processed)
@@ -151,7 +167,7 @@
           <TypingIndicator label={typingLabel} />
         {/if}
 
-        {#if agent.status === 'input' && agent.pendingApproval}
+        {#if agent.pendingApproval}
           <div class="approval-banner">
             <span class="approval-icon">⏳</span>
             <span class="approval-text">{agent.pendingApproval}</span>

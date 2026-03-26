@@ -260,3 +260,35 @@ pub fn get_slash_commands() -> Vec<SlashCommand> {
 
     result
 }
+
+#[tauri::command]
+pub fn list_project_files(cwd: String) -> Vec<String> {
+    use ignore::WalkBuilder;
+
+    let mut files = Vec::new();
+    let walker = WalkBuilder::new(&cwd)
+        .hidden(true)        // skip hidden files
+        .git_ignore(true)    // respect .gitignore
+        .git_global(true)
+        .git_exclude(true)
+        .max_depth(Some(12))
+        .build();
+
+    for entry in walker.flatten() {
+        if !entry.file_type().map_or(false, |ft| ft.is_file()) {
+            continue;
+        }
+        if let Ok(rel) = entry.path().strip_prefix(&cwd) {
+            let rel_str = rel.to_string_lossy().replace('\\', "/");
+            if !rel_str.is_empty() {
+                files.push(rel_str.to_string());
+            }
+        }
+        if files.len() >= 5000 {
+            break;
+        }
+    }
+
+    files.sort();
+    files
+}

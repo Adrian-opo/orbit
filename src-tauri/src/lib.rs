@@ -22,6 +22,7 @@ pub fn run() {
             commands::get_file_versions,
             commands::get_subagent_journal,
             commands::get_slash_commands,
+            commands::list_project_files,
         ])
         .setup(|app| {
             polling::start_polling(app.handle().clone());

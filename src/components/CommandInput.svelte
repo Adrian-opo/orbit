@@ -41,6 +41,7 @@
     <button onclick={() => handleQuickAction('y')}>y</button>
     <button onclick={() => handleQuickAction('n')}>n</button>
     <button onclick={() => handleQuickAction('yes, and continue')}>yes, and continue</button>
+    <button class="ctrl-c" onclick={() => handleQuickAction('\x03')}>Ctrl+C</button>
   </div>
 </div>
 
@@ -95,4 +96,5 @@
     cursor: pointer;
   }
   .quick-actions button:hover { background: rgba(255, 255, 255, 0.06); }
+  .quick-actions button.ctrl-c { color: var(--red); }
 </style>

@@ -2,6 +2,7 @@
   import type { JournalEntry as JEntry } from '../lib/types';
   import ThinkingBlock from './ThinkingBlock.svelte';
   import ToolCallEntry from './ToolCallEntry.svelte';
+  import Markdown from './Markdown.svelte';
 
   export let entry: JEntry;
 
@@ -14,7 +15,7 @@
       <span class="badge user-badge">USER</span>
       <span class="time">{timeStr}</span>
     </div>
-    <div class="text">{entry.text}</div>
+    <div class="text"><Markdown content={entry.text ?? ''} /></div>
   </div>
 {:else if entry.entryType === 'thinking'}
   <ThinkingBlock
@@ -28,7 +29,7 @@
       <span class="badge assistant-badge">ASSISTANT</span>
       <span class="time">{timeStr}</span>
     </div>
-    <div class="text">{entry.text}</div>
+    <div class="text"><Markdown content={entry.text ?? ''} /></div>
   </div>
 {:else if entry.entryType === 'toolCall'}
   <ToolCallEntry {entry} />
@@ -42,7 +43,7 @@
       <span class="badge system-badge">SYSTEM</span>
       <span class="time">{timeStr}</span>
     </div>
-    <div class="text">{entry.text}</div>
+    <div class="text"><Markdown content={entry.text ?? ''} /></div>
   </div>
 {/if}
 

@@ -16,14 +16,10 @@
 
   function extractTarget(e: JournalEntry): string {
     if (!e.toolInput) return '';
-    if (e.toolInput.file_path) {
-      const parts = (e.toolInput.file_path as string).split(/[/\\]/);
-      return parts[parts.length - 1] ?? '';
-    }
+    if (e.toolInput.file_path) return e.toolInput.file_path as string;
     if (e.toolInput.command) {
       const cmd = e.toolInput.command as string;
-      const first = cmd.split('\n')[0];
-      return first.length > 60 ? first.slice(0, 60) + '...' : first;
+      return cmd.split('\n')[0];
     }
     if (e.toolInput.pattern) return e.toolInput.pattern as string;
     if (e.toolInput.description) return e.toolInput.description as string;
@@ -69,11 +65,9 @@
   .target {
     color: var(--text-secondary);
     font-size: 12px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     flex: 1;
     min-width: 0;
+    word-break: break-all;
   }
   .time {
     color: var(--text-dim);

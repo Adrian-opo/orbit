@@ -36,6 +36,14 @@
   <div class="entry tool-result">
     <div class="output mono">{entry.output?.slice(0, 500)}{(entry.output?.length ?? 0) > 500 ? '...' : ''}</div>
   </div>
+{:else if entry.entryType === 'system'}
+  <div class="entry system">
+    <div class="header">
+      <span class="badge system-badge">SYSTEM</span>
+      <span class="time">{timeStr}</span>
+    </div>
+    <div class="text">{entry.text}</div>
+  </div>
 {/if}
 
 <style>
@@ -54,6 +62,8 @@
   .badge { padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: 600; }
   .user-badge { background: rgba(59, 130, 246, 0.2); color: var(--blue); }
   .assistant-badge { background: var(--purple-dim); color: var(--purple); }
+  .system-badge { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); }
+  .entry.system { opacity: 0.7; }
   .time { color: var(--text-dim); font-size: 9px; }
   .text { font-size: 11px; line-height: 1.5; }
   .output {

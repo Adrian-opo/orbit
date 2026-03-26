@@ -11,10 +11,6 @@
 
   let logContainer: HTMLDivElement;
 
-  $: if (agent.sessionId) {
-    loadJournal(agent.sessionId);
-  }
-
   async function loadJournal(sessionId: string) {
     const entries = await getJournal(sessionId);
     journal.set(entries);

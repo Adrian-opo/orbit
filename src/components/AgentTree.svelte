@@ -5,27 +5,22 @@
   export let subagents: SubagentInfo[];
 
   $: running = subagents.filter(a => a.status === 'running');
-  $: done = subagents.filter(a => a.status === 'done');
-  // Show running agents + last 2 done (most recent)
-  $: visible = [...done.slice(-2), ...running];
-  $: hiddenCount = subagents.length - visible.length;
+  $: doneCount = subagents.filter(a => a.status === 'done').length;
 </script>
 
-{#if subagents.length > 0}
+{#if running.length > 0 || doneCount > 0}
 <div class="tree mono">
-  <span class="main">● main <span class="status-{status}">({status})</span></span>
-  {#if hiddenCount > 0}
-    <span class="sep"> → </span>
-    <span class="hidden-count">{hiddenCount} done</span>
+  {#if running.length > 0}
+    {#each running as agent}
+      <span class="running-indicator">▸ {agent.agentType}</span>
+      {#if agent.description}
+        <span class="desc">{agent.description}</span>
+      {/if}
+    {/each}
   {/if}
-  {#each visible as agent, i}
-    <span class="sep"> → </span>
-    <span>{i < visible.length - 1 ? '├' : '└'} {agent.agentType}
-      <span class="agent-status" class:done={agent.status === 'done'} class:running={agent.status === 'running'}>
-        {agent.status === 'done' ? '✓' : '●'}
-      </span>
-    </span>
-  {/each}
+  {#if doneCount > 0}
+    <span class="done-count">{doneCount} subagent{doneCount > 1 ? 's' : ''} completed</span>
+  {/if}
 </div>
 {/if}
 
@@ -36,16 +31,11 @@
     background: var(--bg-subtle);
     font-size: 12px;
     color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
-  .main { color: var(--text-primary); }
-  .sep { color: var(--text-dim); }
-  .hidden-count { color: var(--text-dim); font-size: 11px; }
-  .status-working { color: var(--green); }
-  .status-input { color: var(--amber); }
-  .status-idle { color: var(--text-muted); }
-  .agent-status.done { color: var(--green); }
-  .agent-status.running { color: var(--amber); }
+  .running-indicator { color: var(--amber); font-weight: 500; }
+  .desc { color: var(--text-dim); font-size: 11px; }
+  .done-count { color: var(--text-dim); font-size: 11px; }
 </style>

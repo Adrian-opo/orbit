@@ -1,21 +1,30 @@
 pub mod models;
 pub mod session_watcher;
 pub mod journal_reader;
+pub mod diff_builder;
 pub mod agent_tree;
 pub mod keystroke_sender;
-pub mod diff_builder;
+pub mod commands;
+pub mod polling;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+use polling::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .manage(AppState::new())
+        .invoke_handler(tauri::generate_handler![
+            commands::send_keystroke,
+            commands::send_message,
+            commands::get_journal,
+            commands::get_diff,
+            commands::get_file_versions,
+        ])
+        .setup(|app| {
+            polling::start_polling(app.handle().clone());
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

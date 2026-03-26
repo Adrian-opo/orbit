@@ -167,7 +167,7 @@
           <TypingIndicator label={typingLabel} />
         {/if}
 
-        {#if agent.pendingApproval}
+        {#if agent.pendingApproval && agent.status !== 'working'}
           <div class="approval-banner">
             <span class="approval-icon">⏳</span>
             <span class="approval-text">{agent.pendingApproval}</span>

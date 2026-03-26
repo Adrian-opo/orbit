@@ -27,14 +27,24 @@
     } catch {
       // Fallback: empty
     }
-    if (agentCwd) {
-      try {
-        projectFiles = await listProjectFiles(agentCwd);
-      } catch {
-        // Fallback: empty
-      }
-    }
   });
+
+  // Reset input and reload files when switching agents
+  let prevSessionId = sessionId;
+  let prevCwd = agentCwd;
+  $: {
+    if (sessionId !== prevSessionId) {
+      inputText = '';
+      showSuggestions = false;
+      showFilePicker = false;
+      if (textareaEl) textareaEl.style.height = 'auto';
+      prevSessionId = sessionId;
+    }
+    if (agentCwd && agentCwd !== prevCwd) {
+      prevCwd = agentCwd;
+      listProjectFiles(agentCwd).then(files => projectFiles = files).catch(() => {});
+    }
+  }
 
   // Slash command filtering
   $: query = inputText.startsWith('/') ? inputText.toLowerCase() : '';
@@ -72,14 +82,19 @@
     if (atQuery === null) return [];
     if (atQuery === '') return projectFiles.slice(0, 15);
     const q = atQuery.toLowerCase();
-    const matches: string[] = [];
+    const nameMatches: string[] = [];
+    const pathMatches: string[] = [];
     for (const f of projectFiles) {
-      if (f.toLowerCase().includes(q)) {
-        matches.push(f);
-        if (matches.length >= 15) break;
+      const fl = f.toLowerCase();
+      const fileName = fl.split('/').pop() ?? '';
+      if (fileName.includes(q)) {
+        nameMatches.push(f);
+      } else if (fl.includes(q)) {
+        pathMatches.push(f);
       }
+      if (nameMatches.length + pathMatches.length >= 30) break;
     }
-    return matches;
+    return [...nameMatches, ...pathMatches].slice(0, 15);
   })();
 
   $: {

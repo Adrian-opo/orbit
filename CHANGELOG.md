@@ -1,40 +1,21 @@
 # Changelog
 
-Todas as alterações significativas do projeto Orbit são registradas aqui.
-Gerado automaticamente pelo hook `commit-msg` a cada commit.
+Novidades e melhorias do Orbit em linguagem simples.
 
 ---
 
-## [2026-04-06 15:36] feat: bash auto-run, progress streaming e rate limit handling
-**Branch:** `master` · **Autor:** josefernando · 10 files changed, 235 insertions(+), 20 deletions(-)
+## Abril 2026
 
-### Detalhes
-- Remove pending_approval para Bash (auto-run via --dangerously-skip-permissions)
-- Status do agente permanece Working durante execução de Bash (não Input)
-- Captura eventos progress do Claude para exibir output em tempo real
-- Novo tipo Progress em JournalEntryType; Feed.svelte agrupa com toolCall
-- Captura stderr do processo Claude para detectar rate limit
-- Emite session:rate-limit via Tauri; banner no frontend com auto-dismiss de 30s
-- kill_pid via taskkill no Windows ao parar sessão
+### Execução de comandos sem interrupção
+Comandos do terminal agora executam automaticamente, sem pedir confirmação a cada passo. O fluxo de trabalho do agente ficou mais fluido e sem pausas desnecessárias.
 
-### Arquivos alterados
-  - api/App.svelte
-  - api/components/Feed.svelte
-  - api/components/MetaPanel.svelte
-  - api/components/ToolCallEntry.svelte
-  - api/lib/tauri.ts
-  - api/lib/types.ts
-  - front/src/journal_reader.rs
-  - front/src/models.rs
-  - front/src/services/session_manager.rs
-  - front/src/services/spawn_manager.rs
+### Output em tempo real
+Durante a execução de comandos longos, o resultado aparece progressivamente na tela — sem precisar esperar o comando terminar para ver o que está acontecendo.
 
----
+### Aviso de limite de uso da API
+Quando o limite de uso da API do Claude é atingido, o app exibe uma mensagem clara na tela em vez de simplesmente parar de responder. O aviso some automaticamente após 30 segundos.
 
-## [2026-04-06] refactor: remove unnecessary comments across TS, Svelte, and Rust sources
-**Branch:** `master` · **Autor:** josefernando
-
-### Arquivos alterados
-  - (múltiplos arquivos — limpeza geral de comentários desnecessários)
+### Indicador de sessão parada
+Sessões encerradas agora exibem uma etiqueta "stopped" no painel lateral, tornando mais fácil identificar o estado de cada sessão.
 
 ---

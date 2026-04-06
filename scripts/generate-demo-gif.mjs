@@ -20,7 +20,7 @@ const ROOT = join(__dirname, '..');
 const VIEWPORT = { width: 1200, height: 750 };
 const GIF_W = 960;
 const GIF_H = 600;
-const FPS = 4;
+const FPS = 2;
 const FRAME_DELAY = Math.round(100 / FPS); // centiseconds
 const OUT = join(ROOT, 'demo.gif');
 
@@ -88,45 +88,45 @@ async function main() {
     }
   };
 
-  // Scene A: app loads — sidebar with 3 sessions (2s)
+  // Scene A: app loads — sidebar with 3 sessions (3s)
   console.log('Scene A: sidebar overview');
-  await hold(2000);
+  await hold(3000);
 
-  // Scene B: click session 1 "fix auth bug" (3s)
+  // Scene B: click session 1 "fix auth bug" (5s)
   console.log('Scene B: session 1 feed');
   const items = await page.$$('.item');
   if (items[0]) {
     await items[0].click();
-    await sleep(250);
+    await sleep(600);
   }
-  await hold(3000);
+  await hold(5000);
 
-  // Scene C: scroll feed down (2s)
+  // Scene C: scroll feed down (3s)
   console.log('Scene C: scroll feed');
   await page.evaluate(() => {
     const el = document.querySelector('.feed-wrap');
     if (el) el.scrollTop += 280;
   });
-  await sleep(200);
-  await hold(2000);
+  await sleep(400);
+  await hold(3000);
 
-  // Scene D: click session 2 — pending approval (3s)
+  // Scene D: click session 2 — pending approval (5s)
   console.log('Scene D: session 2 pending approval');
   const items2 = await page.$$('.item');
   if (items2[1]) {
     await items2[1].click();
-    await sleep(250);
+    await sleep(600);
   }
-  await hold(3000);
+  await hold(5000);
 
-  // Scene E: focus input and type a message (2.5s)
+  // Scene E: focus input and type a message (4s)
   console.log('Scene E: typing a message');
   const textarea = await page.$('textarea');
   if (textarea) {
     await textarea.click();
-    await page.keyboard.type('Run tests and fix any failures', { delay: 45 });
-    await sleep(300);
-    await hold(2500);
+    await page.keyboard.type('Run tests and fix any failures', { delay: 80 });
+    await sleep(500);
+    await hold(4000);
   }
 
   await browser.close();

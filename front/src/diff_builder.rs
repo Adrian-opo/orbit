@@ -97,7 +97,7 @@ pub fn build_diff(
         .count() as u32;
 
     Some(DiffResult {
-        file_path: file_hash.to_string(), // caller should map to real path
+        file_path: file_hash.to_string(),
         from_version,
         to_version,
         hunks,
@@ -108,7 +108,6 @@ pub fn build_diff(
 
 /// Simple line-by-line diff using longest common subsequence.
 fn compute_diff_hunks(old: &[&str], new: &[&str]) -> Vec<DiffHunk> {
-    // Build edit script using simple O(nm) LCS
     let m = old.len();
     let n = new.len();
 
@@ -151,7 +150,6 @@ fn compute_diff_hunks(old: &[&str], new: &[&str]) -> Vec<DiffHunk> {
         }
     }
 
-    // Group into hunks (split on runs of 3+ context lines)
     if lines.is_empty() {
         return vec![];
     }
@@ -169,7 +167,6 @@ fn compute_diff_hunks(old: &[&str], new: &[&str]) -> Vec<DiffHunk> {
             DiffLineKind::Context => {
                 context_run += 1;
                 if context_run > 3 && !current_lines.is_empty() {
-                    // End current hunk
                     hunks.push(DiffHunk {
                         old_start: hunk_old_start,
                         new_start: hunk_new_start,

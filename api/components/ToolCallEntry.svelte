@@ -63,7 +63,6 @@
 
   $: lang = detectLang(target);
 
-  // Diff lines — real Myers algorithm
   $: rawChunks = hasEditDiff
     ? diffLines(entry.toolInput!.old_string as string, entry.toolInput!.new_string as string)
     : [];
@@ -72,7 +71,6 @@
   $: inlineVisible = inlineLines.slice(0, 6);
   $: modalLines = buildModalLines(rawChunks);
 
-  // Write / Create lines (all additions)
   $: writeLines = hasWriteContent
     ? (entry.toolInput!.content as string)
         .split('\n')
@@ -198,7 +196,6 @@
     return result;
   }
 
-  // Strip "  123→" line number prefixes from Read output
   function stripLineNumbers(text: string): { lineNums: string[]; code: string } {
     const lines = text.split('\n');
     const lineNums: string[] = [];

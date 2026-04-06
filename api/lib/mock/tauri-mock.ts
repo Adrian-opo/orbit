@@ -1,14 +1,5 @@
-/**
- * Mock Tauri API for browser testing.
- * Simulates the full backend session lifecycle with fake data.
- *
- * Run with: VITE_MOCK=true npm run dev
- * Then open http://localhost:1420 in any browser.
- */
 import type { Session, TokenUsage } from '../stores/sessions';
 import type { JournalEntry, SlashCommand } from '../types';
-
-// ── Fake data ─────────────────────────────────────────────────
 
 const MOCK_SESSIONS: Session[] = [
   {
@@ -240,8 +231,6 @@ const MOCK_JOURNAL: Record<number, JournalEntry[]> = {
   3: [],
 };
 
-// ── Event emitters ─────────────────────────────────────────────
-
 type Listener = (payload: unknown) => void;
 const listeners: Map<string, Listener[]> = new Map();
 
@@ -259,8 +248,6 @@ export function mockListen(event: string, cb: Listener) {
     if (i !== -1) arr.splice(i, 1);
   };
 }
-
-// ── Mock invoke handlers ───────────────────────────────────────
 
 let nextId = 4;
 let sessions = [...MOCK_SESSIONS];
@@ -304,7 +291,6 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
       sessions.push(newSession);
       journals[id] = [];
 
-      // Simulate spawn lifecycle
       setTimeout(() => {
         sessions = sessions.map((s) =>
           s.id === id ? { ...s, status: 'running', pid: 10000 + id } : s
@@ -368,8 +354,6 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
       return null;
   }
 }
-
-// ── Simulate Claude response ───────────────────────────────────
 
 function simulateClaudeResponse(sessionId: number, userMsg: string) {
   if (!journals[sessionId]) journals[sessionId] = [];

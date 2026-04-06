@@ -9,7 +9,6 @@ interface ModelPricing {
   cacheWrite: number;
 }
 
-// Prices per 1M tokens (USD)
 const PRICING: Record<string, ModelPricing> = {
   'claude-opus-4-6': { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },
   'claude-opus-4-20250514': { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },

@@ -22,7 +22,6 @@ pub fn get_file_versions(session_id: String) -> Vec<diff_builder::FileVersionInf
 
 #[tauri::command]
 pub fn get_subagent_journal(session_id: String, subagent_id: String) -> Vec<JournalEntry> {
-    // Find the subagent JSONL path
     let projects_dir = match dirs::home_dir() {
         Some(h) => h.join(".claude").join("projects"),
         None => return vec![],
@@ -75,7 +74,6 @@ fn frontmatter_field(content: &str, field: &str) -> Option<String> {
 
 /// Scan a plugin directory for skills, commands and agents.
 fn scan_plugin(install_path: &Path, plugin_name: &str, out: &mut Vec<SlashCommand>) {
-    // Skills: skills/<name>/SKILL.md
     let skills_dir = install_path.join("skills");
     if let Ok(entries) = std::fs::read_dir(&skills_dir) {
         for entry in entries.flatten() {
@@ -85,7 +83,6 @@ fn scan_plugin(install_path: &Path, plugin_name: &str, out: &mut Vec<SlashComman
                     let name = frontmatter_field(&content, "name")
                         .unwrap_or_else(|| entry.file_name().to_string_lossy().to_string());
                     let desc = frontmatter_field(&content, "description").unwrap_or_default();
-                    // Truncate long descriptions
                     let desc_short = if desc.len() > 80 {
                         format!("{}...", &desc[..77])
                     } else {
@@ -101,7 +98,6 @@ fn scan_plugin(install_path: &Path, plugin_name: &str, out: &mut Vec<SlashComman
         }
     }
 
-    // Commands: commands/<name>.md (skip deprecated)
     let cmds_dir = install_path.join("commands");
     if let Ok(entries) = std::fs::read_dir(&cmds_dir) {
         for entry in entries.flatten() {
@@ -133,7 +129,6 @@ fn scan_plugin(install_path: &Path, plugin_name: &str, out: &mut Vec<SlashComman
         }
     }
 
-    // Agents: agents/<name>.md
     let agents_dir = install_path.join("agents");
     if let Ok(entries) = std::fs::read_dir(&agents_dir) {
         for entry in entries.flatten() {
@@ -167,7 +162,6 @@ fn scan_plugin(install_path: &Path, plugin_name: &str, out: &mut Vec<SlashComman
 pub fn get_slash_commands() -> Vec<SlashCommand> {
     let mut result: Vec<SlashCommand> = Vec::new();
 
-    // Built-in Claude Code commands (always available)
     let builtins = [
         ("/help", "Show help"),
         ("/compact", "Compact conversation context"),
@@ -194,7 +188,6 @@ pub fn get_slash_commands() -> Vec<SlashCommand> {
         });
     }
 
-    // Discover installed plugins
     let home = match dirs::home_dir() {
         Some(h) => h,
         None => return result,
@@ -241,8 +234,8 @@ pub fn list_project_files(cwd: String) -> Vec<String> {
 
     let mut files = Vec::new();
     let walker = WalkBuilder::new(&cwd)
-        .hidden(true) // skip hidden files
-        .git_ignore(true) // respect .gitignore
+        .hidden(true)
+        .git_ignore(true)
         .git_global(true)
         .git_exclude(true)
         .max_depth(Some(12))
@@ -267,44 +260,107 @@ pub fn list_project_files(cwd: String) -> Vec<String> {
     files
 }
 
+/// Extract tasks by scanning session_outputs for the last `TodoWrite` tool call.
+/// Claude Code emits tool_use blocks with name="TodoWrite" and input.todos=[...].
 #[tauri::command]
-pub fn get_tasks(session_id: String) -> Vec<TaskItem> {
-    let tasks_dir = match dirs::home_dir() {
-        Some(h) => h.join(".claude").join("tasks").join(&session_id),
-        None => return vec![],
-    };
-
-    let entries = match std::fs::read_dir(&tasks_dir) {
-        Ok(e) => e,
+pub fn get_tasks(
+    session_id: String,
+    state: tauri::State<crate::ipc::session::SessionState>,
+) -> Vec<TaskItem> {
+    let id: i64 = match session_id.parse() {
+        Ok(v) => v,
         Err(_) => return vec![],
     };
 
-    let mut tasks: Vec<TaskItem> = Vec::new();
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().is_none_or(|e| e != "json") {
-            continue;
+    let outputs = {
+        let m = state.0.lock().unwrap();
+        match m.db.get_outputs(id) {
+            Ok(o) => o,
+            Err(_) => return vec![],
         }
-        let content = match std::fs::read_to_string(&path) {
-            Ok(c) => c,
+    };
+
+    // Find the last TodoWrite call — its todos list represents the current state.
+    let mut last_todos: Option<Vec<TaskItem>> = None;
+
+    for raw in &outputs {
+        let val: serde_json::Value = match serde_json::from_str(raw) {
+            Ok(v) => v,
             Err(_) => continue,
         };
-        if let Ok(task) = serde_json::from_str::<TaskItem>(&content) {
-            if task.status != "deleted" {
-                tasks.push(task);
+
+        if val.get("type").and_then(|t| t.as_str()) != Some("assistant") {
+            continue;
+        }
+
+        let content = match val
+            .get("message")
+            .and_then(|m| m.get("content"))
+            .and_then(|c| c.as_array())
+        {
+            Some(c) => c,
+            None => continue,
+        };
+
+        for block in content {
+            if block.get("type").and_then(|t| t.as_str()) != Some("tool_use") {
+                continue;
             }
+            if block.get("name").and_then(|n| n.as_str()) != Some("TodoWrite") {
+                continue;
+            }
+
+            let todos_val = match block.get("input").and_then(|i| i.get("todos")) {
+                Some(t) => t,
+                None => continue,
+            };
+
+            let todos: Vec<TaskItem> = todos_val
+                .as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, t)| {
+                    let id_str = t
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| (idx + 1).to_string());
+                    let subject = t
+                        .get("content")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let status = t
+                        .get("status")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("pending")
+                        .to_string();
+                    if status == "deleted" || subject.is_empty() {
+                        return None;
+                    }
+                    let active_form = t
+                        .get("activeForm")
+                        .or_else(|| t.get("active_form"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    Some(TaskItem {
+                        id: id_str,
+                        subject,
+                        description: String::new(),
+                        active_form,
+                        status,
+                        blocks: vec![],
+                        blocked_by: vec![],
+                    })
+                })
+                .collect();
+
+            last_todos = Some(todos);
         }
     }
 
-    // Sort by ID numerically
-    tasks.sort_by(|a, b| {
-        let a_num: u32 = a.id.parse().unwrap_or(u32::MAX);
-        let b_num: u32 = b.id.parse().unwrap_or(u32::MAX);
-        a_num.cmp(&b_num)
-    });
-
-    tasks
+    last_todos.unwrap_or_default()
 }
 
 #[derive(serde::Serialize)]
@@ -355,7 +411,6 @@ pub fn get_claude_usage_stats() -> ClaudeUsageStats {
     let mut weekly_messages: u64 = 0;
     let mut today_messages: u64 = 0;
 
-    // Sum tokens from dailyModelTokens
     if let Some(arr) = json.get("dailyModelTokens").and_then(|v| v.as_array()) {
         for entry in arr {
             let date = entry.get("date").and_then(|d| d.as_str()).unwrap_or("");
@@ -371,7 +426,6 @@ pub fn get_claude_usage_stats() -> ClaudeUsageStats {
         }
     }
 
-    // Sum messages from dailyActivity
     if let Some(arr) = json.get("dailyActivity").and_then(|v| v.as_array()) {
         for entry in arr {
             let date = entry.get("date").and_then(|d| d.as_str()).unwrap_or("");

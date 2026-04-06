@@ -22,7 +22,6 @@ pub fn create_session(
 ) -> Result<Session, String> {
     let mode = permission_mode.unwrap_or_else(|| "ignore".to_string());
 
-    // Phase 1: fast — create DB record, return session immediately
     let session = {
         let mut m = state.0.lock().unwrap();
         m.init_session(
@@ -37,7 +36,6 @@ pub fn create_session(
     use tauri::Emitter;
     let _ = app.emit("session:created", &session);
 
-    // Phase 2: spawn Claude in background with -p flag
     let manager = Arc::clone(&state.0);
     let session_id = session.id;
     std::thread::spawn(move || {
@@ -53,8 +51,18 @@ pub fn list_sessions(state: State<SessionState>) -> Vec<Session> {
 }
 
 #[tauri::command]
-pub fn stop_session(session_id: SessionId, state: State<SessionState>) -> Result<(), String> {
-    state.0.lock().unwrap().stop_session(session_id)
+pub fn stop_session(
+    session_id: SessionId,
+    state: State<SessionState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    state.0.lock().unwrap().stop_session(session_id)?;
+    use tauri::Emitter;
+    let _ = app.emit(
+        "session:stopped",
+        serde_json::json!({ "sessionId": session_id }),
+    );
+    Ok(())
 }
 
 #[tauri::command]

@@ -202,7 +202,6 @@
     margin-top: 3px;
   }
 
-  /* Modal */
   .modal-backdrop {
     position: fixed;
     top: 0;

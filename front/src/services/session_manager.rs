@@ -205,7 +205,6 @@ impl SessionManager {
             exit_code: None,
             lines_changed: None,
         };
-        // Persist to DB as a synthetic user line
         let user_line = serde_json::json!({
             "type": "user",
             "message": { "content": &prompt_text },
@@ -214,7 +213,6 @@ impl SessionManager {
         .to_string();
         let _ = db.insert_output(session_id, &user_line);
 
-        // Update in-memory journal
         {
             let mut m = manager.lock().unwrap();
             let state = m.journal_states.entry(session_id).or_default();
@@ -268,7 +266,6 @@ impl SessionManager {
                         }
                     }
 
-                    // Persist + process
                     let _ = db.insert_output(session_id, &trimmed);
 
                     let (new_entries, state_event) = {
@@ -330,7 +327,6 @@ impl SessionManager {
             }
         }
 
-        // Process exited
         {
             let mut m = manager.lock().unwrap();
             if let Some(a) = m.active.get_mut(&session_id) {
@@ -369,11 +365,6 @@ impl SessionManager {
                         .map_err(|e| e.to_string())?
                         .ok_or_else(|| format!("Session {session_id} not found"))?;
 
-                if session.status == crate::models::SessionStatus::Stopped.as_str() {
-                    return Err(format!("Session {session_id} was stopped"));
-                }
-
-                // Restore with claude_session_id from DB
                 let claude_session_id = m.db.get_claude_session_id(session_id).ok().flatten();
 
                 m.active.insert(
@@ -387,7 +378,6 @@ impl SessionManager {
             }
         }
 
-        // Spawn follow-up in background thread
         let manager_clone = Arc::clone(&manager);
         std::thread::spawn(move || {
             Self::do_spawn(manager_clone, app, session_id, text);

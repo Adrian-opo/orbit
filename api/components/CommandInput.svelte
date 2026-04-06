@@ -17,7 +17,6 @@
   let suggestionEls: HTMLButtonElement[] = [];
   let suggestionsContainer: HTMLDivElement | null = null;
 
-  // @ file picker state
   let projectFiles: string[] = [];
   let showFilePicker = false;
   let fileSelectedIdx = 0;
@@ -57,7 +56,6 @@
     }
   });
 
-  // Reset input and reload files when switching agents
   let prevSessionId = sessionId;
   let prevCwd = '';
   $: {
@@ -76,7 +74,6 @@
     }
   }
 
-  // Slash command filtering
   $: query = inputText.startsWith('/') ? inputText.toLowerCase() : '';
   $: filtered = query ? commands.filter((c) => c.cmd.toLowerCase().includes(query)) : [];
   $: {
@@ -84,7 +81,6 @@
     if (selectedIdx >= filtered.length) selectedIdx = 0;
   }
 
-  // @ file picker: detect "@" token at cursor position
   function getAtQuery(): string | null {
     if (!textareaEl) return null;
     const pos = textareaEl.selectionStart;
@@ -237,7 +233,6 @@
       }
     }
 
-    // Slash command navigation (existing)
     if (showSuggestions) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -332,13 +327,6 @@
     </div>
     <button class="send-btn" onclick={handleSend}>Send</button>
   </div>
-  <!-- quick-actions commented out — replaced by rotating hints -->
-  <!-- <div class="quick-actions">
-    <button onclick={() => handleQuickAction('y')}>y</button>
-    <button onclick={() => handleQuickAction('n')}>n</button>
-    <button onclick={() => handleQuickAction('yes, and continue')}>yes, and continue</button>
-    <button class="ctrl-c" onclick={() => handleQuickAction('\x03')}>Ctrl+C</button>
-  </div> -->
   <div class="hint-bar" class:fade-out={!hintVisible}>
     <span class="hint-icon">◎</span>
     {currentHint}
@@ -395,8 +383,6 @@
     font-size: 13px;
     cursor: pointer;
   }
-  /* .quick-actions styles kept for reference but section is hidden */
-
   .hint-bar {
     margin-top: 6px;
     font-size: 11px;

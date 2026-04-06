@@ -4,10 +4,6 @@ import type { Session, TokenUsage, MiniLogEntry } from './stores/sessions';
 import type { JournalEntry, SlashCommand, TaskItem } from './types';
 import { mockInvoke, mockListen } from './mock/tauri-mock';
 
-// ── Mock / Real API switch ─────────────────────────────────────
-// npm run dev:mock  →  browser mode with fake data (no Rust backend needed)
-// npm run tauri dev →  real Tauri backend
-
 const IS_MOCK =
   import.meta.env.VITE_MOCK === 'true' ||
   !(window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
@@ -24,8 +20,6 @@ function listen<T>(event: string, cb: (e: { payload: T }) => void): Promise<() =
   }
   return _listen<T>(event, cb);
 }
-
-// ── Session IPC ────────────────────────────────────────────────
 
 export interface CreateSessionOptions {
   projectPath: string;
@@ -61,8 +55,6 @@ export async function getSessionJournal(sessionId: number): Promise<JournalEntry
   return await invoke('get_session_journal', { sessionId });
 }
 
-// ── Project IPC ────────────────────────────────────────────────
-
 export async function createProject(name: string, path: string) {
   return await invoke('create_project', { name, path });
 }
@@ -70,8 +62,6 @@ export async function createProject(name: string, path: string) {
 export async function listProjects() {
   return await invoke('list_projects');
 }
-
-// ── Read-only commands (unchanged) ────────────────────────────
 
 export async function getSubagentJournal(
   sessionId: string,
@@ -102,8 +92,6 @@ export interface ClaudeUsageStats {
 export async function getClaudeUsageStats(): Promise<ClaudeUsageStats> {
   return await invoke('get_claude_usage_stats');
 }
-
-// ── Event listeners ────────────────────────────────────────────
 
 export interface SessionOutputPayload {
   sessionId: number;

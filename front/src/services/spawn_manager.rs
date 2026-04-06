@@ -162,7 +162,6 @@ pub fn spawn_claude(config: SpawnConfig) -> Result<SpawnHandle, String> {
         }
     }
 
-    // Resume previous conversation if we have a Claude session ID
     if let Some(ref resume_id) = config.claude_session_id {
         cmd.args(["--resume", resume_id]);
     }

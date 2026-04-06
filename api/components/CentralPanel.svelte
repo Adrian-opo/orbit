@@ -26,7 +26,6 @@
 
   $: if (session) loadHistory(session.id);
 
-  // Auto-scroll when new entries arrive
   // Clear pending only when assistant responds (not on user entry echo)
   $: {
     const e = $journal.get(session?.id);

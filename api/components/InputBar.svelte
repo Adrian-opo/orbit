@@ -52,7 +52,6 @@
     }
   });
 
-  // Reset on session switch
   let prevId = sessionId;
   $: if (sessionId !== prevId) {
     text = '';
@@ -60,7 +59,6 @@
     if (textarea) textarea.style.height = 'auto';
   }
 
-  // Load files when cwd changes
   let prevCwd = '';
   $: if (cwd && cwd !== prevCwd) {
     prevCwd = cwd;
@@ -69,7 +67,6 @@
       .catch((e) => console.warn('[InputBar] listProjectFiles failed:', e));
   }
 
-  // Slash suggestions
   $: suggestions =
     text.startsWith('/') && text.length > 1
       ? commands.filter((c) => c.cmd.toLowerCase().includes(text.toLowerCase())).slice(0, 8)
@@ -77,7 +74,6 @@
   $: showSuggestions = suggestions.length > 0;
   $: if (selIdx >= suggestions.length) selIdx = 0;
 
-  // @ file suggestions
   function atQuery(): string | null {
     if (!textarea) return null;
     const before = text.slice(0, textarea.selectionStart);
@@ -245,7 +241,9 @@
       on:input={autoResize}
       placeholder={sessionStatus === 'initializing'
         ? 'waiting for session to start...'
-        : 'message... (/ for commands, @ for files)'}
+        : sessionStatus === 'stopped'
+          ? 'session stopped — type to resume...'
+          : 'message... (/ for commands, @ for files)'}
       rows="1"
       disabled={sessionStatus === 'initializing'}
     ></textarea>
@@ -257,13 +255,6 @@
     >
   </div>
 
-  <!-- quick-row commented out — replaced by rotating hints -->
-  <!-- <div class="quick-row">
-    <button class="qb" on:click={() => quickAction('y')}>y</button>
-    <button class="qb" on:click={() => quickAction('n')}>n</button>
-    <button class="qb" on:click={() => quickAction('yes, continue')}>yes, continue</button>
-    <button class="qb danger" on:click={() => quickAction('\x03')}>ctrl+c</button>
-  </div> -->
   <div class="hint-bar" class:fade-out={!hintVisible}>
     <span class="hint-icon">◎</span>
     {currentHint}
@@ -384,8 +375,6 @@
   .send-btn:disabled {
     opacity: 0.3;
   }
-
-  /* .quick-row styles kept for reference but section is hidden */
 
   .hint-bar {
     padding: 0 10px 7px;

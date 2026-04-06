@@ -8,7 +8,6 @@
 
   $: isWorking = ['working', 'running'].includes(status);
 
-  // Pair toolCall with its toolResult
   interface DisplayItem {
     entry: JournalEntry;
     result: JournalEntry | null;
@@ -29,7 +28,6 @@
           items.push({ entry: e, result: null });
         }
       } else if (e.entryType === 'toolResult') {
-        // orphan — skip, already handled
       } else {
         items.push({ entry: e, result: null });
       }

@@ -97,7 +97,6 @@ pub fn parse_journal(
 
     let file_size = file.metadata().map(|m| m.len()).unwrap_or(0);
     if file_size == prev_file_size && prev_file_size > 0 {
-        // Re-derive status from tail even if no new data
         state.status = derive_status_from_tail(path, state.input_tokens, state.output_tokens);
         state.file_size = file_size;
         return state;
@@ -107,7 +106,6 @@ pub fn parse_journal(
     if prev_file_size > 0 {
         let _ = reader.seek(SeekFrom::Start(prev_file_size));
     } else {
-        // Fresh parse — reset accumulators
         state.entries.clear();
         state.input_tokens = 0;
         state.output_tokens = 0;
@@ -217,7 +215,6 @@ pub fn parse_journal(
                                         .unwrap_or("")
                                         .to_string();
                                     if !text.is_empty() {
-                                        // Calculate thinking duration if we had a thinking block
                                         let duration =
                                             last_thinking_ts.take().and_then(|think_ts| {
                                                 let t1 = think_ts
@@ -229,7 +226,6 @@ pub fn parse_journal(
                                                 Some((t2 - t1).num_milliseconds() as f64 / 1000.0)
                                             });
 
-                                        // Update thinking_duration on the last thinking entry
                                         if let Some(d) = duration {
                                             if let Some(last) = state.entries.last_mut() {
                                                 if last.entry_type == JournalEntryType::Thinking {
@@ -261,7 +257,6 @@ pub fn parse_journal(
                                         .to_string();
                                     let input = block.get("input").cloned();
 
-                                    // Build mini log entry
                                     let target = extract_tool_target(&tool_name, &input);
                                     state.mini_log.push(MiniLogEntry {
                                         tool: tool_name.clone(),
@@ -269,7 +264,6 @@ pub fn parse_journal(
                                         result: None,
                                         success: None,
                                     });
-                                    // Keep only last 4
                                     if state.mini_log.len() > 4 {
                                         state.mini_log.remove(0);
                                     }
@@ -311,7 +305,6 @@ pub fn parse_journal(
                                         .unwrap_or("")
                                         .to_string();
 
-                                    // Update last mini log entry with result
                                     if let Some(last) = state.mini_log.last_mut() {
                                         last.success = Some(
                                             !output_text.contains("error")
@@ -335,7 +328,6 @@ pub fn parse_journal(
                                 }
                             }
                         }
-                        // Plain user text
                         else if let Some(text) = content.as_str() {
                             if !text.is_empty() {
                                 state.entries.push(JournalEntry {
@@ -360,10 +352,8 @@ pub fn parse_journal(
         }
     }
 
-    // Derive current status from the tail of the file
     state.status = derive_status_from_tail(path, state.input_tokens, state.output_tokens);
 
-    // Check for pending approval (last entry is tool_use with no tool_result)
     state.pending_approval = detect_pending_approval(&state.entries);
 
     state.file_size = file_size;
@@ -394,10 +384,7 @@ fn extract_tool_target(tool: &str, input: &Option<Value>) -> String {
             input
                 .get("file_path")
                 .and_then(|v| v.as_str())
-                .map(|p| {
-                    // Show just the basename
-                    p.rsplit(&['/', '\\']).next().unwrap_or(p).to_string()
-                })
+                .map(|p| p.rsplit(&['/', '\\']).next().unwrap_or(p).to_string())
                 .unwrap_or_default()
         }
         "Grep" => input
@@ -595,7 +582,6 @@ pub fn process_line(state: &mut JournalState, line: &str) {
         return;
     }
 
-    // Skip synthetic messages
     if trimmed.contains("\"<synthetic>\"") {
         return;
     }
@@ -615,12 +601,10 @@ pub fn process_line(state: &mut JournalState, line: &str) {
             let mut end_turn = false;
 
             if let Some(msg) = &raw.message {
-                // Extract model
                 if let Some(m) = msg.get("model").and_then(|v| v.as_str()) {
                     state.model = Some(m.to_string());
                 }
 
-                // Extract token usage
                 if let Some(usage) = msg.get("usage") {
                     state.input_tokens = usage
                         .get("input_tokens")
@@ -654,7 +638,6 @@ pub fn process_line(state: &mut JournalState, line: &str) {
                     }
                 }
 
-                // Extract content blocks
                 if let Some(content) = msg.get("content").and_then(|v| v.as_array()) {
                     for block in content {
                         let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
@@ -743,7 +726,6 @@ pub fn process_line(state: &mut JournalState, line: &str) {
                 }
             }
 
-            // Update status
             if end_turn {
                 state.status = AgentStatus::Idle;
                 state.pending_approval = None;

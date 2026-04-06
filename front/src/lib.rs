@@ -47,7 +47,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // New orchestrator commands
             ipc::session::create_session,
             ipc::session::list_sessions,
             ipc::session::stop_session,
@@ -59,7 +58,6 @@ pub fn run() {
             ipc::session::delete_session,
             ipc::project::create_project,
             ipc::project::list_projects,
-            // Keep existing read-only commands
             commands::get_diff,
             commands::get_file_versions,
             commands::get_subagent_journal,

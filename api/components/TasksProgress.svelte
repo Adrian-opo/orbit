@@ -25,7 +25,6 @@
     if (pollInterval) clearInterval(pollInterval);
   });
 
-  // Re-fetch when sessionId changes
   $: if (sessionId) loadTasks();
 
   $: completedCount = tasks.filter((t) => t.status === 'completed').length;
@@ -33,8 +32,6 @@
   $: pendingCount = tasks.filter((t) => t.status === 'pending').length;
   $: totalCount = tasks.length;
   $: progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-
-  // Build a set of task IDs for quick lookup
 
   function statusDot(status: string): string {
     if (status === 'completed') return 'dot-completed';

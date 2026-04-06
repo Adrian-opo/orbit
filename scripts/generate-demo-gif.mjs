@@ -110,21 +110,21 @@ async function main() {
   await sleep(400);
   await hold(3000);
 
-  // Scene D: click session 2 — pending approval (5s)
-  console.log('Scene D: session 2 pending approval');
+  // Scene D: click session 2 — show feed (4s)
+  console.log('Scene D: session 2 feed');
   const items2 = await page.$$('.item');
   if (items2[1]) {
     await items2[1].click();
     await sleep(600);
   }
-  await hold(5000);
+  await hold(4000);
 
   // Scene E: focus input and type a message (4s)
   console.log('Scene E: typing a message');
   const textarea = await page.$('textarea');
   if (textarea) {
     await textarea.click();
-    await page.keyboard.type('Run tests and fix any failures', { delay: 80 });
+    await page.keyboard.type('Add unit tests for the Chart component', { delay: 80 });
     await sleep(500);
     await hold(4000);
   }

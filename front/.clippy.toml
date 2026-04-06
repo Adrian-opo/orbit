@@ -1,0 +1,3 @@
+msrv = "1.85"
+# Suppress MSRV warnings for stdlib APIs — we target latest stable
+avoid-breaking-exported-api = false

@@ -179,7 +179,7 @@ impl SessionManager {
         // Update in-memory journal
         {
             let mut m = manager.lock().unwrap();
-            let state = m.journal_states.entry(session_id).or_insert_with(JournalState::default);
+            let state = m.journal_states.entry(session_id).or_default();
             state.entries.push(user_entry.clone());
         }
 
@@ -234,7 +234,7 @@ impl SessionManager {
                         let mut m = manager.lock().unwrap();
                         let state = m.journal_states
                             .entry(session_id)
-                            .or_insert_with(JournalState::default);
+                            .or_default();
 
                         let prev_len = state.entries.len();
                         process_line(state, &trimmed);
@@ -322,7 +322,7 @@ impl SessionManager {
                     session,
                     claude_session_id,
                 });
-                m.journal_states.entry(session_id).or_insert_with(JournalState::default);
+                m.journal_states.entry(session_id).or_default();
             }
         }
 

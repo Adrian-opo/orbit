@@ -10,9 +10,37 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: front -> front/target
+
+      - run: npm ci
+
+      - name: Clippy (Rust)
+        run: cargo clippy --manifest-path front/Cargo.toml -- -D warnings
+
+      - name: svelte-check (TypeScript)
+        run: npx svelte-check --tsconfig tsconfig.json --fail-on-warnings
+
   build-windows:
     name: Build Windows (.exe)
     runs-on: windows-latest
+    needs: lint
 
     steps:
       - name: Checkout

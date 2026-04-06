@@ -101,7 +101,7 @@ fn scan_plugin(install_path: &Path, plugin_name: &str, out: &mut Vec<SlashComman
     if let Ok(entries) = std::fs::read_dir(&cmds_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "md") {
+            if path.extension().is_some_and(|e| e == "md") {
                 if let Ok(content) = std::fs::read_to_string(&path) {
                     let desc = frontmatter_field(&content, "description")
                         .unwrap_or_default();
@@ -130,7 +130,7 @@ fn scan_plugin(install_path: &Path, plugin_name: &str, out: &mut Vec<SlashComman
     if let Ok(entries) = std::fs::read_dir(&agents_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "md") {
+            if path.extension().is_some_and(|e| e == "md") {
                 if let Ok(content) = std::fs::read_to_string(&path) {
                     let name = frontmatter_field(&content, "name")
                         .unwrap_or_else(|| path.file_stem().unwrap_or_default().to_string_lossy().to_string());
@@ -235,7 +235,7 @@ pub fn list_project_files(cwd: String) -> Vec<String> {
         .build();
 
     for entry in walker.flatten() {
-        if !entry.file_type().map_or(false, |ft| ft.is_file()) {
+        if !entry.file_type().is_some_and(|ft| ft.is_file()) {
             continue;
         }
         if let Ok(rel) = entry.path().strip_prefix(&cwd) {
@@ -269,7 +269,7 @@ pub fn get_tasks(session_id: String) -> Vec<TaskItem> {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if !path.extension().is_some_and(|e| e == "json") {
+        if path.extension().is_none_or(|e| e != "json") {
             continue;
         }
         let content = match std::fs::read_to_string(&path) {

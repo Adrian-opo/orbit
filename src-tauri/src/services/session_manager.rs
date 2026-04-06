@@ -360,4 +360,199 @@ impl SessionManager {
             self.journal_states.insert(session.id, state);
         }
     }
+
+    /// Rename a session (updates DB name field).
+    pub fn rename_session(&mut self, session_id: SessionId, name: &str) -> Result<(), String> {
+        self.db.rename_session(session_id, name).map_err(|e| e.to_string())
+    }
+
+    /// Delete a session: stop if active, remove from DB.
+    pub fn delete_session(&mut self, session_id: SessionId) -> Result<(), String> {
+        self.active.remove(&session_id);
+        self.journal_states.remove(&session_id);
+        self.db.delete_session(session_id).map_err(|e| e.to_string())
+    }
+
+    /// Returns true if the session is in the active (spawned) map.
+    pub fn is_session_active(&self, session_id: SessionId) -> bool {
+        self.active.contains_key(&session_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    use crate::services::database::DatabaseService;
+
+    fn make_manager() -> Arc<Mutex<SessionManager>> {
+        let db = Arc::new(DatabaseService::open_in_memory().unwrap());
+        Arc::new(Mutex::new(SessionManager::new(db)))
+    }
+
+    // ── init_session ───────────────────────────────────────────
+
+    #[test]
+    fn test_init_session_creates_db_record() {
+        let mgr = make_manager();
+        let session = mgr.lock().unwrap()
+            .init_session("/tmp/myproject", None, "ignore", None)
+            .unwrap();
+
+        assert!(session.id > 0);
+        assert_eq!(session.status, "initializing");
+        assert_eq!(session.cwd, Some("/tmp/myproject".to_string()));
+        assert_eq!(session.permission_mode, "ignore");
+        assert!(session.pid.is_none());
+    }
+
+    #[test]
+    fn test_init_session_with_model_and_name() {
+        let mgr = make_manager();
+        let session = mgr.lock().unwrap()
+            .init_session("/tmp/proj", Some("fix bug"), "ignore", Some("claude-sonnet-4-6"))
+            .unwrap();
+
+        assert_eq!(session.name, Some("fix bug".to_string()));
+        assert_eq!(session.model, Some("claude-sonnet-4-6".to_string()));
+    }
+
+    #[test]
+    fn test_init_session_populates_journal_state() {
+        let mgr = make_manager();
+        let session = mgr.lock().unwrap()
+            .init_session("/tmp/proj", None, "ignore", None)
+            .unwrap();
+
+        // Journal state should be pre-seeded (even if empty)
+        let m = mgr.lock().unwrap();
+        assert!(m.journal_states.contains_key(&session.id));
+    }
+
+    // ── send_message ───────────────────────────────────────────
+
+    #[test]
+    fn test_send_message_fails_when_not_active() {
+        let mgr = make_manager();
+        let session = mgr.lock().unwrap()
+            .init_session("/tmp/proj", None, "ignore", None)
+            .unwrap();
+
+        // Session is initializing — not in active map yet
+        let result = mgr.lock().unwrap().send_message(session.id, "hello");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("not active"), "Expected 'not active' in: {err}");
+    }
+
+    #[test]
+    fn test_send_message_to_nonexistent_session() {
+        let mgr = make_manager();
+        let result = mgr.lock().unwrap().send_message(999, "hello");
+        assert!(result.is_err());
+    }
+
+    // ── get_sessions ───────────────────────────────────────────
+
+    #[test]
+    fn test_get_sessions_returns_all_db_sessions() {
+        let mgr = make_manager();
+        {
+            let mut m = mgr.lock().unwrap();
+            m.init_session("/tmp/a", None, "ignore", None).unwrap();
+            m.init_session("/tmp/b", Some("task"), "approve", None).unwrap();
+        }
+
+        let sessions = mgr.lock().unwrap().get_sessions();
+        assert_eq!(sessions.len(), 2);
+        // Ordered by created_at DESC
+        let cwds: Vec<_> = sessions.iter().map(|s| s.cwd.as_deref().unwrap_or("")).collect();
+        assert!(cwds.contains(&"/tmp/a"));
+        assert!(cwds.contains(&"/tmp/b"));
+    }
+
+    #[test]
+    fn test_get_sessions_empty_initially() {
+        let mgr = make_manager();
+        let sessions = mgr.lock().unwrap().get_sessions();
+        assert!(sessions.is_empty());
+    }
+
+    // ── stop_session ───────────────────────────────────────────
+
+    #[test]
+    fn test_stop_session_updates_db_status() {
+        let mgr = make_manager();
+        let session = mgr.lock().unwrap()
+            .init_session("/tmp/proj", None, "ignore", None)
+            .unwrap();
+
+        mgr.lock().unwrap().stop_session(session.id).unwrap();
+
+        let sessions = mgr.lock().unwrap().get_sessions();
+        assert_eq!(sessions[0].status, "stopped");
+    }
+
+    // ── is_session_active ──────────────────────────────────────
+
+    #[test]
+    fn test_is_session_active_false_after_init() {
+        let mgr = make_manager();
+        let session = mgr.lock().unwrap()
+            .init_session("/tmp/proj", None, "ignore", None)
+            .unwrap();
+
+        assert!(!mgr.lock().unwrap().is_session_active(session.id));
+    }
+
+    // ── rename / delete ────────────────────────────────────────
+
+    #[test]
+    fn test_rename_session() {
+        let mgr = make_manager();
+        let session = mgr.lock().unwrap()
+            .init_session("/tmp/proj", None, "ignore", None)
+            .unwrap();
+
+        mgr.lock().unwrap().rename_session(session.id, "my task").unwrap();
+
+        let sessions = mgr.lock().unwrap().get_sessions();
+        assert_eq!(sessions[0].name, Some("my task".to_string()));
+    }
+
+    #[test]
+    fn test_delete_session_removes_from_db_and_state() {
+        let mgr = make_manager();
+        let session = mgr.lock().unwrap()
+            .init_session("/tmp/proj", None, "ignore", None)
+            .unwrap();
+
+        assert_eq!(mgr.lock().unwrap().get_sessions().len(), 1);
+
+        mgr.lock().unwrap().delete_session(session.id).unwrap();
+
+        assert_eq!(mgr.lock().unwrap().get_sessions().len(), 0);
+        assert!(!mgr.lock().unwrap().journal_states.contains_key(&session.id));
+    }
+
+    // ── restore_from_db ────────────────────────────────────────
+
+    #[test]
+    fn test_restore_from_db_rebuilds_journal_state() {
+        let db = Arc::new(DatabaseService::open_in_memory().unwrap());
+        let session_id = db.create_session(None, None, "/tmp/proj", "ignore", None).unwrap();
+
+        // Insert a couple of JSONL lines
+        let line1 = r#"{"type":"assistant","message":{"model":"claude-sonnet-4-6","content":[{"type":"text","text":"Hello!"}],"usage":{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
+        let line2 = r#"{"type":"assistant","message":{"model":"claude-sonnet-4-6","stop_reason":"end_turn","content":[{"type":"text","text":"Done."}],"usage":{"input_tokens":15,"output_tokens":8,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
+        db.insert_output(session_id, line1).unwrap();
+        db.insert_output(session_id, line2).unwrap();
+
+        let mut sm = SessionManager::new(db);
+        sm.restore_from_db();
+
+        let journal = sm.get_journal(session_id);
+        assert_eq!(journal.len(), 2, "Should have 2 journal entries (Hello + Done)");
+        assert_eq!(journal[0].entry_type, crate::models::JournalEntryType::Assistant);
+    }
 }

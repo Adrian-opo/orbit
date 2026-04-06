@@ -110,3 +110,22 @@ export function onSessionError(cb: (sessionId: number, error: string) => void) {
     cb(e.payload.sessionId, e.payload.error)
   );
 }
+
+export interface ClaudeCheck {
+  found: boolean;
+  path: string | null;
+  searchedPath?: string;
+  hint?: string;
+}
+
+export async function checkClaude(): Promise<ClaudeCheck> {
+  return await invoke('check_claude');
+}
+
+export async function renameSession(sessionId: number, name: string): Promise<void> {
+  await invoke('rename_session', { sessionId, name });
+}
+
+export async function deleteSession(sessionId: number): Promise<void> {
+  await invoke('delete_session', { sessionId });
+}

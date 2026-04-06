@@ -3,6 +3,7 @@ use tauri::{AppHandle, State};
 
 use crate::models::{Session, SessionId, JournalEntry};
 use crate::services::session_manager::SessionManager;
+use crate::services::spawn_manager::find_claude;
 
 pub struct SessionState(pub Arc<Mutex<SessionManager>>);
 
@@ -64,4 +65,40 @@ pub fn send_session_message(
 #[tauri::command]
 pub fn get_session_journal(session_id: SessionId, state: State<SessionState>) -> Vec<JournalEntry> {
     state.0.lock().unwrap().get_journal(session_id)
+}
+
+/// Diagnostic: check if claude CLI is available and return its path or an error message.
+#[tauri::command]
+pub fn check_claude() -> serde_json::Value {
+    match find_claude() {
+        Some(path) => serde_json::json!({ "found": true, "path": path }),
+        None => {
+            let path_var = std::env::var("PATH").unwrap_or_default();
+            serde_json::json!({
+                "found": false,
+                "path": null,
+                "searchedPath": path_var,
+                "hint": "Install with: npm install -g @anthropic-ai/claude-code"
+            })
+        }
+    }
+}
+
+/// Rename a session.
+#[tauri::command]
+pub fn rename_session(
+    session_id: SessionId,
+    name: String,
+    state: State<SessionState>,
+) -> Result<(), String> {
+    state.0.lock().unwrap().rename_session(session_id, &name)
+}
+
+/// Delete a session (removes from DB, stops if running).
+#[tauri::command]
+pub fn delete_session(
+    session_id: SessionId,
+    state: State<SessionState>,
+) -> Result<(), String> {
+    state.0.lock().unwrap().delete_session(session_id)
 }

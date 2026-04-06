@@ -51,6 +51,9 @@ pub fn run() {
             ipc::session::stop_session,
             ipc::session::send_session_message,
             ipc::session::get_session_journal,
+            ipc::session::check_claude,
+            ipc::session::rename_session,
+            ipc::session::delete_session,
             ipc::project::create_project,
             ipc::project::list_projects,
             // Keep existing read-only commands

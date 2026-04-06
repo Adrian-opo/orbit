@@ -1,10 +1,55 @@
 <script lang="ts">
-  import { sessions, selectedSessionId } from '../lib/stores/sessions';
+  import { sessions, selectedSessionId, updateSessionState } from '../lib/stores/sessions';
   import { statusColor, statusLabel, isPulsing } from '../lib/status';
   import NewSessionModal from './NewSessionModal.svelte';
-  import { estimateCost, formatCost, formatTokens } from '../lib/cost';
+  import ContextMenu from './ContextMenu.svelte';
+  import { estimateCost, formatCost, formatTokens, renameSession, deleteSession } from '../lib/tauri';
+
+  // Context menu state
+  let ctxMenu: { x: number; y: number; sessionId: number; sessionName: string } | null = null;
+  let renaming: { id: number; value: string } | null = null;
+
+  function onContextMenu(e: MouseEvent, s: typeof $sessions[0]) {
+    e.preventDefault();
+    ctxMenu = { x: e.clientX, y: e.clientY, sessionId: s.id, sessionName: s.name ?? s.projectName ?? `#${s.id}` };
+  }
+
+  async function handleCtxAction(action: string) {
+    if (!ctxMenu) return;
+    const { sessionId, sessionName } = ctxMenu;
+    ctxMenu = null;
+
+    if (action === 'rename') {
+      renaming = { id: sessionId, value: sessionName };
+    } else if (action === 'delete') {
+      if (confirm(`Delete session "${sessionName}"?`)) {
+        await deleteSession(sessionId);
+        sessions.update(l => l.filter(s => s.id !== sessionId));
+        if ($selectedSessionId === sessionId) selectedSessionId.set(null);
+      }
+    } else if (action === 'stop') {
+      try {
+        const { stopSession } = await import('../lib/tauri');
+        await stopSession(sessionId);
+      } catch {}
+    }
+  }
+
+  async function submitRename() {
+    if (!renaming) return;
+    const { id, value } = renaming;
+    renaming = null;
+    if (!value.trim()) return;
+    await renameSession(id, value.trim());
+    sessions.update(l => updateSessionState(l, id, { name: value.trim() }));
+  }
 
   let showModal = false;
+
+  function focusOnMount(node: HTMLInputElement) {
+    node.focus(); node.select();
+    return {};
+  }
 
   function fmtTokens(s: typeof $sessions[0]): string {
     if (!s.tokens) return '—';
@@ -29,6 +74,20 @@
   <NewSessionModal on:done={() => showModal = false} on:cancel={() => showModal = false} />
 {/if}
 
+{#if ctxMenu}
+  <ContextMenu
+    x={ctxMenu.x} y={ctxMenu.y}
+    items={[
+      { label: 'Rename', action: 'rename' },
+      { label: 'Stop', action: 'stop' },
+      { divider: true },
+      { label: 'Delete', action: 'delete', danger: true },
+    ]}
+    on:select={e => handleCtxAction(e.detail)}
+    on:close={() => ctxMenu = null}
+  />
+{/if}
+
 <aside class="sidebar">
   <header class="header">
     <span class="title">sessions</span>
@@ -47,10 +106,21 @@
           class="item"
           class:active
           on:click={() => selectedSessionId.set(s.id)}
+          on:contextmenu={e => onContextMenu(e, s)}
         >
           <div class="item-top">
             <span class="dot" style="color:{color}" class:pulse={pulsing}>●</span>
-            <span class="name">{displayName(s)}</span>
+            {#if renaming?.id === s.id}
+              <input
+                class="rename-input"
+                bind:value={renaming.value}
+                on:keydown={e => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') renaming = null; }}
+                on:blur={submitRename}
+                use:focusOnMount
+              />
+            {:else}
+              <span class="name">{displayName(s)}</span>
+            {/if}
             <span class="status" style="color:{color}">{statusLabel(s.status)}</span>
           </div>
           <div class="item-meta">
@@ -185,6 +255,14 @@
     padding-left: 14px;
   }
   .sep { color: var(--t3); }
+  .rename-input {
+    flex: 1; min-width: 0;
+    background: var(--bg3);
+    border: 1px solid var(--ac);
+    border-radius: 2px; color: var(--t0);
+    font-size: var(--md); font-family: var(--mono);
+    padding: 1px 5px; outline: none;
+  }
   .approval-dot {
     color: var(--s-input);
     margin-left: 4px;

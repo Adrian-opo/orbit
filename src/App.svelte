@@ -6,16 +6,18 @@
   } from './lib/stores/sessions';
   import { journal } from './lib/stores/journal';
   import {
-    listSessions,
+    listSessions, checkClaude,
     onSessionCreated, onSessionOutput, onSessionState,
     onSessionStopped, onSessionRunning, onSessionError,
   } from './lib/tauri';
+  import type { ClaudeCheck } from './lib/tauri';
   import Sidebar from './components/Sidebar.svelte';
   import CentralPanel from './components/CentralPanel.svelte';
   import MetaPanel from './components/MetaPanel.svelte';
 
   let prevStatuses: Record<number, string> = {};
   let audioCtx: AudioContext | null = null;
+  let claudeCheck: ClaudeCheck | null = null;
 
   function beep() {
     try {
@@ -31,7 +33,8 @@
   }
 
   onMount(async () => {
-    const existing = await listSessions();
+    const [existing, check] = await Promise.all([listSessions(), checkClaude()]);
+    claudeCheck = check;
     sessions.set(existing);
     if (existing.length > 0 && !$selectedSessionId) selectedSessionId.set(existing[0].id);
 
@@ -84,7 +87,17 @@
     <CentralPanel session={selected} />
   {:else}
     <div class="empty">
-      <span class="empty-hint">no session selected — press <kbd>n</kbd> to create one</span>
+      {#if claudeCheck && !claudeCheck.found}
+        <div class="claude-warn">
+          <span class="warn-icon">⚠</span>
+          <div>
+            <div class="warn-title">claude CLI not found</div>
+            <div class="warn-hint">{claudeCheck.hint ?? 'npm install -g @anthropic-ai/claude-code'}</div>
+          </div>
+        </div>
+      {:else}
+        <span class="empty-hint">no session selected</span>
+      {/if}
     </div>
   {/if}
   {#if selected}
@@ -111,13 +124,14 @@
     color: var(--t2);
     letter-spacing: 0.02em;
   }
-  kbd {
-    background: var(--bg3);
-    border: 1px solid var(--bd1);
-    border-radius: 3px;
-    padding: 0 5px;
-    font-family: var(--mono);
-    font-size: var(--xs);
-    color: var(--t1);
+  .claude-warn {
+    display: flex; align-items: flex-start; gap: 10px;
+    background: rgba(224,72,72,0.07);
+    border: 1px solid rgba(224,72,72,0.25);
+    border-radius: 4px; padding: 14px 18px;
+    max-width: 360px;
   }
+  .warn-icon { color: var(--s-error); font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .warn-title { font-size: var(--md); color: var(--s-error); margin-bottom: 4px; }
+  .warn-hint { font-size: var(--xs); color: var(--t1); font-style: italic; }
 </style>

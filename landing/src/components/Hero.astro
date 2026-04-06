@@ -127,9 +127,10 @@
   .btn-primary, .btn-secondary {
     display: inline-flex; align-items: center; gap: 8px;
     border-radius: 4px; font-family: var(--font);
-    cursor: pointer; width: fit-content;
+    cursor: pointer; width: 100%;
     transition: all 0.2s;
   }
+  .cta-group { width: fit-content; }
   .btn-primary {
     background: var(--ac-dim);
     border: 1px solid rgba(0, 212, 126, 0.4);
@@ -169,7 +170,7 @@
   @media (max-width: 768px) {
     .orbit-wrap { width: 220px; height: 220px; margin-bottom: 32px; }
     .subtitle { font-size: 12px; }
-    .btn-primary, .btn-secondary { width: fit-content; }
+    .btn-primary, .btn-secondary { width: 100%; }
   }
   @media (max-width: 480px) {
     h1 { letter-spacing: 0.06em; }

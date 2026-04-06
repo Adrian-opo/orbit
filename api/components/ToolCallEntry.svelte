@@ -605,6 +605,12 @@
     background: var(--bg3);
   }
 
+  .diff-block.modal-code-scroll {
+    font-family: var(--mono);
+    font-size: 11px;
+    overflow-x: auto;
+  }
+
   /* highlight.js tokens */
   .detail :global(.hljs-keyword),
   .detail :global(.hljs-selector-tag),

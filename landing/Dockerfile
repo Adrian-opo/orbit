@@ -1,6 +1,8 @@
 # Build stage
 FROM node:20-alpine AS build
 WORKDIR /app
+# Install fonts for og-image PNG generation (sharp needs system fonts)
+RUN apk add --no-cache fontconfig ttf-dejavu && fc-cache -f
 COPY package*.json ./
 RUN npm ci
 COPY . .

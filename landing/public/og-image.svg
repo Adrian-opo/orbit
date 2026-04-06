@@ -45,33 +45,33 @@
   <!-- Left content -->
   <!-- Eyebrow -->
   <text x="100" y="240"
-    font-family="'JetBrains Mono', 'Courier New', monospace"
+    font-family="'DejaVu Sans Mono', 'Courier New', monospace"
     font-size="16" fill="#00d47e" letter-spacing="4" opacity="0.9">
     ● MULTI-AGENT DASHBOARD
   </text>
 
   <!-- Title -->
   <text x="96" y="330"
-    font-family="'JetBrains Mono', 'Courier New', monospace"
+    font-family="'DejaVu Sans Mono', 'Courier New', monospace"
     font-size="96" font-weight="600" fill="#f0f0f0" letter-spacing="8">
     orbit
   </text>
 
   <!-- Subtitle -->
   <text x="100" y="390"
-    font-family="'JetBrains Mono', 'Courier New', monospace"
+    font-family="'DejaVu Sans Mono', 'Courier New', monospace"
     font-size="20" fill="#585858" letter-spacing="1">
     Manage multiple Claude Code sessions
   </text>
   <text x="100" y="418"
-    font-family="'JetBrains Mono', 'Courier New', monospace"
+    font-family="'DejaVu Sans Mono', 'Courier New', monospace"
     font-size="20" fill="#585858" letter-spacing="1">
     simultaneously.
   </text>
 
   <!-- Bottom meta -->
   <text x="100" y="530"
-    font-family="'JetBrains Mono', 'Courier New', monospace"
+    font-family="'DejaVu Sans Mono', 'Courier New', monospace"
     font-size="14" fill="#303030" letter-spacing="2">
     orbit.jfernando.dev  ·  Windows  ·  CC BY-NC 4.0
   </text>

@@ -1,0 +1,14 @@
+# Force LF line endings for all text files
+# Prevents git from converting LF→CRLF on Windows checkout
+* text=auto eol=lf
+
+# Explicitly binary files — no conversion
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.svg binary
+*.lock binary

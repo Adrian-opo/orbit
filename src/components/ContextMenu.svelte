@@ -48,6 +48,7 @@
 <div
   class="menu"
   role="menu"
+  tabindex="-1"
   bind:this={el}
   style="left:{x}px; top:{y}px"
   on:contextmenu|preventDefault

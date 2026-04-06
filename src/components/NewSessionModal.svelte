@@ -49,7 +49,7 @@
 
 <svelte:window on:keydown={onKey} />
 
-<div class="overlay" role="dialog" aria-modal="true" on:click|self={() => dispatch('cancel')}>
+<div class="overlay" role="dialog" aria-modal="true" tabindex="-1" on:click|self={() => dispatch('cancel')} on:keydown={onKey}>
   <div class="modal">
     <div class="modal-header">
       <span class="modal-title">new session</span>

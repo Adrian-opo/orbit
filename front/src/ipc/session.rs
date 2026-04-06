@@ -159,7 +159,11 @@ pub fn diagnose_spawn() -> serde_json::Value {
     .map(|o| {
         let stdout = String::from_utf8_lossy(&o.stdout).trim().to_string();
         let stderr = String::from_utf8_lossy(&o.stderr).trim().to_string();
-        if !stdout.is_empty() { stdout } else { stderr }
+        if !stdout.is_empty() {
+            stdout
+        } else {
+            stderr
+        }
     })
     .unwrap_or_else(|e| format!("version check failed: {e}"));
 

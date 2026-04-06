@@ -42,6 +42,7 @@ pub fn run() {
             };
             app.manage(SessionState(session_manager));
 
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

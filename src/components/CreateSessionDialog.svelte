@@ -72,7 +72,7 @@
         placeholder="What should Claude work on?"
         rows="4"
         disabled={loading}
-      />
+      ></textarea>
     </label>
 
     <label>

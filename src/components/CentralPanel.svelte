@@ -1,14 +1,13 @@
 <script lang="ts">
-  import type { AgentState } from '../lib/types';
+  import type { Session } from '../lib/stores/sessions';
   import { journal, pendingMessages } from '../lib/stores/journal';
   import { detailLevel } from '../lib/stores/preferences';
-  import { getJournal } from '../lib/tauri';
+  import { getSessionJournal } from '../lib/tauri';
   import JournalEntry from './JournalEntry.svelte';
-  import AgentTree from './AgentTree.svelte';
   import CommandInput from './CommandInput.svelte';
   import TypingIndicator from './TypingIndicator.svelte';
 
-  export let agent: AgentState;
+  export let session: Session;
 
   let logContainer: HTMLDivElement;
   let userScrolledUp = false;
@@ -48,14 +47,14 @@
     prevPendingCount = count;
   }
 
-  async function loadJournal(sessionId: string) {
-    const entries = await getJournal(sessionId);
-    // If new entries appeared, clear pending messages (they've been processed)
+  // Load historical journal from backend when session changes
+  async function loadJournal(sessionId: number) {
+    const entries = await getSessionJournal(sessionId);
     if (entries.length > prevEntryCount && prevEntryCount > 0) {
       pendingMessages.clear();
     }
     prevEntryCount = entries.length;
-    journal.set(entries);
+    journal.update(map => new Map(map).set(sessionId, entries));
     if (!userScrolledUp) {
       requestAnimationFrame(() => {
         if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
@@ -63,13 +62,15 @@
     }
   }
 
-  $: if (agent) {
-    loadJournal(agent.sessionId);
+  $: if (session) {
+    loadJournal(session.id);
   }
 
+  $: sessionEntries = $journal.get(session?.id) ?? [];
+
   $: filteredEntries = $detailLevel === 'compact'
-    ? $journal.filter(e => e.entryType === 'toolCall' || e.entryType === 'toolResult')
-    : $journal;
+    ? sessionEntries.filter(e => e.entryType === 'toolCall' || e.entryType === 'toolResult')
+    : sessionEntries;
 
   // Build display list: pair toolCall with its following toolResult, skip standalone toolResults
   $: displayEntries = (() => {
@@ -100,7 +101,7 @@
 
   // Determine typing label based on last entry
   $: typingLabel = (() => {
-    const last = $journal[$journal.length - 1];
+    const last = sessionEntries[sessionEntries.length - 1];
     if (!last) return 'Thinking';
     if (last.entryType === 'thinking') return 'Thinking';
     if (last.entryType === 'toolCall') return `Running ${last.tool ?? 'tool'}`;
@@ -112,17 +113,17 @@
 <div class="central-panel">
   <div class="header">
     <div class="left">
-      <span class="name">{agent.project}</span>
-      <span class="status {agent.status}">
-        {#if agent.status === 'working'}
+      <span class="name">{session.projectName ?? session.cwd ?? 'Session'}</span>
+      <span class="status {session.status}">
+        {#if session.status === 'working' || session.status === 'running'}
           <span class="status-dot-anim"></span>
         {/if}
-        {agent.status.toUpperCase()}
+        {session.status.toUpperCase()}
       </span>
       <span class="meta">
-        {agent.gitBranch ?? ''} · {agent.modelDisplay} · {Math.round((agent.tokens.input + agent.tokens.output) / 1000)}K
-        {#if agent.contextPercent > 0}
-          · {Math.round(agent.contextPercent)}% ctx
+        {session.gitBranch ?? ''} · {session.model ?? '—'} · {Math.round(((session.tokens?.input ?? 0) + (session.tokens?.output ?? 0)) / 1000)}K
+        {#if (session.contextPercent ?? 0) > 0}
+          · {Math.round(session.contextPercent ?? 0)}% ctx
         {/if}
       </span>
     </div>
@@ -132,8 +133,6 @@
       <button class:active={$detailLevel === 'raw'} onclick={() => detailLevel.set('raw')}>Raw</button>
     </div>
   </div>
-
-  <AgentTree subagents={agent.subagents} />
 
   <div class="log-wrapper">
     <div class="log" bind:this={logContainer} onscroll={handleScroll}>
@@ -163,14 +162,14 @@
           </div>
         {/each}
 
-        {#if agent.status === 'working'}
+        {#if session.status === 'working' || session.status === 'running'}
           <TypingIndicator label={typingLabel} />
         {/if}
 
-        {#if agent.pendingApproval && agent.status !== 'working'}
+        {#if session.pendingApproval && session.status !== 'working'}
           <div class="approval-banner">
             <span class="approval-icon">⏳</span>
-            <span class="approval-text">{agent.pendingApproval}</span>
+            <span class="approval-text">{session.pendingApproval}</span>
           </div>
         {/if}
       {/if}
@@ -183,7 +182,7 @@
     {/if}
   </div>
 
-  <CommandInput sessionId={agent.sessionId} agentName={agent.project} agentCwd={agent.cwd} />
+  <CommandInput sessionId={session.id} agentName={session.projectName ?? 'Session'} agentCwd={session.cwd ?? ''} />
 </div>
 
 <style>

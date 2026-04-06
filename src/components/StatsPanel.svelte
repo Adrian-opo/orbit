@@ -1,27 +1,29 @@
 <script lang="ts">
-  import type { AgentState } from '../lib/types';
+  import type { Session } from '../lib/stores/sessions';
 
-  export let agent: AgentState;
+  export let session: Session;
 
-  $: totalTokens = agent.tokens.input + agent.tokens.output;
+  $: tokens = session.tokens;
+  $: totalTokens = (tokens?.input ?? 0) + (tokens?.output ?? 0);
+  $: ctx = session.contextPercent ?? 0;
 </script>
 
 <div class="stats">
   <div class="stat-row">
     <span class="label">Input tokens</span>
-    <span class="value">{agent.tokens.input.toLocaleString()}</span>
+    <span class="value">{(tokens?.input ?? 0).toLocaleString()}</span>
   </div>
   <div class="stat-row">
     <span class="label">Output tokens</span>
-    <span class="value">{agent.tokens.output.toLocaleString()}</span>
+    <span class="value">{(tokens?.output ?? 0).toLocaleString()}</span>
   </div>
   <div class="stat-row">
     <span class="label">Cache read</span>
-    <span class="value">{agent.tokens.cacheRead.toLocaleString()}</span>
+    <span class="value">{(tokens?.cacheRead ?? 0).toLocaleString()}</span>
   </div>
   <div class="stat-row">
     <span class="label">Cache write</span>
-    <span class="value">{agent.tokens.cacheWrite.toLocaleString()}</span>
+    <span class="value">{(tokens?.cacheWrite ?? 0).toLocaleString()}</span>
   </div>
   <div class="stat-row total">
     <span class="label">Total</span>
@@ -29,24 +31,20 @@
   </div>
   <div class="context-section">
     <div class="context-label">
-      Context window: {agent.contextPercent.toFixed(1)}%
+      Context window: {ctx.toFixed(1)}%
     </div>
     <div class="context-bar">
       <div
         class="fill"
-        style="width: {Math.min(agent.contextPercent, 100)}%"
-        class:warn={agent.contextPercent > 70}
-        class:danger={agent.contextPercent > 90}
+        style="width: {Math.min(ctx, 100)}%"
+        class:warn={ctx > 70}
+        class:danger={ctx > 90}
       ></div>
     </div>
   </div>
   <div class="stat-row">
     <span class="label">Model</span>
-    <span class="value">{agent.modelDisplay}</span>
-  </div>
-  <div class="stat-row">
-    <span class="label">Subagents</span>
-    <span class="value">{agent.subagents.length}</span>
+    <span class="value">{session.model ?? '—'}</span>
   </div>
 </div>
 

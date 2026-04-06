@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
-    sessions, selectedSessionId, upsertSession, updateSessionState
+    sessions, selectedSessionId, upsertSession, updateSessionState, getSelectedSession
   } from './lib/stores/sessions';
   import { journal } from './lib/stores/journal';
   import {
@@ -90,7 +90,11 @@
 
 <div class="app-layout">
   <Sidebar />
-  <CentralPanel />
+  {#if getSelectedSession($sessions, $selectedSessionId)}
+    <CentralPanel session={getSelectedSession($sessions, $selectedSessionId)} />
+  {:else}
+    <div class="empty-state">Select or create a session</div>
+  {/if}
   <RightPanel />
 </div>
 
@@ -99,5 +103,13 @@
     display: flex;
     height: 100vh;
     overflow: hidden;
+  }
+  .empty-state {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 14px;
   }
 </style>

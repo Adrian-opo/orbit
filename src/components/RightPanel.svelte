@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { AgentState } from '../lib/types';
+  import { sessions, selectedSessionId, getSelectedSession } from '../lib/stores/sessions';
   import { rightPanelTab } from '../lib/stores/preferences';
   import TasksProgress from './TasksProgress.svelte';
   import StatsPanel from './StatsPanel.svelte';
   import SubagentsPanel from './SubagentsPanel.svelte';
 
-  export let agent: AgentState;
+  $: session = getSelectedSession($sessions, $selectedSessionId);
 
   const tabs: { key: typeof $rightPanelTab; label: string }[] = [
     { key: 'agents', label: 'Sub-agents' },
@@ -27,12 +27,14 @@
     {/each}
   </div>
   <div class="content">
-    {#if $rightPanelTab === 'agents'}
-      <SubagentsPanel sessionId={agent.sessionId} subagents={agent.subagents} />
-    {:else if $rightPanelTab === 'tasks'}
-      <TasksProgress sessionId={agent.sessionId} />
-    {:else if $rightPanelTab === 'stats'}
-      <StatsPanel {agent} />
+    {#if session}
+      {#if $rightPanelTab === 'agents'}
+        <SubagentsPanel sessionId={session.id.toString()} subagents={[]} />
+      {:else if $rightPanelTab === 'tasks'}
+        <TasksProgress sessionId={session.id.toString()} />
+      {:else if $rightPanelTab === 'stats'}
+        <StatsPanel {session} />
+      {/if}
     {/if}
   </div>
 </aside>

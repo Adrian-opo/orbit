@@ -25,7 +25,7 @@
     <span class="title">Sessions</span>
     <div class="header-right">
       <button class="new-session-btn" on:click={() => showCreateDialog = true} title="New Session">+ New Session</button>
-      <button class="theme-toggle" onclick={() => theme.toggle()} title="Toggle theme">
+      <button class="theme-toggle" on:click={() => theme.toggle()} title="Toggle theme">
         {$theme === 'dark' ? '☀' : '☾'}
       </button>
       <span class="badge">{$sessions.length}</span>

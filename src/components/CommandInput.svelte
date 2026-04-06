@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { sendKeystroke, sendMessage, getSlashCommands, listProjectFiles } from '../lib/tauri';
+  import { sendSessionMessage, getSlashCommands, listProjectFiles } from '../lib/tauri';
   import { pendingMessages } from '../lib/stores/journal';
   import type { SlashCommand } from '../lib/types';
 
-  export let sessionId: string;
+  export let sessionId: number;
   export let agentName: string;
   export let agentCwd: string = '';
 
@@ -124,13 +124,13 @@
     showFilePicker = false;
     if (textareaEl) textareaEl.style.height = 'auto';
     pendingMessages.add(text);
-    await sendMessage(sessionId, text);
+    await sendSessionMessage(sessionId, text);
   }
 
   async function handleQuickAction(key: string) {
     const display = key === '\x03' ? 'Ctrl+C' : key;
     pendingMessages.add(display);
-    await sendKeystroke(sessionId, key);
+    await sendSessionMessage(sessionId, key);
   }
 
   function selectCommand(cmd: string) {

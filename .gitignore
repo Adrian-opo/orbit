@@ -38,3 +38,7 @@ front/target/
 
 # Superpowers
 .superpowers/
+
+# Tauri signing keys — never commit
+tauri.key
+tauri.key.pub

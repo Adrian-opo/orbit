@@ -434,18 +434,32 @@ import type { UpdateInfo } from './lib/types';
 let availableUpdate: UpdateInfo | null = null;
 ```
 
-- [ ] **Step 2: Verificar update no `onMount` com delay de 3s**
+- [ ] **Step 2: Verificar update no `onMount` e periodicamente a cada 30 min**
 
 Dentro do `onMount`, ao final (após configurar os listeners):
 ```typescript
-// Verifica update em background sem bloquear o startup
-setTimeout(async () => {
+async function tryCheckUpdate() {
   try {
-    availableUpdate = await checkUpdate();
+    const info = await checkUpdate();
+    if (info) availableUpdate = info;
   } catch (_e) {
-    // silencioso — falha de rede não deve afetar o uso do app
+    // silencioso — falha de rede não afeta o uso do app
   }
-}, 3000);
+}
+
+// Verifica 3s após abrir (sem bloquear startup)
+setTimeout(tryCheckUpdate, 3000);
+
+// Reverifica a cada 30 minutos enquanto o app estiver aberto
+const updateInterval = setInterval(tryCheckUpdate, 30 * 60 * 1000);
+```
+
+E no `onDestroy`, limpar o interval:
+```typescript
+onDestroy(() => {
+  unlisteners.forEach((fn) => fn());
+  clearInterval(updateInterval);
+});
 ```
 
 - [ ] **Step 3: Exibir `UpdateBanner` no template**

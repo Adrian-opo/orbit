@@ -114,6 +114,10 @@ jobs:
       - name: Generate latest.json for updater
         shell: pwsh
         run: |
+          Write-Host "=== Bundle output ==="
+          Get-ChildItem front/target/release/bundle -Recurse -File | Select-Object -ExpandProperty FullName
+          Write-Host "====================="
+
           $version = "${{ github.ref_name }}"
           if (-not $version.StartsWith("v")) { $version = "0.0.0-nightly" }
           $version = $version.TrimStart("v")

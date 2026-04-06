@@ -583,9 +583,12 @@
   .diff-line.ctx .dl-prefix { color: var(--t3); }
   .dl-code {
     flex: 1;
+    min-width: 0;
+    white-space: pre;
+  }
+  .code-inner .dl-code {
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: pre;
   }
   .diff-overflow {
     display: block;
@@ -606,8 +609,6 @@
   }
 
   .diff-block.modal-code-scroll {
-    font-family: var(--mono);
-    font-size: 11px;
     overflow-x: auto;
   }
 

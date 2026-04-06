@@ -43,3 +43,6 @@ front/target/
 # Tauri signing keys — never commit
 tauri.key
 tauri.key.pub
+
+# Generated demo GIF (built locally)
+demo.gif

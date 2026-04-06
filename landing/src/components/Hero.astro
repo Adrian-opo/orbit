@@ -1,0 +1,169 @@
+---
+// No props
+---
+
+<section class="hero">
+  <!-- Stars -->
+  <div class="stars" aria-hidden="true">
+    <div class="star" style="top:12%;left:8%;--d:4s;--delay:.2s;--peak:.5"></div>
+    <div class="star" style="top:22%;left:85%;--d:3.5s;--delay:1s;--peak:.4"></div>
+    <div class="star" style="top:65%;left:91%;--d:5s;--delay:.5s;--peak:.3"></div>
+    <div class="star" style="top:80%;left:6%;--d:4.5s;--delay:2s;--peak:.4"></div>
+    <div class="star" style="top:45%;left:4%;--d:6s;--delay:.8s;--peak:.3"></div>
+    <div class="star" style="top:30%;left:92%;--d:3s;--delay:1.5s;--peak:.5"></div>
+    <div class="star" style="top:72%;left:78%;--d:4s;--delay:.3s;--peak:.35"></div>
+    <div class="star" style="top:18%;left:48%;--d:5.5s;--delay:2.5s;--peak:.25"></div>
+    <div class="star" style="top:88%;left:55%;--d:3.8s;--delay:1.2s;--peak:.4"></div>
+    <div class="star" style="top:55%;left:72%;--d:4.2s;--delay:.6s;--peak:.3"></div>
+  </div>
+
+  <!-- Orbit SVG -->
+  <div class="orbit-wrap" aria-hidden="true">
+    <svg viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="glow-sm">
+          <feGaussianBlur stdDeviation="2" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- Outer ring (clockwise) -->
+      <g class="ring-outer">
+        <ellipse cx="150" cy="150" rx="138" ry="53"
+          stroke="#00d47e" stroke-width="1.2" opacity="0.35"
+          transform="rotate(-38 150 150)"/>
+      </g>
+
+      <!-- Inner ring (counter-clockwise) -->
+      <g class="ring-inner">
+        <ellipse cx="150" cy="150" rx="88" ry="34"
+          stroke="#00d47e" stroke-width="0.8" opacity="0.18"
+          transform="rotate(-38 150 150)"/>
+      </g>
+
+      <!-- Satellite (follows outer ring) -->
+      <g class="satellite">
+        <circle cx="279" cy="117" r="4.5"
+          fill="#00d47e" opacity="0.9" filter="url(#glow-sm)"/>
+      </g>
+
+      <!-- Central body -->
+      <circle cx="150" cy="150" r="20" fill="#00d47e" opacity="0.10"/>
+      <circle cx="150" cy="150" r="12" fill="#00d47e" opacity="0.15"/>
+      <circle cx="150" cy="150" r="6"  fill="#00d47e" filter="url(#glow)"/>
+    </svg>
+  </div>
+
+  <!-- Content -->
+  <p class="eyebrow">● multi-agent dashboard</p>
+  <h1>orbit</h1>
+  <p class="subtitle">
+    Manage multiple Claude Code sessions simultaneously.<br/>
+    Real-time feed, persistent history, token tracking.
+  </p>
+
+  <div class="cta-group">
+    <a href="https://github.com/xinnaider/orbit" class="btn-primary">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+          0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13
+          -.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66
+          .07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15
+          -.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27
+          .68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12
+          .51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48
+          0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8
+          c0-4.42-3.58-8-8-8z"/>
+      </svg>
+      Star on GitHub
+    </a>
+    <a href="https://github.com/xinnaider/orbit/releases/latest" class="btn-secondary">
+      ↓ Download for Windows
+    </a>
+    <span class="meta">Windows 10+ · MIT · free &amp; open source</span>
+  </div>
+</section>
+
+<style>
+  .hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+    padding: 120px 24px 80px;
+    text-align: center;
+  }
+  .stars { position: absolute; inset: 0; pointer-events: none; }
+
+  .orbit-wrap {
+    width: 300px; height: 300px;
+    margin: 0 auto 44px; flex-shrink: 0;
+  }
+  .orbit-wrap svg { width: 100%; height: 100%; overflow: visible; }
+
+  .eyebrow {
+    font-size: 10px; letter-spacing: 0.25em;
+    color: var(--ac); text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-size: clamp(40px, 8vw, 72px);
+    font-weight: 600; letter-spacing: 0.12em;
+    color: var(--t0); line-height: 1.1; margin-bottom: 18px;
+  }
+  .subtitle {
+    font-size: 13px; color: var(--t2);
+    max-width: 420px; line-height: 1.8; margin-bottom: 36px;
+  }
+
+  .cta-group {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 10px;
+  }
+  .btn-primary, .btn-secondary {
+    display: inline-flex; align-items: center; gap: 8px;
+    border-radius: 4px; font-family: var(--font);
+    cursor: pointer; width: 220px; justify-content: center;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: var(--ac-dim);
+    border: 1px solid rgba(0, 212, 126, 0.4);
+    color: var(--ac); padding: 12px 28px; font-size: 13px;
+    letter-spacing: 0.06em;
+  }
+  .btn-primary:hover {
+    background: rgba(0, 212, 126, 0.18);
+    border-color: rgba(0, 212, 126, 0.7);
+    box-shadow: 0 0 24px rgba(0, 212, 126, 0.12);
+  }
+  .btn-secondary {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #888; padding: 11px 28px; font-size: 12px;
+    letter-spacing: 0.06em;
+  }
+  .btn-secondary:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.15);
+    color: var(--t1);
+  }
+  .meta {
+    margin-top: 4px;
+    font-size: 10px; color: var(--t3); letter-spacing: 0.1em;
+  }
+
+  @media (max-width: 768px) {
+    .orbit-wrap { width: 220px; height: 220px; margin-bottom: 32px; }
+    .subtitle { font-size: 12px; }
+    .btn-primary, .btn-secondary { width: 200px; }
+  }
+  @media (max-width: 480px) {
+    h1 { letter-spacing: 0.06em; }
+    .orbit-wrap { width: 180px; height: 180px; }
+  }
+</style>

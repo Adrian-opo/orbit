@@ -118,6 +118,7 @@ impl SessionManager {
             )
         };
 
+        let prompt_text = prompt.clone(); // keep a copy for the user entry
         let config = SpawnConfig {
             session_id,
             cwd: std::path::PathBuf::from(&cwd),
@@ -152,6 +153,40 @@ impl SessionManager {
         let _ = app.emit("session:running", serde_json::json!({
             "sessionId": session_id, "pid": pid
         }));
+
+        // Emit user message entry immediately — Claude's -p flag doesn't echo it in the stream
+        let user_entry = crate::models::JournalEntry {
+            session_id: session_id.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            entry_type: crate::models::JournalEntryType::User,
+            text: Some(prompt_text.clone()),
+            thinking: None,
+            thinking_duration: None,
+            tool: None,
+            tool_input: None,
+            output: None,
+            exit_code: None,
+            lines_changed: None,
+        };
+        // Persist to DB as a synthetic user line
+        let user_line = serde_json::json!({
+            "type": "user",
+            "message": { "content": &prompt_text },
+            "timestamp": &user_entry.timestamp
+        }).to_string();
+        let _ = db.insert_output(session_id, &user_line);
+
+        // Update in-memory journal
+        {
+            let mut m = manager.lock().unwrap();
+            let state = m.journal_states.entry(session_id).or_insert_with(JournalState::default);
+            state.entries.push(user_entry.clone());
+        }
+
+        let _ = app.emit("session:output", SessionOutputEvent {
+            session_id,
+            entry: user_entry,
+        });
 
         Self::reader_loop(Arc::clone(&manager), app, session_id, handle.reader, db);
     }

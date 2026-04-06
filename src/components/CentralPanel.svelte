@@ -24,10 +24,13 @@
 
   $: if (session) loadHistory(session.id);
 
-  // Auto-scroll + clear pending messages when new entries arrive
+  // Auto-scroll when new entries arrive
+  // Clear pending only when assistant responds (not on user entry echo)
   $: {
     const e = $journal.get(session?.id);
-    if (e && e.length > 0) pendingMessages.clear();
+    if (e && e.some(entry => entry.entryType === 'assistant' || entry.entryType === 'toolCall')) {
+      pendingMessages.clear();
+    }
     scrollIfNeeded();
   }
 

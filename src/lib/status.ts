@@ -1,0 +1,44 @@
+// Unified status helpers — Session.status can be DB values or runtime event values
+
+export type SessionStatus =
+  | 'initializing' | 'running' | 'waiting'
+  | 'completed' | 'stopped' | 'error'
+  | 'working' | 'input' | 'idle' | 'new';
+
+export function statusColor(status: string): string {
+  switch (status) {
+    case 'working':
+    case 'running':    return 'var(--s-working)';
+    case 'input':
+    case 'waiting':    return 'var(--s-input)';
+    case 'initializing': return 'var(--s-init)';
+    case 'error':      return 'var(--s-error)';
+    case 'completed':
+    case 'stopped':
+    case 'idle':       return 'var(--s-done)';
+    default:           return 'var(--s-idle)';
+  }
+}
+
+export function statusLabel(status: string): string {
+  switch (status) {
+    case 'working':      return 'working';
+    case 'running':      return 'running';
+    case 'input':
+    case 'waiting':      return 'waiting';
+    case 'initializing': return 'init';
+    case 'completed':
+    case 'idle':         return 'idle';
+    case 'stopped':      return 'stopped';
+    case 'error':        return 'error';
+    default:             return status;
+  }
+}
+
+export function isActive(status: string): boolean {
+  return ['working', 'running', 'input', 'waiting', 'initializing'].includes(status);
+}
+
+export function isPulsing(status: string): boolean {
+  return ['working', 'running'].includes(status);
+}

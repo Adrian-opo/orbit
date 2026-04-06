@@ -1,172 +1,202 @@
 <script lang="ts">
   import { sessions, selectedSessionId } from '../lib/stores/sessions';
-  import type { Session } from '../lib/stores/sessions';
-  import { theme } from '../lib/stores/preferences';
-  import CreateSessionDialog from './CreateSessionDialog.svelte';
+  import { statusColor, statusLabel, isPulsing } from '../lib/status';
+  import NewSessionModal from './NewSessionModal.svelte';
+  import { estimateCost, formatCost, formatTokens } from '../lib/cost';
 
-  let showCreateDialog = false;
+  let showModal = false;
 
-  $: totalTokens = $sessions.reduce((sum, s) => {
-    if (!s.tokens) return sum;
-    return sum + s.tokens.input + s.tokens.output;
-  }, 0);
-  $: awaitingCount = $sessions.filter(s => s.status === 'waiting').length;
+  function fmtTokens(s: typeof $sessions[0]): string {
+    if (!s.tokens) return '—';
+    const total = s.tokens.input + s.tokens.output;
+    return formatTokens(total);
+  }
+
+  function fmtModel(model: string | null): string {
+    if (!model) return '—';
+    if (model.includes('opus'))   return 'opus';
+    if (model.includes('sonnet')) return 'sonnet';
+    if (model.includes('haiku'))  return 'haiku';
+    return model.split('-')[2] ?? model;
+  }
+
+  function displayName(s: typeof $sessions[0]): string {
+    return s.name ?? s.projectName ?? s.cwd?.split(/[\\/]/).pop() ?? `#${s.id}`;
+  }
 </script>
 
-{#if showCreateDialog}
-  <CreateSessionDialog
-    on:created={() => showCreateDialog = false}
-    on:cancel={() => showCreateDialog = false}
-  />
+{#if showModal}
+  <NewSessionModal on:done={() => showModal = false} on:cancel={() => showModal = false} />
 {/if}
 
 <aside class="sidebar">
-  <div class="sidebar-header">
-    <span class="title">Sessions</span>
-    <div class="header-right">
-      <button class="new-session-btn" on:click={() => showCreateDialog = true} title="New Session">+ New Session</button>
-      <button class="theme-toggle" on:click={() => theme.toggle()} title="Toggle theme">
-        {$theme === 'dark' ? '☀' : '☾'}
-      </button>
-      <span class="badge">{$sessions.length}</span>
-    </div>
-  </div>
-  <div class="sidebar-content">
+  <header class="header">
+    <span class="title">sessions</span>
+    <button class="new-btn" on:click={() => showModal = true} title="New session (n)">+</button>
+  </header>
+
+  <div class="list">
     {#if $sessions.length === 0}
-      <p class="empty">No sessions detected</p>
+      <p class="empty">no sessions</p>
     {:else}
-      {#each $sessions as session (session.id)}
-        <div
-          class="session-item"
-          class:selected={$selectedSessionId === session.id}
-          on:click={() => selectedSessionId.set(session.id)}
-          on:keydown={(e) => e.key === 'Enter' && selectedSessionId.set(session.id)}
-          role="button"
-          tabindex="0"
+      {#each $sessions as s (s.id)}
+        {@const active = $selectedSessionId === s.id}
+        {@const color = statusColor(s.status)}
+        {@const pulsing = isPulsing(s.status)}
+        <button
+          class="item"
+          class:active
+          on:click={() => selectedSessionId.set(s.id)}
         >
-          <div class="session-name">{session.projectName ?? session.cwd ?? 'Session'}</div>
-          <div class="session-meta">
-            <span class="status status-{session.status}">{session.status}</span>
-            <span class="model">{session.model ?? '—'}</span>
+          <div class="item-top">
+            <span class="dot" style="color:{color}" class:pulse={pulsing}>●</span>
+            <span class="name">{displayName(s)}</span>
+            <span class="status" style="color:{color}">{statusLabel(s.status)}</span>
           </div>
-          {#if session.tokens}
-            <div class="session-tokens">{Math.round((session.tokens.input + session.tokens.output) / 1000)}K tokens</div>
-          {/if}
-        </div>
+          <div class="item-meta">
+            <span>{fmtModel(s.model)}</span>
+            <span class="sep">·</span>
+            <span>{fmtTokens(s)}</span>
+            {#if s.pendingApproval}
+              <span class="approval-dot" title={s.pendingApproval}>⚑</span>
+            {/if}
+          </div>
+        </button>
       {/each}
     {/if}
   </div>
-  <div class="sidebar-footer">
-    {Math.round(totalTokens / 1000)}K tokens total
-    {#if awaitingCount > 0}
-      • {awaitingCount} awaiting
-    {/if}
-  </div>
+
+  <footer class="footer">
+    <span>{$sessions.length} session{$sessions.length !== 1 ? 's' : ''}</span>
+    <span class="sep">·</span>
+    <span>
+      {formatCost($sessions.reduce((sum, s) => {
+        if (!s.tokens) return sum;
+        return sum + estimateCost(s.tokens, s.model);
+      }, 0))} total
+    </span>
+  </footer>
 </aside>
 
 <style>
   .sidebar {
-    width: 260px;
-    border-right: 1px solid var(--border);
+    width: 220px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
+    border-right: 1px solid var(--bd);
+    background: var(--bg1);
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px 9px;
+    border-bottom: 1px solid var(--bd);
     flex-shrink: 0;
   }
-  .sidebar-header {
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: 600;
+  .title {
+    font-size: var(--sm);
+    color: var(--t2);
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
+  }
+  .new-btn {
+    background: none;
+    border: 1px solid var(--bd1);
+    color: var(--t1);
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
     font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.15s, color 0.15s;
   }
-  .header-right { display: flex; align-items: center; gap: 8px; }
-  .new-session-btn {
-    background: #3b82f6;
-    border: none;
-    border-radius: 4px;
-    color: white;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 3px 8px;
-    line-height: 1.4;
+  .new-btn:hover { border-color: var(--ac); color: var(--ac); }
+
+  .list { flex: 1; overflow-y: auto; }
+
+  .empty {
+    padding: 16px 12px;
+    font-size: var(--sm);
+    color: var(--t3);
   }
-  .new-session-btn:hover { background: #2563eb; }
-  .theme-toggle {
+
+  .item {
+    width: 100%;
+    text-align: left;
     background: none;
     border: none;
-    color: var(--text-muted);
-    font-size: 16px;
+    border-bottom: 1px solid var(--bd);
+    padding: 8px 12px;
     cursor: pointer;
-    padding: 2px;
+    transition: background 0.1s;
+  }
+  .item:hover { background: var(--bg2); }
+  .item.active {
+    background: var(--ac-d2);
+    border-left: 2px solid var(--ac);
+    padding-left: 10px;
+  }
+
+  .item-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+  }
+  .dot {
+    font-size: 8px;
+    flex-shrink: 0;
     line-height: 1;
   }
-  .theme-toggle:hover { color: var(--text-primary); }
-  .badge {
-    background: var(--green-dim);
-    color: var(--green);
-    padding: 1px 6px;
-    border-radius: 8px;
-    font-size: 11px;
+  .dot.pulse { animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
   }
-  .sidebar-content { flex: 1; overflow-y: auto; }
-  .sidebar-footer {
-    padding: 8px 12px;
-    border-top: 1px solid var(--border);
-    font-size: 11px;
-    color: var(--text-dim);
-  }
-  .empty {
-    padding: 20px 12px;
-    color: var(--text-muted);
-    font-size: 13px;
-    text-align: center;
-  }
-  .session-item {
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    user-select: none;
-  }
-  .session-item:hover { background: var(--bg-hover, rgba(255,255,255,0.05)); }
-  .session-item.selected { background: var(--bg-selected, rgba(59,130,246,0.15)); }
-  .session-name {
-    font-size: 13px;
+
+  .name {
+    font-size: var(--md);
+    color: var(--t0);
     font-weight: 500;
-    color: var(--text-primary);
-    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .session-meta {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    margin-top: 3px;
+    white-space: nowrap;
   }
   .status {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    padding: 1px 5px;
-    border-radius: 4px;
+    font-size: var(--xs);
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
   }
-  .status-running { background: var(--green-dim); color: var(--green); }
-  .status-working { background: var(--green-dim); color: var(--green); }
-  .status-waiting { background: var(--yellow-dim, rgba(234,179,8,0.15)); color: var(--yellow, #eab308); }
-  .status-initializing { background: var(--bg-muted, rgba(255,255,255,0.08)); color: var(--text-muted); }
-  .status-completed { background: var(--bg-muted, rgba(255,255,255,0.08)); color: var(--text-dim); }
-  .status-stopped { background: var(--bg-muted, rgba(255,255,255,0.08)); color: var(--text-dim); }
-  .status-error { background: var(--red-dim, rgba(239,68,68,0.15)); color: var(--red, #ef4444); }
-  .model {
-    font-size: 11px;
-    color: var(--text-muted);
+
+  .item-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--xs);
+    color: var(--t2);
+    padding-left: 14px;
   }
-  .session-tokens {
-    font-size: 10px;
-    color: var(--text-dim);
-    margin-top: 2px;
+  .sep { color: var(--t3); }
+  .approval-dot {
+    color: var(--s-input);
+    margin-left: 4px;
+  }
+
+  .footer {
+    padding: 7px 12px;
+    border-top: 1px solid var(--bd);
+    font-size: var(--xs);
+    color: var(--t2);
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
   }
 </style>

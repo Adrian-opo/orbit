@@ -1,131 +1,123 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
-    sessions, selectedSessionId, upsertSession, updateSessionState, getSelectedSession
+    sessions, selectedSessionId,
+    upsertSession, updateSessionState, getSelectedSession
   } from './lib/stores/sessions';
   import { journal } from './lib/stores/journal';
   import {
     listSessions,
-    onSessionCreated,
-    onSessionOutput,
-    onSessionState,
-    onSessionStopped,
-    onSessionRunning,
-    onSessionError,
+    onSessionCreated, onSessionOutput, onSessionState,
+    onSessionStopped, onSessionRunning, onSessionError,
   } from './lib/tauri';
   import Sidebar from './components/Sidebar.svelte';
   import CentralPanel from './components/CentralPanel.svelte';
-  import RightPanel from './components/RightPanel.svelte';
+  import MetaPanel from './components/MetaPanel.svelte';
 
   let prevStatuses: Record<number, string> = {};
   let audioCtx: AudioContext | null = null;
 
-  function playNotificationBeep() {
+  function beep() {
     try {
-      if (!audioCtx || audioCtx.state === 'closed') {
-        audioCtx = new AudioContext();
-      }
+      if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AudioContext();
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.frequency.value = 800;
-      osc.type = 'sine';
-      gain.gain.value = 0.3;
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-      osc.start(audioCtx.currentTime);
-      osc.stop(audioCtx.currentTime + 0.2);
-    } catch {
-      // Audio not available
-    }
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.frequency.value = 880; osc.type = 'sine';
+      gain.gain.value = 0.15;
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+    } catch {}
   }
 
   onMount(async () => {
-    // Load existing sessions on startup
     const existing = await listSessions();
     sessions.set(existing);
-    if (existing.length > 0 && !$selectedSessionId) {
-      selectedSessionId.set(existing[0].id);
-    }
+    if (existing.length > 0 && !$selectedSessionId) selectedSessionId.set(existing[0].id);
 
-    // session:created — new session spawned
-    const unCreated = onSessionCreated((session) => {
-      sessions.update(list => upsertSession(list, session));
-      if (!$selectedSessionId) selectedSessionId.set(session.id);
+    const u1 = onSessionCreated(s => {
+      sessions.update(l => upsertSession(l, s));
+      if (!$selectedSessionId) selectedSessionId.set(s.id);
     });
 
-    // session:output — new journal entry
-    const unOutput = onSessionOutput(({ sessionId, entry }) => {
-      journal.update(map => {
-        const entries = map.get(sessionId) ?? [];
-        return new Map(map).set(sessionId, [...entries, entry]);
-      });
+    const u2 = onSessionOutput(({ sessionId, entry }) => {
+      journal.update(map => new Map(map).set(sessionId, [...(map.get(sessionId) ?? []), entry]));
     });
 
-    // session:state — status/token update
-    const unState = onSessionState((payload) => {
-      const prev = prevStatuses[payload.sessionId];
-      if (payload.status === 'input' && prev && prev !== 'input') {
-        playNotificationBeep();
-      }
-      prevStatuses[payload.sessionId] = payload.status;
-
-      sessions.update(list => updateSessionState(list, payload.sessionId, {
-        status: payload.status as any,
-        tokens: payload.tokens,
-        contextPercent: payload.contextPercent,
-        pendingApproval: payload.pendingApproval,
-        miniLog: payload.miniLog,
+    const u3 = onSessionState(p => {
+      const prev = prevStatuses[p.sessionId];
+      if (p.status === 'input' && prev && prev !== 'input') beep();
+      prevStatuses[p.sessionId] = p.status;
+      sessions.update(l => updateSessionState(l, p.sessionId, {
+        status: p.status as any,
+        tokens: p.tokens,
+        contextPercent: p.contextPercent,
+        pendingApproval: p.pendingApproval,
+        miniLog: p.miniLog,
       }));
     });
 
-    // session:stopped
-    const unStopped = onSessionStopped((sessionId) => {
-      sessions.update(list => updateSessionState(list, sessionId, { status: 'completed' }));
+    const u4 = onSessionStopped(id => {
+      sessions.update(l => updateSessionState(l, id, { status: 'completed' }));
     });
 
-    // session:running — spawn succeeded, update status + pid
-    const unRunning = onSessionRunning((sessionId, pid) => {
-      sessions.update(list => updateSessionState(list, sessionId, { status: 'running', pid }));
+    const u5 = onSessionRunning((id, pid) => {
+      sessions.update(l => updateSessionState(l, id, { status: 'running', pid }));
     });
 
-    // session:error — spawn failed
-    const unError = onSessionError((sessionId, error) => {
-      sessions.update(list => updateSessionState(list, sessionId, { status: 'error' }));
-      console.error(`Session ${sessionId} spawn error:`, error);
+    const u6 = onSessionError((id, error) => {
+      sessions.update(l => updateSessionState(l, id, { status: 'error' }));
+      console.error('session:error', id, error);
     });
 
-    return () => {
-      Promise.all([unCreated, unOutput, unState, unStopped, unRunning, unError])
-        .then(fns => fns.forEach(fn => fn()));
+    return async () => {
+      (await Promise.all([u1, u2, u3, u4, u5, u6])).forEach(fn => fn());
     };
   });
+
+  $: selected = getSelectedSession($sessions, $selectedSessionId);
 </script>
 
-<div class="app-layout">
+<div class="layout">
   <Sidebar />
-  {#if getSelectedSession($sessions, $selectedSessionId)}
-    <CentralPanel session={getSelectedSession($sessions, $selectedSessionId)} />
+  {#if selected}
+    <CentralPanel session={selected} />
   {:else}
-    <div class="empty-state">Select or create a session</div>
+    <div class="empty">
+      <span class="empty-hint">no session selected — press <kbd>n</kbd> to create one</span>
+    </div>
   {/if}
-  <RightPanel />
+  {#if selected}
+    <MetaPanel session={selected} />
+  {/if}
 </div>
 
 <style>
-  .app-layout {
+  .layout {
     display: flex;
     flex: 1;
     min-height: 0;
     overflow: hidden;
   }
-  .empty-state {
+  .empty {
     flex: 1;
-    min-width: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-muted);
-    font-size: 14px;
+    min-width: 0;
+  }
+  .empty-hint {
+    font-size: var(--sm);
+    color: var(--t2);
+    letter-spacing: 0.02em;
+  }
+  kbd {
+    background: var(--bg3);
+    border: 1px solid var(--bd1);
+    border-radius: 3px;
+    padding: 0 5px;
+    font-family: var(--mono);
+    font-size: var(--xs);
+    color: var(--t1);
   }
 </style>

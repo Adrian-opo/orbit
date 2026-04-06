@@ -1,356 +1,202 @@
 <script lang="ts">
+  import { onMount, tick } from 'svelte';
   import type { Session } from '../lib/stores/sessions';
   import { journal, pendingMessages } from '../lib/stores/journal';
-  import { detailLevel } from '../lib/stores/preferences';
   import { getSessionJournal } from '../lib/tauri';
-  import JournalEntry from './JournalEntry.svelte';
-  import CommandInput from './CommandInput.svelte';
-  import TypingIndicator from './TypingIndicator.svelte';
+  import { statusColor, statusLabel, isPulsing } from '../lib/status';
+  import { formatTokens } from '../lib/cost';
+  import Feed from './Feed.svelte';
+  import InputBar from './InputBar.svelte';
 
   export let session: Session;
 
-  let logContainer: HTMLDivElement;
-  let userScrolledUp = false;
-  let showScrollBtn = false;
+  let feedEl: HTMLDivElement;
+  let atBottom = true;
 
-  function handleScroll() {
-    if (!logContainer) return;
-    const { scrollTop, scrollHeight, clientHeight } = logContainer;
-    const atBottom = scrollHeight - scrollTop - clientHeight < 60;
-    userScrolledUp = !atBottom;
-    showScrollBtn = !atBottom;
+  async function loadHistory(id: number) {
+    try {
+      const entries = await getSessionJournal(id);
+      if (entries.length > 0) {
+        journal.update(m => new Map(m).set(id, entries));
+      }
+    } catch {}
+  }
+
+  $: if (session) loadHistory(session.id);
+
+  // Auto-scroll when new entries arrive
+  $: $journal, scrollIfNeeded();
+
+  async function scrollIfNeeded() {
+    if (!atBottom) return;
+    await tick();
+    if (feedEl) feedEl.scrollTop = feedEl.scrollHeight;
+  }
+
+  function onScroll() {
+    if (!feedEl) return;
+    const { scrollTop, scrollHeight, clientHeight } = feedEl;
+    atBottom = scrollHeight - scrollTop - clientHeight < 80;
   }
 
   function scrollToBottom() {
-    if (logContainer) {
-      logContainer.scrollTop = logContainer.scrollHeight;
-      userScrolledUp = false;
-      showScrollBtn = false;
-    }
+    if (feedEl) { feedEl.scrollTop = feedEl.scrollHeight; atBottom = true; }
   }
 
-  let prevEntryCount = 0;
+  $: entries = $journal.get(session?.id) ?? [];
+  $: statusStr = statusLabel(session?.status ?? '');
+  $: statusClr = statusColor(session?.status ?? '');
+  $: pulsing = isPulsing(session?.status ?? '');
 
-  // Auto-scroll when a new pending message is added
-  let prevPendingCount = 0;
-  $: {
-    const count = $pendingMessages.length;
-    if (count > prevPendingCount) {
-      requestAnimationFrame(() => {
-        if (logContainer) {
-          logContainer.scrollTop = logContainer.scrollHeight;
-          userScrolledUp = false;
-          showScrollBtn = false;
-        }
-      });
-    }
-    prevPendingCount = count;
+  function fmtModel(m: string | null) {
+    if (!m) return 'auto';
+    if (m.includes('opus'))   return 'opus-4.6';
+    if (m.includes('sonnet')) return 'sonnet-4.6';
+    if (m.includes('haiku'))  return 'haiku-4.5';
+    return m;
   }
-
-  // Load historical journal from backend when session changes
-  async function loadJournal(sessionId: number) {
-    const entries = await getSessionJournal(sessionId);
-    if (entries.length > prevEntryCount && prevEntryCount > 0) {
-      pendingMessages.clear();
-    }
-    prevEntryCount = entries.length;
-    journal.update(map => new Map(map).set(sessionId, entries));
-    if (!userScrolledUp) {
-      requestAnimationFrame(() => {
-        if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
-      });
-    }
-  }
-
-  $: if (session) {
-    loadJournal(session.id);
-  }
-
-  $: sessionEntries = $journal.get(session?.id) ?? [];
-
-  $: filteredEntries = $detailLevel === 'compact'
-    ? sessionEntries.filter(e => e.entryType === 'toolCall' || e.entryType === 'toolResult')
-    : sessionEntries;
-
-  // Build display list: pair toolCall with its following toolResult, skip standalone toolResults
-  $: displayEntries = (() => {
-    const result: { entry: typeof filteredEntries[0]; resultEntry: typeof filteredEntries[0] | null; skip: boolean }[] = [];
-    const skipSet = new Set<number>();
-
-    for (let i = 0; i < filteredEntries.length; i++) {
-      if (skipSet.has(i)) continue;
-      const entry = filteredEntries[i];
-
-      if (entry.entryType === 'toolCall') {
-        const next = filteredEntries[i + 1];
-        if (next && next.entryType === 'toolResult') {
-          result.push({ entry, resultEntry: next, skip: false });
-          skipSet.add(i + 1);
-        } else {
-          result.push({ entry, resultEntry: null, skip: false });
-        }
-      } else if (entry.entryType === 'toolResult') {
-        // Orphan toolResult (no preceding toolCall) — skip it
-        continue;
-      } else {
-        result.push({ entry, resultEntry: null, skip: false });
-      }
-    }
-    return result;
-  })();
-
-  // Determine typing label based on last entry
-  $: typingLabel = (() => {
-    const last = sessionEntries[sessionEntries.length - 1];
-    if (!last) return 'Thinking';
-    if (last.entryType === 'thinking') return 'Thinking';
-    if (last.entryType === 'toolCall') return `Running ${last.tool ?? 'tool'}`;
-    if (last.entryType === 'toolResult') return 'Processing result';
-    return 'Thinking';
-  })();
 </script>
 
-<div class="central-panel">
+<div class="panel">
+  <!-- Header -->
   <div class="header">
-    <div class="left">
-      <span class="name">{session.projectName ?? session.cwd ?? 'Session'}</span>
-      <span class="status {session.status}">
-        {#if session.status === 'working' || session.status === 'running'}
-          <span class="status-dot-anim"></span>
-        {/if}
-        {session.status.toUpperCase()}
+    <div class="header-left">
+      <span class="dot" style="color:{statusClr}" class:pulse={pulsing}>●</span>
+      <span class="session-name">
+        {session.name ?? session.projectName ?? session.cwd?.split(/[\\/]/).pop() ?? `#${session.id}`}
       </span>
-      <span class="meta">
-        {session.gitBranch ?? ''} · {session.model ?? '—'} · {Math.round(((session.tokens?.input ?? 0) + (session.tokens?.output ?? 0)) / 1000)}K
-        {#if (session.contextPercent ?? 0) > 0}
-          · {Math.round(session.contextPercent ?? 0)}% ctx
-        {/if}
-      </span>
+      {#if session.gitBranch}
+        <span class="branch">{session.gitBranch}</span>
+      {/if}
+      <span class="status" style="color:{statusClr}">{statusStr}</span>
     </div>
-    <div class="level-toggle">
-      <button class:active={$detailLevel === 'compact'} onclick={() => detailLevel.set('compact')}>Compact</button>
-      <button class:active={$detailLevel === 'full'} onclick={() => detailLevel.set('full')}>Full</button>
-      <button class:active={$detailLevel === 'raw'} onclick={() => detailLevel.set('raw')}>Raw</button>
+    <div class="header-right">
+      {#if session.tokens}
+        <span class="meta">
+          {formatTokens(session.tokens.input + session.tokens.output)}
+        </span>
+        {#if (session.contextPercent ?? 0) > 0}
+          <span class="ctx">
+            <span class="ctx-bar">
+              <span class="ctx-fill" style="width:{Math.min(session.contextPercent ?? 0, 100)}%;
+                background:{(session.contextPercent ?? 0) > 85 ? 'var(--s-error)' :
+                             (session.contextPercent ?? 0) > 65 ? 'var(--s-input)' :
+                             'var(--ac)'}">
+              </span>
+            </span>
+            <span class="ctx-pct">{Math.round(session.contextPercent ?? 0)}%</span>
+          </span>
+        {/if}
+      {/if}
+      <span class="model">{fmtModel(session.model)}</span>
     </div>
   </div>
 
-  <div class="log-wrapper">
-    <div class="log" bind:this={logContainer} onscroll={handleScroll}>
-      {#if $detailLevel === 'raw'}
-        <pre class="raw-log mono">{JSON.stringify($journal, null, 2)}</pre>
-      {:else}
-        {#each displayEntries as { entry, resultEntry }, i (entry.timestamp + entry.entryType + i)}
-          {@const prevItem = displayEntries[i - 1]}
-          {@const isChild = entry.entryType === 'toolCall'}
-          {@const isNewGroup = !prevItem ||
-            (entry.entryType === 'user' && prevItem.entry.entryType !== 'user') ||
-            (entry.entryType === 'assistant' && prevItem.entry.entryType !== 'thinking' && prevItem.entry.entryType !== 'assistant') ||
-            (entry.entryType === 'thinking' && prevItem.entry.entryType !== 'thinking')}
-          {#if isNewGroup && i > 0}
-            <div class="gap"></div>
-          {/if}
-          <div class="entry-row" class:child={isChild}>
-            <JournalEntry {entry} {resultEntry} />
-          </div>
-        {/each}
-
-        {#each $pendingMessages as msg (msg.id)}
-          <div class="pending-msg">
-            <span class="pending-icon">↗</span>
-            <span class="pending-text">{msg.text}</span>
-            <span class="pending-label">sending...</span>
-          </div>
-        {/each}
-
-        {#if session.status === 'working' || session.status === 'running'}
-          <TypingIndicator label={typingLabel} />
-        {/if}
-
-        {#if session.pendingApproval && session.status !== 'working'}
-          <div class="approval-banner">
-            <span class="approval-icon">⏳</span>
-            <span class="approval-text">{session.pendingApproval}</span>
-          </div>
-        {/if}
-      {/if}
+  <!-- Approval banner -->
+  {#if session.pendingApproval && session.status !== 'working'}
+    <div class="approval">
+      <span class="approval-icon">⚑</span>
+      <span class="approval-text">{session.pendingApproval}</span>
     </div>
+  {/if}
 
-    {#if showScrollBtn}
-      <button class="scroll-btn" onclick={scrollToBottom} title="Scroll to bottom">
-        ↓
-      </button>
+  <!-- Feed -->
+  <div class="feed-wrap" bind:this={feedEl} on:scroll={onScroll}>
+    {#if entries.length === 0 && $pendingMessages.length === 0}
+      <div class="feed-empty">
+        <span>session #{session.id} · {statusStr}</span>
+      </div>
+    {:else}
+      <Feed {entries} status={session.status} />
+      {#each $pendingMessages as msg (msg.id)}
+        <div class="pending-msg">
+          <span class="pending-arrow">›</span>
+          <span>{msg.text}</span>
+        </div>
+      {/each}
     {/if}
   </div>
 
-  <CommandInput sessionId={session.id} agentName={session.projectName ?? 'Session'} agentCwd={session.cwd ?? ''} />
+  {#if !atBottom}
+    <button class="scroll-btn" on:click={scrollToBottom}>↓ scroll to bottom</button>
+  {/if}
+
+  <!-- Input -->
+  <InputBar sessionId={session.id} cwd={session.cwd ?? ''} />
 </div>
 
 <style>
-  .central-panel {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-width: 0;
-    min-height: 0;
+  .panel {
+    flex: 1; min-width: 0; min-height: 0;
+    display: flex; flex-direction: column;
     overflow: hidden;
+    background: var(--bg);
   }
+
   .header {
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--bd);
+    flex-shrink: 0;
+    background: var(--bg1);
   }
-  .left { display: flex; align-items: center; gap: 8px; }
-  .name { font-weight: 600; font-size: 14px; }
-  .status {
-    padding: 2px 8px;
-    border-radius: 8px;
-    font-size: 11px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 5px;
+  .header-left { display: flex; align-items: center; gap: 8px; }
+  .dot { font-size: 8px; line-height: 1; }
+  .dot.pulse { animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+  .session-name { font-size: var(--md); font-weight: 500; color: var(--t0); }
+  .branch {
+    font-size: var(--xs); color: var(--t2);
+    background: var(--bg3); border: 1px solid var(--bd);
+    border-radius: 2px; padding: 0 5px;
   }
-  .status.working { background: var(--green-dim); color: var(--green); }
-  .status.input { background: var(--amber-dim); color: var(--amber); }
-  .status.idle { background: var(--bg-idle); color: var(--text-muted); }
-  .status-dot-anim {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--green);
-    animation: blink 1.2s ease-in-out infinite;
-  }
-  @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
-  .meta { font-size: 12px; color: var(--text-dim); }
-  .level-toggle {
-    display: flex;
-    gap: 2px;
-    background: var(--bg-overlay);
-    border-radius: 6px;
-    padding: 2px;
-  }
-  .level-toggle button {
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 12px;
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .level-toggle button.active {
-    background: var(--bg-active-toggle);
-    color: var(--blue);
-  }
+  .status { font-size: var(--xs); color: var(--t2); letter-spacing: 0.04em; }
 
-  .log-wrapper {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .meta { font-size: var(--xs); color: var(--t2); }
+  .ctx { display: flex; align-items: center; gap: 5px; }
+  .ctx-bar {
+    width: 40px; height: 3px;
+    background: var(--bg3); border-radius: 2px; overflow: hidden;
   }
-  .log {
-    height: 100%;
-    overflow-y: auto;
-    padding: 12px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .raw-log {
-    font-size: 12px;
-    color: var(--text-secondary);
-    line-height: 1.4;
-    white-space: pre-wrap;
-  }
-  .gap { height: 10px; }
-  .entry-row {
-    animation: fadeIn 0.2s ease-out;
-  }
-  .entry-row.child {
-    margin-left: 16px;
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+  .ctx-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+  .ctx-pct { font-size: var(--xs); color: var(--t2); }
+  .model { font-size: var(--xs); color: var(--t2); }
 
-  .scroll-btn {
-    position: absolute;
-    bottom: 12px;
-    right: 20px;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
-    font-size: 16px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    transition: all 0.15s;
-    z-index: 10;
+  .approval {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px;
+    background: rgba(232,160,48,0.07);
+    border-bottom: 1px solid rgba(232,160,48,0.2);
+    flex-shrink: 0;
   }
-  .scroll-btn:hover {
-    background: var(--bg-tertiary);
-    transform: scale(1.1);
+  .approval-icon { color: var(--s-input); font-size: var(--md); }
+  .approval-text { font-size: var(--sm); color: var(--s-input); }
+
+  .feed-wrap {
+    flex: 1; overflow-y: auto; min-height: 0;
+    padding: 0;
+  }
+  .feed-empty {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; font-size: var(--sm); color: var(--t3);
   }
 
   .pending-msg {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 8px 14px;
-    border-radius: 10px;
-    background: var(--bg-user);
-    border: 1px dashed color-mix(in srgb, var(--blue) 40%, transparent);
-    margin: 4px 0;
-    animation: fadeIn 0.2s ease-out;
-    opacity: 0.7;
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 8px 14px 8px 10px;
+    font-size: var(--base);
+    color: var(--t1); opacity: 0.6;
+    border-left: 2px solid var(--user-fg);
+    margin: 2px 0;
   }
-  .pending-icon {
-    color: var(--blue);
-    font-size: 12px;
-    flex-shrink: 0;
-    margin-top: 1px;
-  }
-  .pending-text {
-    font-size: 13px;
-    color: var(--text-primary);
-    white-space: pre-wrap;
-    flex: 1;
-    min-width: 0;
-  }
-  .pending-label {
-    font-size: 10px;
-    color: var(--text-dim);
-    flex-shrink: 0;
-    font-style: italic;
-  }
+  .pending-arrow { color: var(--user-fg); flex-shrink: 0; }
 
-  .approval-banner {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-    background: var(--amber-dim);
-    border: 1px solid var(--amber);
-    border-radius: 8px;
-    margin-top: 6px;
-    animation: pulseGlow 2s ease-in-out infinite;
+  .scroll-btn {
+    position: absolute; bottom: 56px; right: 16px; z-index: 10;
+    background: var(--bg2); border: 1px solid var(--bd1);
+    border-radius: 3px; color: var(--t1);
+    font-size: var(--xs); padding: 4px 10px;
   }
-  @keyframes pulseGlow {
-    0%, 100% { box-shadow: none; }
-    50% { box-shadow: 0 0 12px var(--pulse-glow); }
-  }
-  .approval-icon { font-size: 16px; }
-  .approval-text { font-size: 12px; color: var(--amber); font-weight: 500; }
+  .scroll-btn:hover { border-color: var(--ac); color: var(--ac); }
 </style>

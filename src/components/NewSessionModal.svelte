@@ -1,0 +1,201 @@
+<script lang="ts">
+  import { createEventDispatcher } from 'svelte';
+  import { open } from '@tauri-apps/plugin-dialog';
+  import { createSession } from '../lib/tauri';
+
+  const dispatch = createEventDispatcher();
+
+  let path = '';
+  let prompt = '';
+  let model = 'auto';
+  let approveMode = false;
+  let loading = false;
+  let error = '';
+
+  const models = [
+    { v: 'auto',                   l: 'auto' },
+    { v: 'claude-sonnet-4-6',      l: 'sonnet-4.6' },
+    { v: 'claude-opus-4-6',        l: 'opus-4.6' },
+    { v: 'claude-haiku-4-5-20251001', l: 'haiku-4.5' },
+  ];
+
+  async function browse() {
+    const sel = await open({ directory: true, multiple: false });
+    if (sel && typeof sel === 'string') path = sel;
+  }
+
+  async function submit() {
+    if (!path.trim() || !prompt.trim()) { error = 'path and prompt required'; return; }
+    loading = true; error = '';
+    try {
+      await createSession({
+        projectPath: path.trim(),
+        prompt: prompt.trim(),
+        model: model === 'auto' ? undefined : model,
+        permissionMode: approveMode ? 'approve' : 'ignore',
+      });
+      dispatch('done');
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    } finally {
+      loading = false;
+    }
+  }
+
+  function onKey(e: KeyboardEvent) {
+    if (e.key === 'Escape') dispatch('cancel');
+  }
+</script>
+
+<svelte:window on:keydown={onKey} />
+
+<div class="overlay" on:click|self={() => dispatch('cancel')}>
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">new session</span>
+      <button class="close" on:click={() => dispatch('cancel')}>✕</button>
+    </div>
+
+    <div class="field">
+      <label class="label">path</label>
+      <div class="path-row">
+        <input
+          class="input"
+          bind:value={path}
+          placeholder="/home/user/project"
+          disabled={loading}
+          on:keydown={e => e.key === 'Enter' && prompt && submit()}
+        />
+        <button class="browse" on:click={browse} disabled={loading} title="browse">⌘</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="label">prompt</label>
+      <textarea
+        class="input textarea"
+        bind:value={prompt}
+        placeholder="what should claude work on?"
+        rows="3"
+        disabled={loading}
+        on:keydown={e => { if (e.key === 'Enter' && e.metaKey) submit(); }}
+      ></textarea>
+    </div>
+
+    <div class="row">
+      <div class="field half">
+        <label class="label">model</label>
+        <select class="input select" bind:value={model} disabled={loading}>
+          {#each models as m}
+            <option value={m.v}>{m.l}</option>
+          {/each}
+        </select>
+      </div>
+      <div class="field half approve-field">
+        <label class="label">approve tools</label>
+        <label class="toggle">
+          <input type="checkbox" bind:checked={approveMode} disabled={loading} />
+          <span class="toggle-track" class:on={approveMode}></span>
+        </label>
+      </div>
+    </div>
+
+    {#if error}
+      <p class="error">! {error}</p>
+    {/if}
+
+    <div class="actions">
+      <button class="btn ghost" on:click={() => dispatch('cancel')} disabled={loading}>cancel</button>
+      <button class="btn primary" on:click={submit} disabled={loading || !path || !prompt}>
+        {loading ? 'spawning...' : 'start session'}
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal {
+    background: var(--bg1);
+    border: 1px solid var(--bd1);
+    border-radius: 4px;
+    width: 480px;
+    max-width: 94vw;
+    display: flex; flex-direction: column; gap: 14px;
+    padding: 20px;
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-size: var(--md); color: var(--t1); letter-spacing: 0.06em; }
+  .close {
+    background: none; border: none; color: var(--t2);
+    font-size: 12px; padding: 2px 4px;
+  }
+  .close:hover { color: var(--t0); }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .label { font-size: var(--xs); color: var(--t2); letter-spacing: 0.06em; }
+  .input {
+    background: var(--bg2); border: 1px solid var(--bd1);
+    border-radius: 3px; color: var(--t0);
+    font-size: var(--md); padding: 6px 8px;
+    outline: none; width: 100%;
+    transition: border-color 0.15s;
+  }
+  .input:focus { border-color: var(--bd2); }
+  .input:disabled { opacity: 0.5; }
+  .textarea { resize: none; line-height: 1.5; }
+  .select { appearance: none; cursor: pointer; }
+
+  .path-row { display: flex; gap: 6px; }
+  .path-row .input { flex: 1; }
+  .browse {
+    background: var(--bg2); border: 1px solid var(--bd1);
+    color: var(--t1); border-radius: 3px;
+    padding: 0 10px; font-size: var(--base);
+    flex-shrink: 0;
+  }
+  .browse:hover { border-color: var(--bd2); color: var(--t0); }
+
+  .row { display: flex; gap: 12px; }
+  .half { flex: 1; }
+  .approve-field { justify-content: space-between; flex-direction: row; align-items: center; }
+  .approve-field .label { align-self: flex-start; margin-top: 4px; }
+
+  .toggle { display: flex; align-items: center; cursor: pointer; }
+  .toggle input { display: none; }
+  .toggle-track {
+    width: 28px; height: 14px;
+    background: var(--bg3); border: 1px solid var(--bd1);
+    border-radius: 7px; position: relative;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .toggle-track::after {
+    content: '';
+    position: absolute; top: 1px; left: 1px;
+    width: 10px; height: 10px;
+    border-radius: 50%; background: var(--t2);
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle-track.on { background: var(--ac-d); border-color: var(--ac); }
+  .toggle-track.on::after { transform: translateX(14px); background: var(--ac); }
+
+  .error { font-size: var(--sm); color: var(--s-error); }
+
+  .actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .btn {
+    background: none; border: 1px solid var(--bd1);
+    border-radius: 3px; color: var(--t1);
+    font-size: var(--sm); padding: 5px 14px;
+    transition: all 0.15s;
+  }
+  .btn:hover { border-color: var(--bd2); color: var(--t0); }
+  .btn.primary { background: var(--ac-d); border-color: var(--ac); color: var(--ac); }
+  .btn.primary:hover { background: rgba(0,212,126,0.18); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>

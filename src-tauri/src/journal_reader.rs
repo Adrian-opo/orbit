@@ -802,4 +802,101 @@ mod process_line_tests {
         process_line(&mut state, line);
         assert_eq!(state.status, AgentStatus::Idle);
     }
+
+    #[test]
+    fn test_process_thinking_block_creates_thinking_entry() {
+        let mut state = JournalState::default();
+        let line = r#"{"type":"assistant","message":{"model":"claude-sonnet-4-6","content":[{"type":"thinking","thinking":"Let me reason..."}],"usage":{"input_tokens":5,"output_tokens":2,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
+        process_line(&mut state, line);
+        assert_eq!(state.entries.len(), 1);
+        assert_eq!(state.entries[0].entry_type, JournalEntryType::Thinking);
+        assert_eq!(state.entries[0].thinking.as_deref(), Some("Let me reason..."));
+    }
+
+    #[test]
+    fn test_process_user_plain_text_creates_user_entry() {
+        let mut state = JournalState::default();
+        let line = r#"{"type":"user","message":{"content":"Fix the bug"}}"#;
+        process_line(&mut state, line);
+        assert_eq!(state.entries.len(), 1);
+        assert_eq!(state.entries[0].entry_type, JournalEntryType::User);
+        assert_eq!(state.entries[0].text.as_deref(), Some("Fix the bug"));
+        assert_eq!(state.status, AgentStatus::Working);
+    }
+
+    #[test]
+    fn test_process_tool_result_creates_tool_result_entry() {
+        let mut state = JournalState::default();
+        // First send a tool_use so mini_log has an entry to update
+        let tool_line = r#"{"type":"assistant","message":{"model":"m","content":[{"type":"tool_use","name":"Bash","input":{"command":"ls"}}],"usage":{"input_tokens":1,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
+        process_line(&mut state, tool_line);
+
+        let result_line = r#"{"type":"user","message":{"content":[{"type":"tool_result","content":"file1.rs\nfile2.rs"}]}}"#;
+        process_line(&mut state, result_line);
+
+        let tool_result = state.entries.iter().find(|e| e.entry_type == JournalEntryType::ToolResult);
+        assert!(tool_result.is_some());
+        assert!(tool_result.unwrap().output.as_ref().unwrap().contains("file1.rs"));
+        assert_eq!(state.status, AgentStatus::Working);
+    }
+
+    #[test]
+    fn test_process_system_stop_hook_sets_idle() {
+        let mut state = JournalState::default();
+        state.status = AgentStatus::Working;
+        let line = r#"{"type":"system","message":{"subtype":"stop_hook_summary"}}"#;
+        process_line(&mut state, line);
+        assert_eq!(state.status, AgentStatus::Idle);
+    }
+
+    #[test]
+    fn test_process_mini_log_capped_at_4() {
+        let mut state = JournalState::default();
+        let tool_line = |name: &str| format!(
+            r#"{{"type":"assistant","message":{{"model":"m","content":[{{"type":"tool_use","name":"{}","input":{{"command":"x"}}}}],"usage":{{"input_tokens":1,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}}}}"#,
+            name
+        );
+
+        for name in ["Bash", "Read", "Write", "Grep", "Edit"] {
+            process_line(&mut state, &tool_line(name));
+        }
+
+        assert_eq!(state.mini_log.len(), 4);
+        // First entry (Bash) was evicted
+        assert_ne!(state.mini_log[0].tool, "Bash");
+    }
+
+    #[test]
+    fn test_process_token_accumulation() {
+        let mut state = JournalState::default();
+        let line = r#"{"type":"assistant","message":{"model":"m","content":[{"type":"text","text":"hi"}],"usage":{"input_tokens":100,"output_tokens":50,"cache_creation_input_tokens":20,"cache_read_input_tokens":30}}}"#;
+        process_line(&mut state, line);
+        // input_tokens + cache_creation + cache_read = 100 + 20 + 30 = 150
+        assert_eq!(state.input_tokens, 150);
+        assert_eq!(state.output_tokens, 50);
+        assert_eq!(state.cache_write, 20);
+        assert_eq!(state.cache_read, 30);
+    }
+
+    #[test]
+    fn test_process_pending_approval_set_and_cleared() {
+        let mut state = JournalState::default();
+        // Tool call → pending_approval set
+        let tool_line = r#"{"type":"assistant","message":{"model":"m","content":[{"type":"tool_use","name":"Bash","input":{"command":"rm -rf /"}}],"usage":{"input_tokens":1,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
+        process_line(&mut state, tool_line);
+        assert!(state.pending_approval.is_some());
+
+        // Tool result → pending_approval cleared
+        let result_line = r#"{"type":"user","message":{"content":[{"type":"tool_result","content":"done"}]}}"#;
+        process_line(&mut state, result_line);
+        assert!(state.pending_approval.is_none());
+    }
+
+    #[test]
+    fn test_process_synthetic_message_is_skipped() {
+        let mut state = JournalState::default();
+        let line = r#"{"type":"assistant","message":{"content":"<synthetic>"}}"#;
+        process_line(&mut state, line);
+        assert!(state.entries.is_empty());
+    }
 }

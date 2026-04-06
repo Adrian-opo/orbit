@@ -101,8 +101,10 @@
 <style>
   .app-layout {
     display: flex;
-    height: 100vh;
+    flex: 1;
+    height: 100%;
     overflow: hidden;
+    min-height: 0;
   }
   .empty-state {
     flex: 1;
@@ -111,5 +113,6 @@
     justify-content: center;
     color: var(--text-muted);
     font-size: 14px;
+    min-width: 0;
   }
 </style>

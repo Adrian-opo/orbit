@@ -122,18 +122,23 @@
   box-sizing: border-box;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 14px;
   overflow: hidden;
-  height: 100vh;
+  height: 100%;
 }
 
 #app {
-  height: 100vh;
+  height: 100%;
   display: flex;
+  flex-direction: column;
 }
 
 ::-webkit-scrollbar {

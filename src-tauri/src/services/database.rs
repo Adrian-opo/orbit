@@ -283,4 +283,80 @@ mod tests {
         let missing = db.get_session(999).unwrap();
         assert!(missing.is_none());
     }
+
+    #[test]
+    fn test_update_session_pid_sets_running() {
+        let db = DatabaseService::open_in_memory().unwrap();
+        let id = db.create_session(None, None, "/tmp/proj", "ignore", None).unwrap();
+        assert_eq!(db.get_session(id).unwrap().unwrap().status, "initializing");
+
+        db.update_session_pid(id, 12345).unwrap();
+
+        let session = db.get_session(id).unwrap().unwrap();
+        assert_eq!(session.status, "running");
+        assert_eq!(session.pid, Some(12345));
+    }
+
+    #[test]
+    fn test_get_projects_empty() {
+        let db = DatabaseService::open_in_memory().unwrap();
+        let projects = db.get_projects().unwrap();
+        assert!(projects.is_empty());
+    }
+
+    #[test]
+    fn test_get_projects_returns_all() {
+        let db = DatabaseService::open_in_memory().unwrap();
+        db.create_project("alpha", "/alpha").unwrap();
+        db.create_project("beta", "/beta").unwrap();
+        let projects = db.get_projects().unwrap();
+        assert_eq!(projects.len(), 2);
+        // Ordered by name ASC
+        assert_eq!(projects[0].name, "alpha");
+        assert_eq!(projects[1].name, "beta");
+    }
+
+    #[test]
+    fn test_session_with_project_foreign_key() {
+        let db = DatabaseService::open_in_memory().unwrap();
+        let project = db.create_project("myapp", "/myapp").unwrap();
+        let id = db.create_session(Some(project.id), Some("feat"), "/myapp", "approve", Some("claude-sonnet-4-6")).unwrap();
+
+        let session = db.get_session(id).unwrap().unwrap();
+        assert_eq!(session.project_id, Some(project.id));
+        assert_eq!(session.name, Some("feat".to_string()));
+        assert_eq!(session.permission_mode, "approve");
+        assert_eq!(session.model, Some("claude-sonnet-4-6".to_string()));
+    }
+
+    #[test]
+    fn test_outputs_ordered_by_insertion() {
+        let db = DatabaseService::open_in_memory().unwrap();
+        let id = db.create_session(None, None, "/tmp", "ignore", None).unwrap();
+
+        for i in 0..5 {
+            db.insert_output(id, &format!(r#"{{"line":{}}}"#, i)).unwrap();
+        }
+
+        let rows = db.get_outputs(id).unwrap();
+        assert_eq!(rows.len(), 5);
+        for (i, row) in rows.iter().enumerate() {
+            assert!(row.contains(&i.to_string()));
+        }
+    }
+
+    #[test]
+    fn test_outputs_isolated_per_session() {
+        let db = DatabaseService::open_in_memory().unwrap();
+        let id1 = db.create_session(None, None, "/a", "ignore", None).unwrap();
+        let id2 = db.create_session(None, None, "/b", "ignore", None).unwrap();
+
+        db.insert_output(id1, r#"{"session":1}"#).unwrap();
+        db.insert_output(id2, r#"{"session":2}"#).unwrap();
+
+        assert_eq!(db.get_outputs(id1).unwrap().len(), 1);
+        assert_eq!(db.get_outputs(id2).unwrap().len(), 1);
+        assert!(db.get_outputs(id1).unwrap()[0].contains("1"));
+        assert!(db.get_outputs(id2).unwrap()[0].contains("2"));
+    }
 }

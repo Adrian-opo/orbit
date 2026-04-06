@@ -11,10 +11,19 @@
 </script>
 
 <div class="thinking-block">
-  <div class="header" onclick={() => expanded = !expanded} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && (expanded = !expanded)}>
+  <div
+    class="header"
+    onclick={() => (expanded = !expanded)}
+    role="button"
+    tabindex="0"
+    onkeydown={(e) => e.key === 'Enter' && (expanded = !expanded)}
+  >
     <div class="left">
       <span class="badge">THINKING</span>
-      <span class="meta">{timeStr} {#if durationStr}• {durationStr}{/if}</span>
+      <span class="meta"
+        >{timeStr}
+        {#if durationStr}• {durationStr}{/if}</span
+      >
     </div>
     <span class="toggle">{expanded ? '▼' : '▶'} {expanded ? 'expanded' : 'collapsed'}</span>
   </div>
@@ -26,7 +35,10 @@
 </div>
 
 <style>
-  .thinking-block { padding: 8px 10px; background: var(--bg-thinking); }
+  .thinking-block {
+    padding: 8px 10px;
+    background: var(--bg-thinking);
+  }
   .header {
     display: flex;
     justify-content: space-between;
@@ -34,7 +46,11 @@
     margin-bottom: 6px;
     cursor: pointer;
   }
-  .left { display: flex; align-items: center; gap: 6px; }
+  .left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
   .badge {
     background: var(--purple-dim);
     color: var(--purple);
@@ -43,8 +59,14 @@
     font-size: 11px;
     font-weight: 600;
   }
-  .meta { color: var(--text-dim); font-size: 11px; }
-  .toggle { color: var(--text-dim); font-size: 11px; }
+  .meta {
+    color: var(--text-dim);
+    font-size: 11px;
+  }
+  .toggle {
+    color: var(--text-dim);
+    font-size: 11px;
+  }
   .content {
     font-size: 13px;
     color: var(--thinking-text);

@@ -38,7 +38,13 @@ export interface AgentState {
   startedAt: number;
 }
 
-export type JournalEntryType = 'user' | 'thinking' | 'assistant' | 'toolCall' | 'toolResult' | 'system';
+export type JournalEntryType =
+  | 'user'
+  | 'thinking'
+  | 'assistant'
+  | 'toolCall'
+  | 'toolResult'
+  | 'system';
 
 export interface JournalEntry {
   sessionId: string;

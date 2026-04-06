@@ -17,9 +17,11 @@
     try {
       const entries = await getSessionJournal(id);
       if (entries.length > 0) {
-        journal.update(m => new Map(m).set(id, entries));
+        journal.update((m) => new Map(m).set(id, entries));
       }
-    } catch (_e) { /* no-op */ }
+    } catch (_e) {
+      /* no-op */
+    }
   }
 
   $: if (session) loadHistory(session.id);
@@ -28,7 +30,7 @@
   // Clear pending only when assistant responds (not on user entry echo)
   $: {
     const e = $journal.get(session?.id);
-    if (e && e.some(entry => entry.entryType === 'assistant' || entry.entryType === 'toolCall')) {
+    if (e && e.some((entry) => entry.entryType === 'assistant' || entry.entryType === 'toolCall')) {
       pendingMessages.clear();
     }
     scrollIfNeeded();
@@ -47,7 +49,10 @@
   }
 
   function scrollToBottom() {
-    if (feedEl) { feedEl.scrollTop = feedEl.scrollHeight; atBottom = true; }
+    if (feedEl) {
+      feedEl.scrollTop = feedEl.scrollHeight;
+      atBottom = true;
+    }
   }
 
   $: entries = $journal.get(session?.id) ?? [];
@@ -57,9 +62,9 @@
 
   function fmtModel(m: string | null) {
     if (!m) return 'auto';
-    if (m.includes('opus'))   return 'opus-4.6';
+    if (m.includes('opus')) return 'opus-4.6';
     if (m.includes('sonnet')) return 'sonnet-4.6';
-    if (m.includes('haiku'))  return 'haiku-4.5';
+    if (m.includes('haiku')) return 'haiku-4.5';
     return m;
   }
 </script>
@@ -70,7 +75,10 @@
     <div class="header-left">
       <span class="dot" style="color:{statusClr}" class:pulse={pulsing}>●</span>
       <span class="session-name">
-        {session.name ?? session.projectName ?? session.cwd?.split(/[\\/]/).pop() ?? `#${session.id}`}
+        {session.name ??
+          session.projectName ??
+          session.cwd?.split(/[\\/]/).pop() ??
+          `#${session.id}`}
       </span>
       {#if session.gitBranch}
         <span class="branch">{session.gitBranch}</span>
@@ -85,10 +93,15 @@
         {#if (session.contextPercent ?? 0) > 0}
           <span class="ctx">
             <span class="ctx-bar">
-              <span class="ctx-fill" style="width:{Math.min(session.contextPercent ?? 0, 100)}%;
-                background:{(session.contextPercent ?? 0) > 85 ? 'var(--s-error)' :
-                             (session.contextPercent ?? 0) > 65 ? 'var(--s-input)' :
-                             'var(--ac)'}">
+              <span
+                class="ctx-fill"
+                style="width:{Math.min(session.contextPercent ?? 0, 100)}%;
+                background:{(session.contextPercent ?? 0) > 85
+                  ? 'var(--s-error)'
+                  : (session.contextPercent ?? 0) > 65
+                    ? 'var(--s-input)'
+                    : 'var(--ac)'}"
+              >
               </span>
             </span>
             <span class="ctx-pct">{Math.round(session.contextPercent ?? 0)}%</span>
@@ -134,76 +147,162 @@
 
 <style>
   .panel {
-    flex: 1; min-width: 0; min-height: 0;
-    display: flex; flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     background: var(--bg);
   }
 
   .header {
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: 8px 14px;
     border-bottom: 1px solid var(--bd);
     flex-shrink: 0;
     background: var(--bg1);
   }
-  .header-left { display: flex; align-items: center; gap: 8px; }
-  .dot { font-size: 8px; line-height: 1; }
-  .dot.pulse { animation: pulse 2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
-  .session-name { font-size: var(--md); font-weight: 500; color: var(--t0); }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot {
+    font-size: 8px;
+    line-height: 1;
+  }
+  .dot.pulse {
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.25;
+    }
+  }
+  .session-name {
+    font-size: var(--md);
+    font-weight: 500;
+    color: var(--t0);
+  }
   .branch {
-    font-size: var(--xs); color: var(--t2);
-    background: var(--bg3); border: 1px solid var(--bd);
-    border-radius: 2px; padding: 0 5px;
+    font-size: var(--xs);
+    color: var(--t2);
+    background: var(--bg3);
+    border: 1px solid var(--bd);
+    border-radius: 2px;
+    padding: 0 5px;
   }
-  .status { font-size: var(--xs); color: var(--t2); letter-spacing: 0.04em; }
+  .status {
+    font-size: var(--xs);
+    color: var(--t2);
+    letter-spacing: 0.04em;
+  }
 
-  .header-right { display: flex; align-items: center; gap: 10px; }
-  .meta { font-size: var(--xs); color: var(--t2); }
-  .ctx { display: flex; align-items: center; gap: 5px; }
-  .ctx-bar {
-    width: 40px; height: 3px;
-    background: var(--bg3); border-radius: 2px; overflow: hidden;
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
-  .ctx-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
-  .ctx-pct { font-size: var(--xs); color: var(--t2); }
-  .model { font-size: var(--xs); color: var(--t2); }
+  .meta {
+    font-size: var(--xs);
+    color: var(--t2);
+  }
+  .ctx {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .ctx-bar {
+    width: 40px;
+    height: 3px;
+    background: var(--bg3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .ctx-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+  .ctx-pct {
+    font-size: var(--xs);
+    color: var(--t2);
+  }
+  .model {
+    font-size: var(--xs);
+    color: var(--t2);
+  }
 
   .approval {
-    display: flex; align-items: center; gap: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 6px 14px;
-    background: rgba(232,160,48,0.07);
-    border-bottom: 1px solid rgba(232,160,48,0.2);
+    background: rgba(232, 160, 48, 0.07);
+    border-bottom: 1px solid rgba(232, 160, 48, 0.2);
     flex-shrink: 0;
   }
-  .approval-icon { color: var(--s-input); font-size: var(--md); }
-  .approval-text { font-size: var(--sm); color: var(--s-input); }
+  .approval-icon {
+    color: var(--s-input);
+    font-size: var(--md);
+  }
+  .approval-text {
+    font-size: var(--sm);
+    color: var(--s-input);
+  }
 
   .feed-wrap {
-    flex: 1; overflow-y: auto; min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
     padding: 0;
   }
   .feed-empty {
-    display: flex; align-items: center; justify-content: center;
-    height: 100%; font-size: var(--sm); color: var(--t3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: var(--sm);
+    color: var(--t3);
   }
 
   .pending-msg {
-    display: flex; gap: 8px; align-items: flex-start;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
     padding: 8px 14px 8px 10px;
     font-size: var(--base);
-    color: var(--t1); opacity: 0.6;
+    color: var(--t1);
+    opacity: 0.6;
     border-left: 2px solid var(--user-fg);
     margin: 2px 0;
   }
-  .pending-arrow { color: var(--user-fg); flex-shrink: 0; }
+  .pending-arrow {
+    color: var(--user-fg);
+    flex-shrink: 0;
+  }
 
   .scroll-btn {
-    position: absolute; bottom: 56px; right: 16px; z-index: 10;
-    background: var(--bg2); border: 1px solid var(--bd1);
-    border-radius: 3px; color: var(--t1);
-    font-size: var(--xs); padding: 4px 10px;
+    position: absolute;
+    bottom: 56px;
+    right: 16px;
+    z-index: 10;
+    background: var(--bg2);
+    border: 1px solid var(--bd1);
+    border-radius: 3px;
+    color: var(--t1);
+    font-size: var(--xs);
+    padding: 4px 10px;
   }
-  .scroll-btn:hover { border-color: var(--ac); color: var(--ac); }
+  .scroll-btn:hover {
+    border-color: var(--ac);
+    color: var(--ac);
+  }
 </style>

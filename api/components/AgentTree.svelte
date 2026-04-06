@@ -3,24 +3,24 @@
 
   export let subagents: SubagentInfo[];
 
-  $: running = subagents.filter(a => a.status === 'running');
-  $: doneCount = subagents.filter(a => a.status === 'done').length;
+  $: running = subagents.filter((a) => a.status === 'running');
+  $: doneCount = subagents.filter((a) => a.status === 'done').length;
 </script>
 
 {#if running.length > 0 || doneCount > 0}
-<div class="tree mono">
-  {#if running.length > 0}
-    {#each running as agent}
-      <span class="running-indicator">▸ {agent.agentType}</span>
-      {#if agent.description}
-        <span class="desc">{agent.description}</span>
-      {/if}
-    {/each}
-  {/if}
-  {#if doneCount > 0}
-    <span class="done-count">{doneCount} subagent{doneCount > 1 ? 's' : ''} completed</span>
-  {/if}
-</div>
+  <div class="tree mono">
+    {#if running.length > 0}
+      {#each running as agent}
+        <span class="running-indicator">▸ {agent.agentType}</span>
+        {#if agent.description}
+          <span class="desc">{agent.description}</span>
+        {/if}
+      {/each}
+    {/if}
+    {#if doneCount > 0}
+      <span class="done-count">{doneCount} subagent{doneCount > 1 ? 's' : ''} completed</span>
+    {/if}
+  </div>
 {/if}
 
 <style>
@@ -34,7 +34,16 @@
     align-items: center;
     gap: 10px;
   }
-  .running-indicator { color: var(--amber); font-weight: 500; }
-  .desc { color: var(--text-dim); font-size: 11px; }
-  .done-count { color: var(--text-dim); font-size: 11px; }
+  .running-indicator {
+    color: var(--amber);
+    font-weight: 500;
+  }
+  .desc {
+    color: var(--text-dim);
+    font-size: 11px;
+  }
+  .done-count {
+    color: var(--text-dim);
+    font-size: 11px;
+  }
 </style>

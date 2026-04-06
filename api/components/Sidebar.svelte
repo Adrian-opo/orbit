@@ -12,9 +12,14 @@
   let renaming: { id: number; value: string } | null = null;
   let confirmDelete: { id: number; name: string } | null = null;
 
-  function onContextMenu(e: MouseEvent, s: typeof $sessions[0]) {
+  function onContextMenu(e: MouseEvent, s: (typeof $sessions)[0]) {
     e.preventDefault();
-    ctxMenu = { x: e.clientX, y: e.clientY, sessionId: s.id, sessionName: s.name ?? s.projectName ?? `#${s.id}` };
+    ctxMenu = {
+      x: e.clientX,
+      y: e.clientY,
+      sessionId: s.id,
+      sessionName: s.name ?? s.projectName ?? `#${s.id}`,
+    };
   }
 
   async function handleCtxAction(action: string) {
@@ -27,7 +32,11 @@
     } else if (action === 'delete') {
       confirmDelete = { id: sessionId, name: sessionName };
     } else if (action === 'stop') {
-      try { await stopSession(sessionId); } catch (_e) { /* no-op */ }
+      try {
+        await stopSession(sessionId);
+      } catch (_e) {
+        /* no-op */
+      }
     }
   }
 
@@ -37,7 +46,7 @@
     renaming = null;
     if (!value.trim()) return;
     await renameSession(id, value.trim());
-    sessions.update(l => updateSessionState(l, id, { name: value.trim() }));
+    sessions.update((l) => updateSessionState(l, id, { name: value.trim() }));
   }
 
   let showModal = false;
@@ -49,7 +58,7 @@
     return { destroy() {} };
   }
 
-  function fmtTokens(s: typeof $sessions[0]): string {
+  function fmtTokens(s: (typeof $sessions)[0]): string {
     if (!s.tokens) return '—';
     const total = s.tokens.input + s.tokens.output;
     return formatTokens(total);
@@ -57,19 +66,19 @@
 
   function fmtModel(model: string | null): string {
     if (!model || model === 'auto') return 'auto';
-    if (model.includes('opus'))   return 'opus';
+    if (model.includes('opus')) return 'opus';
     if (model.includes('sonnet')) return 'sonnet';
-    if (model.includes('haiku'))  return 'haiku';
+    if (model.includes('haiku')) return 'haiku';
     return model.split('-')[2] ?? model;
   }
 
-  function displayName(s: typeof $sessions[0]): string {
+  function displayName(s: (typeof $sessions)[0]): string {
     return s.name ?? s.projectName ?? s.cwd?.split(/[\\/]/).pop() ?? `#${s.id}`;
   }
 </script>
 
 {#if showModal}
-  <NewSessionModal on:done={() => showModal = false} on:cancel={() => showModal = false} />
+  <NewSessionModal on:done={() => (showModal = false)} on:cancel={() => (showModal = false)} />
 {/if}
 
 {#if confirmDelete}
@@ -77,14 +86,17 @@
     <div class="confirm-box">
       <p>Delete <strong>{confirmDelete.name}</strong>?</p>
       <div class="confirm-actions">
-        <button class="confirm-btn" on:click={() => confirmDelete = null}>cancel</button>
-        <button class="confirm-btn danger" on:click={async () => {
-          const { id } = confirmDelete!;
-          confirmDelete = null;
-          await deleteSession(id);
-          sessions.update(l => l.filter(s => s.id !== id));
-          if ($selectedSessionId === id) selectedSessionId.set(null);
-        }}>delete</button>
+        <button class="confirm-btn" on:click={() => (confirmDelete = null)}>cancel</button>
+        <button
+          class="confirm-btn danger"
+          on:click={async () => {
+            const { id } = confirmDelete!;
+            confirmDelete = null;
+            await deleteSession(id);
+            sessions.update((l) => l.filter((s) => s.id !== id));
+            if ($selectedSessionId === id) selectedSessionId.set(null);
+          }}>delete</button
+        >
       </div>
     </div>
   </div>
@@ -92,15 +104,16 @@
 
 {#if ctxMenu}
   <ContextMenu
-    x={ctxMenu.x} y={ctxMenu.y}
+    x={ctxMenu.x}
+    y={ctxMenu.y}
     items={[
       { label: 'Rename', action: 'rename', danger: false },
       { label: 'Stop', action: 'stop', danger: false },
       { label: '—', action: 'divider', divider: true },
       { label: 'Delete', action: 'delete', danger: true },
     ]}
-    on:select={e => handleCtxAction(e.detail)}
-    on:close={() => ctxMenu = null}
+    on:select={(e) => handleCtxAction(e.detail)}
+    on:close={() => (ctxMenu = null)}
   />
 {/if}
 
@@ -110,7 +123,7 @@
       <span class="brand-logo">{@html OrbitLogo}</span>
       <span class="brand-name">orbit</span>
     </div>
-    <button class="new-btn" on:click={() => showModal = true} title="New session">+</button>
+    <button class="new-btn" on:click={() => (showModal = true)} title="New session">+</button>
   </header>
 
   <div class="list">
@@ -125,7 +138,7 @@
           class="item"
           class:active
           on:click={() => selectedSessionId.set(s.id)}
-          on:contextmenu={e => onContextMenu(e, s)}
+          on:contextmenu={(e) => onContextMenu(e, s)}
         >
           <div class="item-top">
             <span class="dot" style="color:{color}" class:pulse={pulsing}>●</span>
@@ -133,7 +146,10 @@
               <input
                 class="rename-input"
                 bind:value={renaming.value}
-                on:keydown={e => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') renaming = null; }}
+                on:keydown={(e) => {
+                  if (e.key === 'Enter') submitRename();
+                  if (e.key === 'Escape') renaming = null;
+                }}
                 on:blur={submitRename}
                 use:focusOnMount
               />
@@ -159,10 +175,12 @@
     <span>{$sessions.length} session{$sessions.length !== 1 ? 's' : ''}</span>
     <span class="sep">·</span>
     <span>
-      {formatCost($sessions.reduce((sum, s) => {
-        if (!s.tokens) return sum;
-        return sum + estimateCost(s.tokens, s.model);
-      }, 0))} total
+      {formatCost(
+        $sessions.reduce((sum, s) => {
+          if (!s.tokens) return sum;
+          return sum + estimateCost(s.tokens, s.model);
+        }, 0)
+      )} total
     </span>
   </footer>
 </aside>
@@ -219,11 +237,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: border-color 0.15s, color 0.15s;
+    transition:
+      border-color 0.15s,
+      color 0.15s;
   }
-  .new-btn:hover { border-color: var(--ac); color: var(--ac); }
+  .new-btn:hover {
+    border-color: var(--ac);
+    color: var(--ac);
+  }
 
-  .list { flex: 1; overflow-y: auto; }
+  .list {
+    flex: 1;
+    overflow-y: auto;
+  }
 
   .empty {
     padding: 16px 12px;
@@ -241,7 +267,9 @@
     cursor: pointer;
     transition: background 0.1s;
   }
-  .item:hover { background: var(--bg2); }
+  .item:hover {
+    background: var(--bg2);
+  }
   .item.active {
     background: var(--ac-d2);
     border-left: 2px solid var(--ac);
@@ -259,10 +287,17 @@
     flex-shrink: 0;
     line-height: 1;
   }
-  .dot.pulse { animation: pulse 2s ease-in-out infinite; }
+  .dot.pulse {
+    animation: pulse 2s ease-in-out infinite;
+  }
   @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
+    }
   }
 
   .name {
@@ -289,37 +324,70 @@
     color: var(--t2);
     padding-left: 14px;
   }
-  .sep { color: var(--t3); }
+  .sep {
+    color: var(--t3);
+  }
   .confirm-overlay {
-    position: fixed; inset: 0; z-index: 200;
-    background: rgba(0,0,0,0.5);
-    display: flex; align-items: center; justify-content: center;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .confirm-box {
-    background: var(--bg2); border: 1px solid var(--bd1);
-    border-radius: 4px; padding: 16px 20px;
+    background: var(--bg2);
+    border: 1px solid var(--bd1);
+    border-radius: 4px;
+    padding: 16px 20px;
     min-width: 200px;
   }
-  .confirm-box p { font-size: var(--sm); color: var(--t0); margin-bottom: 12px; }
-  .confirm-box strong { color: var(--t0); }
-  .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .confirm-box p {
+    font-size: var(--sm);
+    color: var(--t0);
+    margin-bottom: 12px;
+  }
+  .confirm-box strong {
+    color: var(--t0);
+  }
+  .confirm-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
   .confirm-btn {
-    background: none; border: 1px solid var(--bd1);
-    border-radius: 3px; color: var(--t1);
-    font-size: var(--xs); padding: 4px 12px; cursor: pointer;
+    background: none;
+    border: 1px solid var(--bd1);
+    border-radius: 3px;
+    color: var(--t1);
+    font-size: var(--xs);
+    padding: 4px 12px;
+    cursor: pointer;
     font-family: var(--mono);
   }
-  .confirm-btn:hover { border-color: var(--bd2); color: var(--t0); }
-  .confirm-btn.danger { color: var(--s-error); }
-  .confirm-btn.danger:hover { border-color: var(--s-error); }
+  .confirm-btn:hover {
+    border-color: var(--bd2);
+    color: var(--t0);
+  }
+  .confirm-btn.danger {
+    color: var(--s-error);
+  }
+  .confirm-btn.danger:hover {
+    border-color: var(--s-error);
+  }
 
   .rename-input {
-    flex: 1; min-width: 0;
+    flex: 1;
+    min-width: 0;
     background: var(--bg3);
     border: 1px solid var(--ac);
-    border-radius: 2px; color: var(--t0);
-    font-size: var(--md); font-family: var(--mono);
-    padding: 1px 5px; outline: none;
+    border-radius: 2px;
+    color: var(--t0);
+    font-size: var(--md);
+    font-family: var(--mono);
+    padding: 1px 5px;
+    outline: none;
   }
   .approval-dot {
     color: var(--s-input);

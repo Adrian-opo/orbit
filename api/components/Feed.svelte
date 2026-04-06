@@ -43,7 +43,8 @@
   let expandedThinking = new Set<number>();
   function toggleThinking(i: number) {
     const next = new Set(expandedThinking);
-    if (next.has(i)) next.delete(i); else next.add(i);
+    if (next.has(i)) next.delete(i);
+    else next.add(i);
     expandedThinking = next;
   }
 </script>
@@ -60,7 +61,6 @@
           <Markdown content={e.text ?? ''} />
         </div>
       </div>
-
     {:else if e.entryType === 'thinking'}
       {@const expanded = expandedThinking.has(i)}
       <div class="row thinking">
@@ -81,7 +81,6 @@
           </div>
         {/if}
       </div>
-
     {:else if e.entryType === 'assistant'}
       <div class="row assistant">
         <div class="row-meta">
@@ -92,7 +91,6 @@
           <Markdown content={e.text ?? ''} />
         </div>
       </div>
-
     {:else if e.entryType === 'toolCall'}
       <div class="row tool">
         <div class="row-meta">
@@ -113,7 +111,9 @@
           </div>
         {:else if (e.tool === 'Read' || e.tool === 'Edit' || e.tool === 'Write') && e.toolInput?.file_path}
           <div class="tool-cmd">
-            <span class="prompt-char">{e.tool === 'Read' ? '‹' : e.tool === 'Write' ? '›' : '~'}</span>
+            <span class="prompt-char"
+              >{e.tool === 'Read' ? '‹' : e.tool === 'Write' ? '›' : '~'}</span
+            >
             <span class="tool-path">{String(e.toolInput.file_path).split(/[/\\]/).pop()}</span>
             <span class="tool-path-full">{e.toolInput.file_path}</span>
           </div>
@@ -134,7 +134,6 @@
           </div>
         {/if}
       </div>
-
     {:else if e.entryType === 'system'}
       <div class="row system">
         <span class="system-text">{e.text}</span>
@@ -153,103 +152,207 @@
 </div>
 
 <style>
-  .feed { padding: 10px 0; display: flex; flex-direction: column; gap: 1px; }
+  .feed {
+    padding: 10px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
 
-  .row { padding: 8px 14px; }
-  .row:hover { background: rgba(255,255,255,0.015); }
+  .row {
+    padding: 8px 14px;
+  }
+  .row:hover {
+    background: rgba(255, 255, 255, 0.015);
+  }
 
   .row-meta {
-    display: flex; align-items: center; gap: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 4px;
   }
   .row-who {
-    font-size: var(--xs); font-weight: 600;
-    letter-spacing: 0.06em; text-transform: lowercase;
+    font-size: var(--xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: lowercase;
   }
-  .user-who  { color: var(--user-fg); }
-  .ai-who    { color: var(--ac); }
-  .think-who { color: var(--think-fg); }
-  .tool-who  { color: var(--tool-fg); }
+  .user-who {
+    color: var(--user-fg);
+  }
+  .ai-who {
+    color: var(--ac);
+  }
+  .think-who {
+    color: var(--think-fg);
+  }
+  .tool-who {
+    color: var(--tool-fg);
+  }
 
-  .row-ts { font-size: var(--xs); color: var(--t3); }
+  .row-ts {
+    font-size: var(--xs);
+    color: var(--t3);
+  }
 
   .expand-btn {
-    background: none; border: none; color: var(--t2);
-    font-size: var(--xs); cursor: pointer; padding: 0;
+    background: none;
+    border: none;
+    color: var(--t2);
+    font-size: var(--xs);
+    cursor: pointer;
+    padding: 0;
   }
-  .expand-btn:hover { color: var(--t0); }
+  .expand-btn:hover {
+    color: var(--t0);
+  }
 
-  .tool-status { font-size: var(--xs); }
-  .tool-status.ok { color: var(--s-working); }
-  .tool-status.fail { color: var(--s-error); }
+  .tool-status {
+    font-size: var(--xs);
+  }
+  .tool-status.ok {
+    color: var(--s-working);
+  }
+  .tool-status.fail {
+    color: var(--s-error);
+  }
 
   .row-body {
-    font-size: var(--base); line-height: 1.6;
+    font-size: var(--base);
+    line-height: 1.6;
     color: var(--t0);
     padding-left: 0;
   }
 
-  .user .row-body { color: var(--t0); }
+  .user .row-body {
+    color: var(--t0);
+  }
 
   .think-body {
-    color: var(--think-fg); white-space: pre-wrap;
-    font-style: italic; font-size: var(--sm);
+    color: var(--think-fg);
+    white-space: pre-wrap;
+    font-style: italic;
+    font-size: var(--sm);
     background: var(--think-bg);
     border-left: 2px solid var(--think-fg);
-    padding: 6px 10px; border-radius: 0 3px 3px 0;
-    max-height: 280px; overflow-y: auto;
+    padding: 6px 10px;
+    border-radius: 0 3px 3px 0;
+    max-height: 280px;
+    overflow-y: auto;
   }
   .think-preview {
-    color: var(--think-fg); font-style: italic;
-    font-size: var(--sm); opacity: 0.7;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    color: var(--think-fg);
+    font-style: italic;
+    font-size: var(--sm);
+    opacity: 0.7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .tool-cmd {
-    display: flex; align-items: flex-start; gap: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
     padding: 5px 8px;
-    background: var(--bg2); border-radius: 3px;
+    background: var(--bg2);
+    border-radius: 3px;
     border-left: 2px solid var(--tool-fg);
     margin-bottom: 3px;
   }
-  .prompt-char { color: var(--tool-fg); font-size: var(--md); flex-shrink: 0; margin-top: 1px; }
+  .prompt-char {
+    color: var(--tool-fg);
+    font-size: var(--md);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
   .tool-cmd pre {
-    font-size: var(--sm); color: var(--t0);
-    white-space: pre-wrap; word-break: break-all; margin: 0;
+    font-size: var(--sm);
+    color: var(--t0);
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
     font-family: var(--mono);
   }
-  .tool-path { font-size: var(--md); color: var(--t0); font-weight: 500; }
-  .tool-path-full { font-size: var(--xs); color: var(--t2); margin-left: 4px; }
+  .tool-path {
+    font-size: var(--md);
+    color: var(--t0);
+    font-weight: 500;
+  }
+  .tool-path-full {
+    font-size: var(--xs);
+    color: var(--t2);
+    margin-left: 4px;
+  }
 
   .tool-result {
     padding: 5px 8px;
     background: var(--result-bg);
-    border-radius: 3px; border-left: 2px solid var(--bd1);
+    border-radius: 3px;
+    border-left: 2px solid var(--bd1);
   }
   .tool-result pre {
-    font-size: var(--sm); color: var(--result-fg);
-    white-space: pre-wrap; word-break: break-word;
-    margin: 0; font-family: var(--mono);
-    max-height: 200px; overflow-y: auto;
+    font-size: var(--sm);
+    color: var(--result-fg);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    font-family: var(--mono);
+    max-height: 200px;
+    overflow-y: auto;
     line-height: 1.5;
   }
 
-  .system { padding: 4px 14px; }
-  .system-text { font-size: var(--xs); color: var(--t3); font-style: italic; }
+  .system {
+    padding: 4px 14px;
+  }
+  .system-text {
+    font-size: var(--xs);
+    color: var(--t3);
+    font-style: italic;
+  }
 
   .typing-row {
-    display: flex; align-items: center; gap: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 10px 14px;
   }
-  .typing-dots { display: flex; gap: 3px; align-items: center; }
+  .typing-dots {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+  }
   .typing-dots span {
-    width: 4px; height: 4px; border-radius: 50%;
-    background: var(--ac); display: block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--ac);
+    display: block;
     animation: td 1.2s ease-in-out infinite;
     opacity: 0.4;
   }
-  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes td { 0%,100%{opacity:0.4;transform:none} 40%{opacity:1;transform:translateY(-3px)} }
-  .typing-label { font-size: var(--xs); color: var(--t2); letter-spacing: 0.06em; }
+  .typing-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .typing-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+  @keyframes td {
+    0%,
+    100% {
+      opacity: 0.4;
+      transform: none;
+    }
+    40% {
+      opacity: 1;
+      transform: translateY(-3px);
+    }
+  }
+  .typing-label {
+    font-size: var(--xs);
+    color: var(--t2);
+    letter-spacing: 0.06em;
+  }
 </style>

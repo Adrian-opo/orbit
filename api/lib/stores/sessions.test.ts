@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  getSelectedSession,
-  upsertSession,
-  updateSessionState,
-  type Session,
-} from './sessions';
+import { getSelectedSession, upsertSession, updateSessionState, type Session } from './sessions';
 
 function makeSession(overrides: Partial<Session> = {}): Session {
   return {

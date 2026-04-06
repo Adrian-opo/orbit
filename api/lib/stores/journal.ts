@@ -22,13 +22,13 @@ function createPendingStore() {
         text,
         timestamp: new Date().toISOString(),
       };
-      update(msgs => [...msgs, msg]);
+      update((msgs) => [...msgs, msg]);
     },
     clear() {
       update(() => []);
     },
     remove(id: number) {
-      update(msgs => msgs.filter(m => m.id !== id));
+      update((msgs) => msgs.filter((m) => m.id !== id));
     },
   };
 }

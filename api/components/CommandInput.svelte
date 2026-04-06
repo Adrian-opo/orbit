@@ -42,15 +42,15 @@
     }
     if (agentCwd && agentCwd !== prevCwd) {
       prevCwd = agentCwd;
-      listProjectFiles(agentCwd).then(files => projectFiles = files).catch(() => {});
+      listProjectFiles(agentCwd)
+        .then((files) => (projectFiles = files))
+        .catch(() => {});
     }
   }
 
   // Slash command filtering
   $: query = inputText.startsWith('/') ? inputText.toLowerCase() : '';
-  $: filtered = query
-    ? commands.filter(c => c.cmd.toLowerCase().includes(query))
-    : [];
+  $: filtered = query ? commands.filter((c) => c.cmd.toLowerCase().includes(query)) : [];
   $: {
     showSuggestions = filtered.length > 0 && inputText.startsWith('/');
     if (selectedIdx >= filtered.length) selectedIdx = 0;
@@ -216,7 +216,7 @@
         return;
       }
       if (e.key === 'Enter' && !e.shiftKey) {
-        const exactMatch = filtered.find(c => c.cmd === inputText.trim());
+        const exactMatch = filtered.find((c) => c.cmd === inputText.trim());
         if (exactMatch) {
           e.preventDefault();
           handleSend();
@@ -245,7 +245,7 @@
           class="suggestion"
           class:selected={i === fileSelectedIdx}
           onclick={() => selectFile(filePath)}
-          onmouseenter={() => fileSelectedIdx = i}
+          onmouseenter={() => (fileSelectedIdx = i)}
         >
           <span class="file-icon">📄</span>
           <span class="cmd">{filePath.split('/').pop()}</span>
@@ -261,7 +261,7 @@
           class="suggestion"
           class:selected={i === selectedIdx}
           onclick={() => selectCommand(item.cmd)}
-          onmouseenter={() => selectedIdx = i}
+          onmouseenter={() => (selectedIdx = i)}
         >
           <span class="cmd">{item.cmd}</span>
           <span class="desc">{item.desc}</span>
@@ -279,7 +279,11 @@
         onkeydown={handleKeydown}
         placeholder="Send command to {agentName}... (/ for commands, @ for files)"
         rows="1"
-        oninput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 120) + 'px'; }}
+        oninput={(e) => {
+          const t = e.currentTarget;
+          t.style.height = 'auto';
+          t.style.height = Math.min(t.scrollHeight, 120) + 'px';
+        }}
       ></textarea>
     </div>
     <button class="send-btn" onclick={handleSend}>Send</button>
@@ -299,7 +303,11 @@
     background: var(--bg-subtle);
     position: relative;
   }
-  .input-row { display: flex; gap: 8px; align-items: flex-end; }
+  .input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
   .input-wrapper {
     flex: 1;
     display: flex;
@@ -309,7 +317,12 @@
     border-radius: 6px;
     padding: 0 10px;
   }
-  .prompt { color: var(--text-dim); font-size: 13px; margin-right: 6px; margin-top: 8px; }
+  .prompt {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-right: 6px;
+    margin-top: 8px;
+  }
   textarea {
     background: transparent;
     border: none;
@@ -347,8 +360,12 @@
     border-radius: 4px;
     cursor: pointer;
   }
-  .quick-actions button:hover { background: var(--bg-hover); }
-  .quick-actions button.ctrl-c { color: var(--red); }
+  .quick-actions button:hover {
+    background: var(--bg-hover);
+  }
+  .quick-actions button.ctrl-c {
+    color: var(--red);
+  }
 
   /* Suggestions dropdown */
   .suggestions {
@@ -411,8 +428,20 @@
     text-transform: uppercase;
     letter-spacing: 0.3px;
   }
-  .cat.built-in { background: var(--bg-overlay); color: var(--text-dim); }
-  .cat.skill { background: var(--purple-dim); color: var(--purple); }
-  .cat.command { background: var(--green-dim); color: var(--green); }
-  .cat.agent { background: var(--amber-dim); color: var(--amber); }
+  .cat.built-in {
+    background: var(--bg-overlay);
+    color: var(--text-dim);
+  }
+  .cat.skill {
+    background: var(--purple-dim);
+    color: var(--purple);
+  }
+  .cat.command {
+    background: var(--green-dim);
+    color: var(--green);
+  }
+  .cat.agent {
+    background: var(--amber-dim);
+    color: var(--amber);
+  }
 </style>

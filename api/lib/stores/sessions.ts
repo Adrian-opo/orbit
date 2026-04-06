@@ -38,11 +38,11 @@ export const selectedSessionId = writable<number | null>(null);
 
 export function getSelectedSession(list: Session[], id: number | null): Session | null {
   if (id === null) return null;
-  return list.find(s => s.id === id) ?? null;
+  return list.find((s) => s.id === id) ?? null;
 }
 
 export function upsertSession(list: Session[], updated: Session): Session[] {
-  const idx = list.findIndex(s => s.id === updated.id);
+  const idx = list.findIndex((s) => s.id === updated.id);
   if (idx === -1) return [updated, ...list];
   const next = [...list];
   next[idx] = { ...next[idx], ...updated };
@@ -54,5 +54,5 @@ export function updateSessionState(
   sessionId: number,
   patch: Partial<Session>
 ): Session[] {
-  return list.map(s => s.id === sessionId ? { ...s, ...patch } : s);
+  return list.map((s) => (s.id === sessionId ? { ...s, ...patch } : s));
 }

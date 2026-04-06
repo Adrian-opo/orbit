@@ -28,9 +28,9 @@
   // Re-fetch when sessionId changes
   $: if (sessionId) loadTasks();
 
-  $: completedCount = tasks.filter(t => t.status === 'completed').length;
-  $: inProgressCount = tasks.filter(t => t.status === 'in_progress').length;
-  $: pendingCount = tasks.filter(t => t.status === 'pending').length;
+  $: completedCount = tasks.filter((t) => t.status === 'completed').length;
+  $: inProgressCount = tasks.filter((t) => t.status === 'in_progress').length;
+  $: pendingCount = tasks.filter((t) => t.status === 'pending').length;
   $: totalCount = tasks.length;
   $: progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
@@ -64,10 +64,13 @@
       </div>
       <div class="status-counts">
         {#if inProgressCount > 0}
-          <span class="count-item"><span class="dot dot-progress"></span>{inProgressCount} in progress</span>
+          <span class="count-item"
+            ><span class="dot dot-progress"></span>{inProgressCount} in progress</span
+          >
         {/if}
         {#if pendingCount > 0}
-          <span class="count-item"><span class="dot dot-pending"></span>{pendingCount} pending</span>
+          <span class="count-item"><span class="dot dot-pending"></span>{pendingCount} pending</span
+          >
         {/if}
       </div>
     </div>
@@ -75,7 +78,11 @@
     <!-- Task list -->
     <div class="task-list">
       {#each tasks as task (task.id)}
-        <div class="task-item" class:completed={task.status === 'completed'} class:in-progress={task.status === 'in_progress'}>
+        <div
+          class="task-item"
+          class:completed={task.status === 'completed'}
+          class:in-progress={task.status === 'in_progress'}
+        >
           <div class="task-header">
             <span class="task-icon {statusDot(task.status)}">{statusIcon(task.status)}</span>
             <span class="task-subject">
@@ -92,7 +99,7 @@
             <div class="deps">
               <span class="dep-label">blocked by:</span>
               {#each task.blockedBy as depId}
-                {@const depTask = tasks.find(t => t.id === depId)}
+                {@const depTask = tasks.find((t) => t.id === depId)}
                 {#if depTask}
                   <span class="dep-chip" class:dep-done={depTask.status === 'completed'}>
                     #{depId}
@@ -178,9 +185,15 @@
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .dot-completed { background: var(--green); }
-  .dot-progress { background: var(--blue); }
-  .dot-pending { background: var(--text-dim); }
+  .dot-completed {
+    background: var(--green);
+  }
+  .dot-progress {
+    background: var(--blue);
+  }
+  .dot-pending {
+    background: var(--text-dim);
+  }
 
   /* Task list */
   .task-list {
@@ -212,9 +225,15 @@
     text-align: center;
     margin-top: 1px;
   }
-  .task-icon.dot-completed { color: var(--green); }
-  .task-icon.dot-progress { color: var(--blue); }
-  .task-icon.dot-pending { color: var(--text-dim); }
+  .task-icon.dot-completed {
+    color: var(--green);
+  }
+  .task-icon.dot-progress {
+    color: var(--blue);
+  }
+  .task-icon.dot-pending {
+    color: var(--text-dim);
+  }
   .task-subject {
     font-size: 12px;
     color: var(--text-primary);

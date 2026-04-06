@@ -49,7 +49,12 @@
 </div>
 
 <style>
-  .stats { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .stats {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
   .stat-row {
     display: flex;
     justify-content: space-between;
@@ -57,18 +62,41 @@
     padding: 4px 0;
     border-bottom: 1px solid var(--border-subtle);
   }
-  .stat-row.total { font-weight: 600; border-bottom: none; margin-top: 4px; }
-  .label { color: var(--text-muted); }
-  .value { color: var(--text-primary); }
-  .context-section { margin-top: 12px; }
-  .context-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
-  .context-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .stat-row.total {
+    font-weight: 600;
+    border-bottom: none;
+    margin-top: 4px;
+  }
+  .label {
+    color: var(--text-muted);
+  }
+  .value {
+    color: var(--text-primary);
+  }
+  .context-section {
+    margin-top: 12px;
+  }
+  .context-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+  .context-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
   .fill {
     height: 100%;
     background: var(--green);
     border-radius: 3px;
     transition: width 0.3s;
   }
-  .fill.warn { background: var(--amber); }
-  .fill.danger { background: var(--red); }
+  .fill.warn {
+    background: var(--amber);
+  }
+  .fill.danger {
+    background: var(--red);
+  }
 </style>

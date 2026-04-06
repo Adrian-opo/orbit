@@ -32,15 +32,44 @@
     font-family: 'Cascadia Code', 'Fira Code', monospace;
     line-height: 1.5;
   }
-  .entry { display: flex; gap: 4px; color: var(--text-dim); }
-  .tool { min-width: 32px; font-weight: 500; }
-  .tool.read { color: var(--blue); }
-  .tool.edit, .tool.write { color: var(--orange); }
-  .tool.bash { color: var(--green); }
-  .tool.agent { color: var(--purple); }
-  .tool.grep { color: var(--blue); }
-  .target { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .result.ok { color: var(--green); }
-  .result.fail { color: var(--red); }
-  .pending { color: var(--amber); font-weight: 500; }
+  .entry {
+    display: flex;
+    gap: 4px;
+    color: var(--text-dim);
+  }
+  .tool {
+    min-width: 32px;
+    font-weight: 500;
+  }
+  .tool.read {
+    color: var(--blue);
+  }
+  .tool.edit,
+  .tool.write {
+    color: var(--orange);
+  }
+  .tool.bash {
+    color: var(--green);
+  }
+  .tool.agent {
+    color: var(--purple);
+  }
+  .tool.grep {
+    color: var(--blue);
+  }
+  .target {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .result.ok {
+    color: var(--green);
+  }
+  .result.fail {
+    color: var(--red);
+  }
+  .pending {
+    color: var(--amber);
+    font-weight: 500;
+  }
 </style>

@@ -34,7 +34,8 @@
   $: toolClass = (entry.tool ?? '').toLowerCase();
   $: target = extractTarget(entry);
   $: timeStr = entry.timestamp.slice(11, 16);
-  $: hasEditDiff = toolClass === 'edit' && entry.toolInput?.old_string && entry.toolInput?.new_string;
+  $: hasEditDiff =
+    toolClass === 'edit' && entry.toolInput?.old_string && entry.toolInput?.new_string;
   $: hasWriteContent = toolClass === 'write' && entry.toolInput?.content;
   $: hasBashCommand = toolClass === 'bash' && entry.toolInput?.command;
   $: isReadTool = toolClass === 'read';
@@ -45,14 +46,27 @@
   // Diff lines
   $: oldLines = hasEditDiff ? (entry.toolInput!.old_string as string).split('\n') : [];
   $: newLines = hasEditDiff ? (entry.toolInput!.new_string as string).split('\n') : [];
-  $: allDiffLines = [...oldLines.map(l => ({ type: 'rem' as const, text: l })), ...newLines.map(l => ({ type: 'add' as const, text: l }))];
+  $: allDiffLines = [
+    ...oldLines.map((l) => ({ type: 'rem' as const, text: l })),
+    ...newLines.map((l) => ({ type: 'add' as const, text: l })),
+  ];
 
   // Code text
-  $: codeText = hasBashCommand ? (entry.toolInput!.command as string) : hasWriteContent ? (entry.toolInput!.content as string) : '';
+  $: codeText = hasBashCommand
+    ? (entry.toolInput!.command as string)
+    : hasWriteContent
+      ? (entry.toolInput!.content as string)
+      : '';
 
   const toolIcons: Record<string, string> = {
-    read: '📄', edit: '✏️', write: '📝', bash: '⚡',
-    grep: '🔍', glob: '📁', agent: '🤖', skill: '🔧',
+    read: '📄',
+    edit: '✏️',
+    write: '📝',
+    bash: '⚡',
+    grep: '🔍',
+    glob: '📁',
+    agent: '🤖',
+    skill: '🔧',
   };
 
   $: icon = toolIcons[toolClass] ?? '⚙️';
@@ -77,13 +91,25 @@
   function detectLang(filePath: string): string {
     const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
     const map: Record<string, string> = {
-      js: 'javascript', jsx: 'javascript', mjs: 'javascript',
-      ts: 'typescript', tsx: 'typescript',
-      py: 'python', rs: 'rust', css: 'css',
-      html: 'html', svelte: 'svelte', vue: 'html',
-      json: 'json', yaml: 'yaml', yml: 'yaml',
-      sh: 'bash', bash: 'bash', zsh: 'bash',
-      md: 'markdown', toml: 'yaml',
+      js: 'javascript',
+      jsx: 'javascript',
+      mjs: 'javascript',
+      ts: 'typescript',
+      tsx: 'typescript',
+      py: 'python',
+      rs: 'rust',
+      css: 'css',
+      html: 'html',
+      svelte: 'svelte',
+      vue: 'html',
+      json: 'json',
+      yaml: 'yaml',
+      yml: 'yaml',
+      sh: 'bash',
+      bash: 'bash',
+      zsh: 'bash',
+      md: 'markdown',
+      toml: 'yaml',
     };
     return map[ext] ?? '';
   }
@@ -127,7 +153,14 @@
       </span>
     {/if}
     {#if hasDetail || resultEntry?.output}
-      <button class="expand-btn" onclick={(e) => { e.stopPropagation(); modalOpen = true; }} title="Fullscreen">⛶</button>
+      <button
+        class="expand-btn"
+        onclick={(e) => {
+          e.stopPropagation();
+          modalOpen = true;
+        }}
+        title="Fullscreen">⛶</button
+      >
     {/if}
   </div>
 
@@ -144,7 +177,9 @@
             {/each}
           </div>
         {:else if hasBashCommand || hasWriteContent}
-          <pre class="code-inner code-text"><code>{@html doHighlight(codeText, hasBashCommand ? 'bash' : lang)}</code></pre>
+          <pre class="code-inner code-text"><code
+              >{@html doHighlight(codeText, hasBashCommand ? 'bash' : lang)}</code
+            ></pre>
         {/if}
 
         {#if resultEntry?.output}
@@ -156,12 +191,12 @@
             <div class="code-inner read-output">
               <table class="read-table">
                 <tbody>
-                {#each parsed.code.split('\n') as line, li}
-                  <tr>
-                    <td class="line-num">{parsed.lineNums[li] ?? ''}</td>
-                    <td class="line-code">{@html doHighlight(line, lang)}</td>
-                  </tr>
-                {/each}
+                  {#each parsed.code.split('\n') as line, li}
+                    <tr>
+                      <td class="line-num">{parsed.lineNums[li] ?? ''}</td>
+                      <td class="line-code">{@html doHighlight(line, lang)}</td>
+                    </tr>
+                  {/each}
                 </tbody>
               </table>
             </div>
@@ -177,7 +212,13 @@
 </div>
 
 {#if modalOpen}
-  <div class="modal-overlay" onclick={() => modalOpen = false} role="dialog" tabindex="-1" onkeydown={(e) => e.key === 'Escape' && (modalOpen = false)}>
+  <div
+    class="modal-overlay"
+    onclick={() => (modalOpen = false)}
+    role="dialog"
+    tabindex="-1"
+    onkeydown={(e) => e.key === 'Escape' && (modalOpen = false)}
+  >
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div class="modal" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
@@ -186,7 +227,7 @@
           <span class="tool {toolClass}">{entry.tool}</span>
           <span class="target mono">{target}</span>
         </div>
-        <button class="modal-close" onclick={() => modalOpen = false}>✕</button>
+        <button class="modal-close" onclick={() => (modalOpen = false)}>✕</button>
       </div>
       <div class="modal-body detail">
         {#if hasEditDiff}
@@ -204,7 +245,9 @@
         {:else if hasBashCommand || hasWriteContent}
           <div class="modal-section-label">{hasBashCommand ? 'Command' : 'Content'}</div>
           <div class="code-card modal-card">
-            <pre class="modal-code-scroll code-text"><code>{@html doHighlight(codeText, hasBashCommand ? 'bash' : lang)}</code></pre>
+            <pre class="modal-code-scroll code-text"><code
+                >{@html doHighlight(codeText, hasBashCommand ? 'bash' : lang)}</code
+              ></pre>
           </div>
         {/if}
 
@@ -216,12 +259,12 @@
               <div class="modal-code-scroll read-output">
                 <table class="read-table">
                   <tbody>
-                  {#each parsed.code.split('\n') as line, li}
-                    <tr>
-                      <td class="line-num">{parsed.lineNums[li] ?? ''}</td>
-                      <td class="line-code">{@html doHighlight(line, lang)}</td>
-                    </tr>
-                  {/each}
+                    {#each parsed.code.split('\n') as line, li}
+                      <tr>
+                        <td class="line-num">{parsed.lineNums[li] ?? ''}</td>
+                        <td class="line-code">{@html doHighlight(line, lang)}</td>
+                      </tr>
+                    {/each}
                   </tbody>
                 </table>
               </div>
@@ -253,13 +296,32 @@
   .tool-header:hover {
     background: var(--bg-hover);
   }
-  .icon { font-size: 12px; flex-shrink: 0; }
-  .tool { font-weight: 600; flex-shrink: 0; }
-  .tool.read, .tool.grep, .tool.glob { color: var(--blue); }
-  .tool.edit, .tool.write { color: var(--orange); }
-  .tool.bash { color: var(--green); }
-  .tool.agent { color: var(--purple); }
-  .tool.skill { color: var(--pink); }
+  .icon {
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .tool {
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .tool.read,
+  .tool.grep,
+  .tool.glob {
+    color: var(--blue);
+  }
+  .tool.edit,
+  .tool.write {
+    color: var(--orange);
+  }
+  .tool.bash {
+    color: var(--green);
+  }
+  .tool.agent {
+    color: var(--purple);
+  }
+  .tool.skill {
+    color: var(--pink);
+  }
   .target {
     color: var(--text-secondary);
     font-size: 12px;
@@ -274,9 +336,19 @@
     font-size: 10px;
     flex-shrink: 0;
   }
-  .changes { display: flex; gap: 3px; flex-shrink: 0; }
-  .added { color: var(--green); font-size: 11px; }
-  .removed { color: var(--red); font-size: 11px; }
+  .changes {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+  .added {
+    color: var(--green);
+    font-size: 11px;
+  }
+  .removed {
+    color: var(--red);
+    font-size: 11px;
+  }
   .expand-btn {
     flex-shrink: 0;
     background: var(--bg-overlay);
@@ -388,43 +460,77 @@
     user-select: none;
     opacity: 0.6;
   }
-  .diff-line.rem .diff-prefix { color: var(--red); }
-  .diff-line.add .diff-prefix { color: var(--green); }
-  .diff-code { flex: 1; min-width: 0; }
+  .diff-line.rem .diff-prefix {
+    color: var(--red);
+  }
+  .diff-line.add .diff-prefix {
+    color: var(--green);
+  }
+  .diff-code {
+    flex: 1;
+    min-width: 0;
+  }
 
   /* highlight.js tokens */
   .detail :global(.hljs-keyword),
   .detail :global(.hljs-selector-tag),
-  .detail :global(.hljs-built_in) { color: var(--hl-keyword, #c678dd); }
+  .detail :global(.hljs-built_in) {
+    color: var(--hl-keyword, #c678dd);
+  }
 
   .detail :global(.hljs-string),
   .detail :global(.hljs-attr),
-  .detail :global(.hljs-addition) { color: var(--hl-string, #98c379); }
+  .detail :global(.hljs-addition) {
+    color: var(--hl-string, #98c379);
+  }
 
   .detail :global(.hljs-number),
-  .detail :global(.hljs-literal) { color: var(--hl-number, #d19a66); }
+  .detail :global(.hljs-literal) {
+    color: var(--hl-number, #d19a66);
+  }
 
   .detail :global(.hljs-comment),
-  .detail :global(.hljs-quote) { color: var(--hl-comment, #5c6370); font-style: italic; }
+  .detail :global(.hljs-quote) {
+    color: var(--hl-comment, #5c6370);
+    font-style: italic;
+  }
 
   .detail :global(.hljs-function),
-  .detail :global(.hljs-title) { color: var(--hl-function, #61afef); }
+  .detail :global(.hljs-title) {
+    color: var(--hl-function, #61afef);
+  }
 
   .detail :global(.hljs-type),
-  .detail :global(.hljs-title.class_) { color: var(--hl-type, #e5c07b); }
+  .detail :global(.hljs-title.class_) {
+    color: var(--hl-type, #e5c07b);
+  }
 
   .detail :global(.hljs-variable),
-  .detail :global(.hljs-template-variable) { color: var(--hl-variable, #e06c75); }
+  .detail :global(.hljs-template-variable) {
+    color: var(--hl-variable, #e06c75);
+  }
 
   .detail :global(.hljs-meta),
-  .detail :global(.hljs-selector-class) { color: var(--hl-meta, #61afef); }
+  .detail :global(.hljs-selector-class) {
+    color: var(--hl-meta, #61afef);
+  }
 
-  .detail :global(.hljs-tag) { color: var(--hl-tag, #e06c75); }
-  .detail :global(.hljs-name) { color: var(--hl-tag, #e06c75); }
-  .detail :global(.hljs-attribute) { color: var(--hl-attr, #d19a66); }
+  .detail :global(.hljs-tag) {
+    color: var(--hl-tag, #e06c75);
+  }
+  .detail :global(.hljs-name) {
+    color: var(--hl-tag, #e06c75);
+  }
+  .detail :global(.hljs-attribute) {
+    color: var(--hl-attr, #d19a66);
+  }
 
-  .detail :global(.hljs-params) { color: var(--text-primary); }
-  .detail :global(.hljs-punctuation) { color: var(--text-secondary); }
+  .detail :global(.hljs-params) {
+    color: var(--text-primary);
+  }
+  .detail :global(.hljs-punctuation) {
+    color: var(--text-secondary);
+  }
 
   /* Fullscreen modal */
   .modal-overlay {
@@ -439,8 +545,12 @@
     animation: fadeIn 0.15s ease-out;
   }
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
   .modal {
     background: var(--bg-primary);

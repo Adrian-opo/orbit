@@ -3,12 +3,15 @@
 
   export let x = 0;
   export let y = 0;
-  export let items: Array<{ label: string; action: string; danger?: boolean; divider?: boolean }> = [];
+  export let items: Array<{ label: string; action: string; danger?: boolean; divider?: boolean }> =
+    [];
 
   const dispatch = createEventDispatcher();
   let el: HTMLDivElement;
 
-  function close() { dispatch('close'); }
+  function close() {
+    dispatch('close');
+  }
 
   function select(action: string) {
     dispatch('select', action);
@@ -29,10 +32,10 @@
       if (!el) return;
       const rect = el.getBoundingClientRect();
       if (rect.right > window.innerWidth) {
-        el.style.left = (x - rect.width) + 'px';
+        el.style.left = x - rect.width + 'px';
       }
       if (rect.bottom > window.innerHeight) {
-        el.style.top = (y - rect.height) + 'px';
+        el.style.top = y - rect.height + 'px';
       }
     });
     window.addEventListener('click', onGlobalClick, true);
@@ -57,11 +60,7 @@
     {#if item.divider || item.action === 'divider'}
       <div class="divider"></div>
     {:else}
-      <button
-        class="item"
-        class:danger={item.danger}
-        on:click={() => select(item.action)}
-      >
+      <button class="item" class:danger={item.danger} on:click={() => select(item.action)}>
         {item.label}
       </button>
     {/if}
@@ -77,21 +76,33 @@
     border-radius: 4px;
     padding: 4px;
     min-width: 160px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   }
   .item {
-    display: block; width: 100%;
+    display: block;
+    width: 100%;
     text-align: left;
-    background: none; border: none;
-    color: var(--t0); font-family: var(--mono);
-    font-size: var(--sm); padding: 6px 10px;
-    border-radius: 3px; cursor: pointer;
+    background: none;
+    border: none;
+    color: var(--t0);
+    font-family: var(--mono);
+    font-size: var(--sm);
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
   }
-  .item:hover { background: var(--bg3); }
-  .item.danger { color: var(--s-error); }
-  .item.danger:hover { background: rgba(224,72,72,0.1); }
+  .item:hover {
+    background: var(--bg3);
+  }
+  .item.danger {
+    color: var(--s-error);
+  }
+  .item.danger:hover {
+    background: rgba(224, 72, 72, 0.1);
+  }
   .divider {
-    height: 1px; background: var(--bd);
+    height: 1px;
+    background: var(--bd);
     margin: 3px 4px;
   }
 </style>

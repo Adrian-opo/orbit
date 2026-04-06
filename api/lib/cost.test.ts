@@ -27,7 +27,10 @@ describe('estimateCost', () => {
 
   it('calculates haiku cost correctly', () => {
     // 1M input at $0.8 + 500K output at $4/M * 0.5 = 0.8 + 2 = $2.8
-    const cost = estimateCost(tokens({ input: 1_000_000, output: 500_000 }), 'claude-haiku-4-5-20251001');
+    const cost = estimateCost(
+      tokens({ input: 1_000_000, output: 500_000 }),
+      'claude-haiku-4-5-20251001'
+    );
     expect(cost).toBeCloseTo(2.8, 5);
   });
 

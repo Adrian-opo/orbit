@@ -1,5 +1,7 @@
 <script lang="ts">
-  interface Props { sessionId: string; }
+  interface Props {
+    sessionId: string;
+  }
   let { sessionId }: Props = $props();
 
   // Placeholder — will be populated from diff_builder commands
@@ -13,7 +15,16 @@
 </div>
 
 <style>
-  .diff-view { padding: 8px; font-size: 12px; }
-  .diff-content { line-height: 1.7; }
-  .placeholder { color: var(--text-dim); padding: 20px; text-align: center; }
+  .diff-view {
+    padding: 8px;
+    font-size: 12px;
+  }
+  .diff-content {
+    line-height: 1.7;
+  }
+  .placeholder {
+    color: var(--text-dim);
+    padding: 20px;
+    text-align: center;
+  }
 </style>

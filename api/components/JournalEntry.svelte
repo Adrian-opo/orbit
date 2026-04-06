@@ -56,7 +56,8 @@
   .entry.assistant {
     background: var(--bg-assistant);
   }
-  .entry.user, .entry.assistant {
+  .entry.user,
+  .entry.assistant {
     border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
   }
   .entry.system {
@@ -77,10 +78,22 @@
     font-weight: 700;
     letter-spacing: 0.5px;
   }
-  .user-badge { background: var(--user-badge-bg); color: var(--blue); }
-  .assistant-badge { background: var(--purple-dim); color: var(--purple); }
-  .system-badge { background: var(--bg-system-badge); color: var(--text-muted); }
-  .time { color: var(--text-dim); font-size: 11px; }
+  .user-badge {
+    background: var(--user-badge-bg);
+    color: var(--blue);
+  }
+  .assistant-badge {
+    background: var(--purple-dim);
+    color: var(--purple);
+  }
+  .system-badge {
+    background: var(--bg-system-badge);
+    color: var(--text-muted);
+  }
+  .time {
+    color: var(--text-dim);
+    font-size: 11px;
+  }
   .text {
     font-size: 13px;
     line-height: 1.5;

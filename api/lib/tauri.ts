@@ -8,8 +8,9 @@ import { mockInvoke, mockListen } from './mock/tauri-mock';
 // npm run dev:mock  →  browser mode with fake data (no Rust backend needed)
 // npm run tauri dev →  real Tauri backend
 
-const IS_MOCK = import.meta.env.VITE_MOCK === 'true'
-  || !(window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+const IS_MOCK =
+  import.meta.env.VITE_MOCK === 'true' ||
+  !(window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (IS_MOCK) return mockInvoke(cmd, args) as Promise<T>;
@@ -18,7 +19,7 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
 
 function listen<T>(event: string, cb: (e: { payload: T }) => void): Promise<() => void> {
   if (IS_MOCK) {
-    const unlisten = mockListen(event, payload => cb({ payload: payload as T }));
+    const unlisten = mockListen(event, (payload) => cb({ payload: payload as T }));
     return Promise.resolve(unlisten);
   }
   return _listen<T>(event, cb);
@@ -72,7 +73,10 @@ export async function listProjects() {
 
 // ── Read-only commands (unchanged) ────────────────────────────
 
-export async function getSubagentJournal(sessionId: string, subagentId: string): Promise<JournalEntry[]> {
+export async function getSubagentJournal(
+  sessionId: string,
+  subagentId: string
+): Promise<JournalEntry[]> {
   return await invoke('get_subagent_journal', { sessionId, subagentId });
 }
 
@@ -105,29 +109,29 @@ export interface SessionStatePayload {
 }
 
 export function onSessionCreated(cb: (session: Session) => void) {
-  return listen<Session>('session:created', e => cb(e.payload));
+  return listen<Session>('session:created', (e) => cb(e.payload));
 }
 
 export function onSessionOutput(cb: (payload: SessionOutputPayload) => void) {
-  return listen<SessionOutputPayload>('session:output', e => cb(e.payload));
+  return listen<SessionOutputPayload>('session:output', (e) => cb(e.payload));
 }
 
 export function onSessionState(cb: (payload: SessionStatePayload) => void) {
-  return listen<SessionStatePayload>('session:state', e => cb(e.payload));
+  return listen<SessionStatePayload>('session:state', (e) => cb(e.payload));
 }
 
 export function onSessionStopped(cb: (sessionId: number) => void) {
-  return listen<{ sessionId: number }>('session:stopped', e => cb(e.payload.sessionId));
+  return listen<{ sessionId: number }>('session:stopped', (e) => cb(e.payload.sessionId));
 }
 
 export function onSessionRunning(cb: (sessionId: number, pid: number) => void) {
-  return listen<{ sessionId: number; pid: number }>('session:running', e =>
+  return listen<{ sessionId: number; pid: number }>('session:running', (e) =>
     cb(e.payload.sessionId, e.payload.pid)
   );
 }
 
 export function onSessionError(cb: (sessionId: number, error: string) => void) {
-  return listen<{ sessionId: number; error: string }>('session:error', e =>
+  return listen<{ sessionId: number; error: string }>('session:error', (e) =>
     cb(e.payload.sessionId, e.payload.error)
   );
 }
@@ -150,7 +154,6 @@ export async function renameSession(sessionId: number, name: string): Promise<vo
 export async function deleteSession(sessionId: number): Promise<void> {
   await invoke('delete_session', { sessionId });
 }
-
 
 export interface SpawnDiagnostic {
   claudeFound: boolean;

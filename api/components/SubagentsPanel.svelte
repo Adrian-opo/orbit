@@ -7,8 +7,8 @@
   export let sessionId: string;
   export let subagents: SubagentInfo[];
 
-  $: running = subagents.filter(a => a.status === 'running');
-  $: done = subagents.filter(a => a.status === 'done');
+  $: running = subagents.filter((a) => a.status === 'running');
+  $: done = subagents.filter((a) => a.status === 'done');
 
   let modalAgent: SubagentInfo | null = null;
   let modalEntries: JournalEntry[] = [];
@@ -85,12 +85,22 @@
 </div>
 
 {#if modalAgent}
-  <div class="modal-backdrop" onclick={handleBackdropClick} onkeydown={(e) => e.key === 'Escape' && (modalAgent = null)} role="dialog" tabindex="-1">
+  <div
+    class="modal-backdrop"
+    onclick={handleBackdropClick}
+    onkeydown={(e) => e.key === 'Escape' && (modalAgent = null)}
+    role="dialog"
+    tabindex="-1"
+  >
     <div class="modal">
       <div class="modal-header">
         <div class="modal-title">
           <span class="modal-type">{modalAgent.agentType}</span>
-          <span class="modal-status" class:done={modalAgent.status === 'done'} class:running-status={modalAgent.status === 'running'}>
+          <span
+            class="modal-status"
+            class:done={modalAgent.status === 'done'}
+            class:running-status={modalAgent.status === 'running'}
+          >
             {modalAgent.status}
           </span>
         </div>
@@ -115,9 +125,18 @@
 {/if}
 
 <style>
-  .subagents { padding: 10px; }
-  .empty { color: var(--text-dim); font-size: 13px; text-align: center; padding: 20px; }
-  .section { margin-bottom: 12px; }
+  .subagents {
+    padding: 10px;
+  }
+  .empty {
+    color: var(--text-dim);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+  }
+  .section {
+    margin-bottom: 12px;
+  }
   .section-header {
     font-size: 11px;
     font-weight: 600;
@@ -135,8 +154,12 @@
     border-radius: 50%;
     display: inline-block;
   }
-  .dot.running { background: var(--amber); }
-  .dot.done { background: var(--green); }
+  .dot.running {
+    background: var(--amber);
+  }
+  .dot.done {
+    background: var(--green);
+  }
   .agent-row {
     display: block;
     width: 100%;
@@ -160,8 +183,13 @@
     font-weight: 500;
     color: var(--text-primary);
   }
-  .check { color: var(--green); }
-  .status-dot { color: var(--amber); font-size: 10px; }
+  .check {
+    color: var(--green);
+  }
+  .status-dot {
+    color: var(--amber);
+    font-size: 10px;
+  }
   .agent-desc {
     font-size: 11px;
     color: var(--text-secondary);
@@ -219,8 +247,14 @@
     border-radius: 8px;
     font-weight: 500;
   }
-  .modal-status.done { background: var(--green-dim); color: var(--green); }
-  .modal-status.running-status { background: var(--amber-dim); color: var(--amber); }
+  .modal-status.done {
+    background: var(--green-dim);
+    color: var(--green);
+  }
+  .modal-status.running-status {
+    background: var(--amber-dim);
+    color: var(--amber);
+  }
   .modal-desc {
     font-size: 12px;
     color: var(--text-secondary);
@@ -237,7 +271,9 @@
     cursor: pointer;
     padding: 4px;
   }
-  .modal-close:hover { color: var(--text-primary); }
+  .modal-close:hover {
+    color: var(--text-primary);
+  }
   .modal-body {
     flex: 1;
     overflow-y: auto;

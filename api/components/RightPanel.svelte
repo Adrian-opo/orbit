@@ -47,7 +47,10 @@
     flex-direction: column;
     flex-shrink: 0;
   }
-  .tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
   .tab {
     padding: 8px 12px;
     font-size: 12px;
@@ -57,6 +60,12 @@
     color: var(--text-muted);
     cursor: pointer;
   }
-  .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
-  .content { flex: 1; overflow-y: auto; }
+  .tab.active {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+  .content {
+    flex: 1;
+    overflow-y: auto;
+  }
 </style>

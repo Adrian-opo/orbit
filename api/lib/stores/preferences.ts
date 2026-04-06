@@ -4,7 +4,8 @@ import type { DetailLevel, RightPanelTab } from '../types';
 export type Theme = 'dark' | 'light';
 
 function createThemeStore() {
-  const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('theme') as Theme : null;
+  const stored =
+    typeof localStorage !== 'undefined' ? (localStorage.getItem('theme') as Theme) : null;
   const initial: Theme = stored === 'light' ? 'light' : 'dark';
   const { subscribe, set, update } = writable<Theme>(initial);
 
@@ -23,7 +24,7 @@ function createThemeStore() {
       }
     },
     toggle() {
-      update(current => {
+      update((current) => {
         const next: Theme = current === 'dark' ? 'light' : 'dark';
         if (typeof document !== 'undefined') {
           document.documentElement.setAttribute('data-theme', next);
@@ -31,7 +32,7 @@ function createThemeStore() {
         }
         return next;
       });
-    }
+    },
   };
 }
 

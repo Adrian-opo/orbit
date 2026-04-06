@@ -54,7 +54,9 @@
     border-bottom: 1px solid var(--border-subtle);
     transition: all 0.2s ease;
   }
-  .card:hover { background: var(--bg-hover); }
+  .card:hover {
+    background: var(--bg-hover);
+  }
   .card.selected {
     background: var(--bg-selected);
     border-left-color: var(--blue);
@@ -67,11 +69,24 @@
     animation: inputPulse 2s ease-in-out infinite;
   }
   @keyframes inputPulse {
-    0%, 100% { box-shadow: none; }
-    50% { box-shadow: inset 0 0 12px var(--pulse-glow); }
+    0%,
+    100% {
+      box-shadow: none;
+    }
+    50% {
+      box-shadow: inset 0 0 12px var(--pulse-glow);
+    }
   }
-  .header { display: flex; justify-content: space-between; align-items: center; }
-  .name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
   .status {
     padding: 2px 7px;
     border-radius: 6px;
@@ -81,10 +96,22 @@
     align-items: center;
     gap: 4px;
   }
-  .status.working { background: var(--green-dim); color: var(--green); }
-  .status.input { background: var(--amber-dim); color: var(--amber); }
-  .status.idle { background: var(--bg-idle); color: var(--text-muted); }
-  .status.new { background: var(--blue-dim); color: var(--blue); }
+  .status.working {
+    background: var(--green-dim);
+    color: var(--green);
+  }
+  .status.input {
+    background: var(--amber-dim);
+    color: var(--amber);
+  }
+  .status.idle {
+    background: var(--bg-idle);
+    color: var(--text-muted);
+  }
+  .status.new {
+    background: var(--blue-dim);
+    color: var(--blue);
+  }
   .working-dot {
     width: 6px;
     height: 6px;
@@ -100,8 +127,13 @@
     animation: blink 0.8s ease-in-out infinite;
   }
   @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.2; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.2;
+    }
   }
   .meta {
     font-size: 11px;
@@ -110,7 +142,9 @@
     display: flex;
     gap: 4px;
   }
-  .sep { opacity: 0.5; }
+  .sep {
+    opacity: 0.5;
+  }
   .context-bar {
     margin-top: 6px;
     height: 3px;
@@ -124,6 +158,10 @@
     border-radius: 2px;
     transition: width 0.5s ease;
   }
-  .context-fill.warn { background: var(--amber); }
-  .context-fill.danger { background: var(--red); }
+  .context-fill.warn {
+    background: var(--amber);
+  }
+  .context-fill.danger {
+    background: var(--red);
+  }
 </style>

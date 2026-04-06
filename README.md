@@ -14,6 +14,8 @@
 
 </div>
 
+![Orbit screenshot](media/screenshot.png)
+
 ## Features
 
 - **Multi-session** — run multiple Claude Code agents in parallel across different projects

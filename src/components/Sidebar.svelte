@@ -3,7 +3,7 @@
   import { statusColor, statusLabel, isPulsing } from '../lib/status';
   import NewSessionModal from './NewSessionModal.svelte';
   import ContextMenu from './ContextMenu.svelte';
-  import { estimateCost, formatCost, formatTokens, renameSession, deleteSession } from '../lib/tauri';
+  import { estimateCost, formatCost, formatTokens, renameSession, deleteSession, stopSession } from '../lib/tauri';
 
   // Context menu state
   let ctxMenu: { x: number; y: number; sessionId: number; sessionName: string } | null = null;
@@ -28,10 +28,7 @@
         if ($selectedSessionId === sessionId) selectedSessionId.set(null);
       }
     } else if (action === 'stop') {
-      try {
-        const { stopSession } = await import('../lib/tauri');
-        await stopSession(sessionId);
-      } catch {}
+      try { await stopSession(sessionId); } catch {}
     }
   }
 
@@ -46,9 +43,11 @@
 
   let showModal = false;
 
+  // Svelte action: auto-focus and select when mounted
   function focusOnMount(node: HTMLInputElement) {
-    node.focus(); node.select();
-    return {};
+    node.focus();
+    node.select();
+    return { destroy() {} };
   }
 
   function fmtTokens(s: typeof $sessions[0]): string {

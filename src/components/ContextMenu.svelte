@@ -47,6 +47,7 @@
 
 <div
   class="menu"
+  role="menu"
   bind:this={el}
   style="left:{x}px; top:{y}px"
   on:contextmenu|preventDefault

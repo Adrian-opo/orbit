@@ -49,7 +49,7 @@
 
 <svelte:window on:keydown={onKey} />
 
-<div class="overlay" on:click|self={() => dispatch('cancel')}>
+<div class="overlay" role="dialog" aria-modal="true" on:click|self={() => dispatch('cancel')}>
   <div class="modal">
     <div class="modal-header">
       <span class="modal-title">new session</span>
@@ -57,9 +57,10 @@
     </div>
 
     <div class="field">
-      <label class="label">path</label>
+      <label class="label" for="ns-path">path</label>
       <div class="path-row">
         <input
+          id="ns-path"
           class="input"
           bind:value={path}
           placeholder="/home/user/project"
@@ -71,8 +72,9 @@
     </div>
 
     <div class="field">
-      <label class="label">prompt</label>
+      <label class="label" for="ns-prompt">prompt</label>
       <textarea
+        id="ns-prompt"
         class="input textarea"
         bind:value={prompt}
         placeholder="what should claude work on?"
@@ -84,17 +86,17 @@
 
     <div class="row">
       <div class="field half">
-        <label class="label">model</label>
-        <select class="input select" bind:value={model} disabled={loading}>
+        <label class="label" for="ns-model">model</label>
+        <select id="ns-model" class="input select" bind:value={model} disabled={loading}>
           {#each models as m}
             <option value={m.v}>{m.l}</option>
           {/each}
         </select>
       </div>
       <div class="field half approve-field">
-        <label class="label">approve tools</label>
+        <label class="label" for="ns-approve">approve tools</label>
         <label class="toggle">
-          <input type="checkbox" bind:checked={approveMode} disabled={loading} />
+          <input id="ns-approve" type="checkbox" bind:checked={approveMode} disabled={loading} />
           <span class="toggle-track" class:on={approveMode}></span>
         </label>
       </div>

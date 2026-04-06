@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { JournalEntry } from '../lib/types';
+  import { diffLines } from 'diff';
+  import type { Change } from 'diff';
   import hljs from 'highlight.js/lib/core';
   import javascript from 'highlight.js/lib/languages/javascript';
   import typescript from 'highlight.js/lib/languages/typescript';
@@ -26,6 +28,12 @@
   hljs.registerLanguage('markdown', markdownLang);
   hljs.registerLanguage('svelte', xml);
 
+  type DiffLine = {
+    type: 'add' | 'rem' | 'ctx';
+    text: string;
+    lineNo: number;
+  };
+
   export let entry: JournalEntry;
   export let resultEntry: JournalEntry | null = null;
 
@@ -43,20 +51,29 @@
 
   $: lang = detectLang(target);
 
-  // Diff lines
-  $: oldLines = hasEditDiff ? (entry.toolInput!.old_string as string).split('\n') : [];
-  $: newLines = hasEditDiff ? (entry.toolInput!.new_string as string).split('\n') : [];
-  $: allDiffLines = [
-    ...oldLines.map((l) => ({ type: 'rem' as const, text: l })),
-    ...newLines.map((l) => ({ type: 'add' as const, text: l })),
-  ];
+  // Diff lines — real Myers algorithm
+  $: rawChunks = hasEditDiff
+    ? diffLines(
+        entry.toolInput!.old_string as string,
+        entry.toolInput!.new_string as string,
+      )
+    : [];
+  $: inlineLines = buildInlineLines(rawChunks);
+  $: inlineOverflow = Math.max(0, inlineLines.length - 6);
+  $: inlineVisible = inlineLines.slice(0, 6);
+  $: modalLines = buildModalLines(rawChunks);
 
-  // Code text
-  $: codeText = hasBashCommand
-    ? (entry.toolInput!.command as string)
-    : hasWriteContent
-      ? (entry.toolInput!.content as string)
-      : '';
+  // Write / Create lines (all additions)
+  $: writeLines = hasWriteContent
+    ? (entry.toolInput!.content as string)
+        .split('\n')
+        .map((text, i) => ({ type: 'add' as const, text, lineNo: i + 1 }))
+    : [];
+  $: writeOverflow = Math.max(0, writeLines.length - 6);
+  $: writeVisible = writeLines.slice(0, 6);
+
+  // Code text (bash only — Write is handled via writeLines)
+  $: codeText = hasBashCommand ? (entry.toolInput!.command as string) : '';
 
   const toolIcons: Record<string, string> = {
     read: '📄',
@@ -119,6 +136,57 @@
       return hljs.highlight(code, { language }).value;
     }
     return hljs.highlightAuto(code).value;
+  }
+
+  function buildInlineLines(chunks: Change[]): DiffLine[] {
+    const result: DiffLine[] = [];
+    let oldLine = 1;
+    let newLine = 1;
+    for (const chunk of chunks) {
+      const lines = chunk.value.split('\n');
+      // diffLines includes a trailing empty string when value ends with \n — drop it
+      if (lines[lines.length - 1] === '') lines.pop();
+      if (chunk.added) {
+        for (const text of lines) {
+          result.push({ type: 'add', text, lineNo: newLine++ });
+        }
+      } else if (chunk.removed) {
+        for (const text of lines) {
+          result.push({ type: 'rem', text, lineNo: oldLine++ });
+        }
+      } else {
+        // context: advance both counters but don't emit lines
+        oldLine += lines.length;
+        newLine += lines.length;
+      }
+    }
+    return result;
+  }
+
+  function buildModalLines(chunks: Change[]): DiffLine[] {
+    const result: DiffLine[] = [];
+    let oldLine = 1;
+    let newLine = 1;
+    for (const chunk of chunks) {
+      const lines = chunk.value.split('\n');
+      if (lines[lines.length - 1] === '') lines.pop();
+      if (chunk.added) {
+        for (const text of lines) {
+          result.push({ type: 'add', text, lineNo: newLine++ });
+        }
+      } else if (chunk.removed) {
+        for (const text of lines) {
+          result.push({ type: 'rem', text, lineNo: oldLine++ });
+        }
+      } else {
+        for (const text of lines) {
+          result.push({ type: 'ctx', text, lineNo: newLine });
+          oldLine++;
+          newLine++;
+        }
+      }
+    }
+    return result;
   }
 
   // Strip "  123→" line number prefixes from Read output

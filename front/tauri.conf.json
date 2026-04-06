@@ -36,7 +36,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY0Mzg1RjI1QjFGREZBNkQKUldSdCt2MnhKVjg0OUlhSHRzU0lXd2U5d3JZOUpNNExXTmRzdkhkOVVMTjZnc3huZGRaTFFxSEwK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENFN0U3RkE1OTg4NDc4MUIKUldRYmVJU1lwWDkrempyczAzVDMwVkNzSUtQTXA5V0p5WUVwSlNWdTY2K2hRN3dZRm0rUFVXRjIK",
       "endpoints": [
         "https://github.com/xinnaider/orbit/releases/latest/download/latest.json"
       ]

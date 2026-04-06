@@ -117,14 +117,15 @@
 
     {#if diag}
       <div class="diag">
-        <div class="diag-row" class:ok={diag.ptyWorks} class:fail={!diag.ptyWorks}>
-          PTY: {diag.ptyWorks ? '✓ working' : '✗ failed'} · echo="{diag.echoOutput.slice(0,30)}"
-        </div>
         <div class="diag-row" class:ok={diag.claudeFound} class:fail={!diag.claudeFound}>
-          claude: {diag.claudeFound ? `✓ ${diag.claudePath}` : '✗ not found'}
+          claude: {diag.claudeFound ? `✓ ${diag.claudePath ?? diag.whereOutput}` : '✗ not found'}
         </div>
-        {#if diag.whichOutput}
-          <div class="diag-row">where: {diag.whichOutput.slice(0,80)}</div>
+        {#if diag.versionOutput}
+          <div class="diag-row ok">version: {diag.versionOutput.slice(0,60)}</div>
+        {/if}
+        {#if !diag.claudeFound}
+          <div class="diag-row fail">install: npm install -g @anthropic-ai/claude-code</div>
+          <div class="diag-row" style="font-size:9px;color:var(--t3)">PATH: {diag.augmentedPath.slice(0,120)}</div>
         {/if}
       </div>
     {/if}

@@ -3,7 +3,7 @@ use tauri::{AppHandle, State};
 
 use crate::models::{Session, SessionId, JournalEntry};
 use crate::services::session_manager::SessionManager;
-use crate::services::spawn_manager::{find_claude, spawn_test};
+use crate::services::spawn_manager::find_claude;
 
 pub struct SessionState(pub Arc<Mutex<SessionManager>>);
 
@@ -84,34 +84,72 @@ pub fn check_claude() -> serde_json::Value {
     }
 }
 
-/// Diagnostic: test PTY spawning with a simple echo command.
-/// Returns { pty_works, claude_found, claude_path, echo_output, error }
+/// Diagnostic: fast check of claude availability using regular process commands (no PTY).
+/// Does NOT block the UI.
 #[tauri::command]
 pub fn diagnose_spawn() -> serde_json::Value {
+    use std::process::Command;
+
+    // 1. find_claude() — static path search
     let claude_path = find_claude();
-    let tmp = std::env::temp_dir();
 
-    // Test 1: PTY works at all with a simple echo
+    // 2. `where claude` (Windows) or `which claude` (Unix) — 2s timeout
     #[cfg(windows)]
-    let echo_result = spawn_test("cmd", &["/c", "echo", "PTY_OK"], &tmp);
+    let where_out = Command::new("where")
+        .arg("claude")
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|e| format!("where failed: {e}"));
+
     #[cfg(not(windows))]
-    let echo_result = spawn_test("echo", &["PTY_OK"], &tmp);
+    let where_out = Command::new("which")
+        .arg("claude")
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|e| format!("which failed: {e}"));
 
-    let pty_works = echo_result.as_ref().map(|s| s.contains("PTY_OK")).unwrap_or(false);
+    // 3. `claude --version` using augmented PATH
+    let aug_path = {
+        let current = std::env::var("PATH").unwrap_or_default();
+        #[cfg(windows)]
+        if let Some(home) = dirs::home_dir() {
+            format!("{};{};{};{}",
+                home.join("AppData").join("Roaming").join("npm").to_string_lossy(),
+                home.join("AppData").join("Local").join("pnpm").to_string_lossy(),
+                home.join("AppData").join("Local").join("nvm").to_string_lossy(),
+                current)
+        } else { current }
+        #[cfg(not(windows))]
+        current
+    };
 
-    // Test 2: where/which claude in augmented PATH
     #[cfg(windows)]
-    let which_result = spawn_test("cmd", &["/c", "where", "claude"], &tmp);
+    let version_out = Command::new("cmd")
+        .args(["/c", "claude", "--version"])
+        .env("PATH", &aug_path)
+        .output()
+        .map(|o| {
+            let stdout = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            let stderr = String::from_utf8_lossy(&o.stderr).trim().to_string();
+            if !stdout.is_empty() { stdout } else { stderr }
+        })
+        .unwrap_or_else(|e| format!("version check failed: {e}"));
+
     #[cfg(not(windows))]
-    let which_result = spawn_test("which", &["claude"], &tmp);
+    let version_out = Command::new("claude")
+        .arg("--version")
+        .env("PATH", &aug_path)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|e| format!("version check failed: {e}"));
 
     serde_json::json!({
-        "ptyWorks": pty_works,
-        "echoOutput": echo_result.unwrap_or_else(|e| format!("FAIL: {e}")),
-        "claudeFound": claude_path.is_some(),
+        "claudeFound": claude_path.is_some() || !where_out.is_empty(),
         "claudePath": claude_path,
-        "whichOutput": which_result.unwrap_or_else(|e| format!("FAIL: {e}")),
-        "processPath": std::env::var("PATH").unwrap_or_default().chars().take(300).collect::<String>(),
+        "whereOutput": where_out,
+        "versionOutput": version_out,
+        "augmentedPath": aug_path.chars().take(400).collect::<String>(),
+        "processPath": std::env::var("PATH").unwrap_or_default().chars().take(200).collect::<String>(),
     })
 }
 

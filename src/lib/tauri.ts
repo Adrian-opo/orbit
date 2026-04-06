@@ -154,11 +154,11 @@ export async function deleteSession(sessionId: number): Promise<void> {
 
 
 export interface SpawnDiagnostic {
-  ptyWorks: boolean;
-  echoOutput: string;
   claudeFound: boolean;
   claudePath: string | null;
-  whichOutput: string;
+  whereOutput: string;
+  versionOutput: string;
+  augmentedPath: string;
   processPath: string;
 }
 

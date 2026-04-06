@@ -124,44 +124,6 @@ fn claude_command() -> Result<CommandBuilder, String> {
     }
 }
 
-/// Spawn any process via PTY for diagnostic purposes (e.g. `echo hello`).
-pub fn spawn_test(exe: &str, args: &[&str], cwd: &std::path::Path) -> Result<String, String> {
-    use std::io::BufRead;
-
-    let pty_system = native_pty_system();
-    let pair = pty_system.openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
-        .map_err(|e| format!("openpty failed: {e}"))?;
-
-    let mut cmd = CommandBuilder::new(exe);
-    cmd.args(args);
-    cmd.cwd(cwd);
-    cmd.env("PATH", extended_path());
-
-    let child = pair.slave.spawn_command(cmd)
-        .map_err(|e| format!("spawn failed: {e}"))?;
-    drop(pair.slave);
-    std::mem::forget(child);
-
-    let reader = pair.master.try_clone_reader()
-        .map_err(|e| format!("reader failed: {e}"))?;
-
-    let mut buf = std::io::BufReader::new(reader);
-    let mut output = String::new();
-    let mut line = String::new();
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
-
-    loop {
-        if std::time::Instant::now() > deadline { break; }
-        line.clear();
-        match buf.read_line(&mut line) {
-            Ok(0) | Err(_) => break,
-            Ok(_) => output.push_str(&line),
-        }
-        if output.len() > 2000 { break; }
-    }
-
-    Ok(output.trim().to_string())
-}
 
 /// Spawn a Claude Code process via PTY.
 /// Returns a PtyHandle with the process PID, a writer (for stdin), and a reader (for stdout).

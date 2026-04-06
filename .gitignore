@@ -1,5 +1,23 @@
+# System
 .DS_Store
-node_modules
+bash.exe.stackdump
+*.stackdump
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
+
+# Docs (internal plans/specs)
+docs/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# SvelteKit / Vite
 /build
 /.svelte-kit
 /package
@@ -8,4 +26,9 @@ node_modules
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Rust / Tauri backend
+front/target/
+
+# Superpowers
 .superpowers/

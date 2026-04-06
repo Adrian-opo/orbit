@@ -1,7 +1,7 @@
 {
   "name": "orbit",
   "version": "0.1.0",
-  "description": "",
+  "description": "Orbit — multi-session Claude Code agent dashboard",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
@@ -12,7 +12,11 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "tauri": "tauri"
+    "test:rust": "cd front && cargo test",
+    "tauri": "tauri -c front/tauri.conf.json",
+    "tauri:dev": "tauri dev -c front/tauri.conf.json",
+    "tauri:build": "tauri build -c front/tauri.conf.json",
+    "tauri:icon": "tauri icon -c front/tauri.conf.json"
   },
   "license": "MIT",
   "dependencies": {

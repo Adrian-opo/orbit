@@ -29,6 +29,7 @@ export interface Session {
   contextPercent: number | null;
   pendingApproval: string | null;
   miniLog: MiniLogEntry[] | null;
+  costUsd: number | null;
   createdAt: string;
   updatedAt: string;
 }

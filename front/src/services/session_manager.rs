@@ -24,6 +24,7 @@ pub struct SessionStateEvent {
     pub context_percent: f64,
     pub pending_approval: Option<String>,
     pub mini_log: Vec<crate::models::MiniLogEntry>,
+    pub cost_usd: Option<f64>,
 }
 
 struct ActiveSession {
@@ -342,6 +343,7 @@ impl SessionManager {
                             },
                             pending_approval: state.pending_approval.clone(),
                             mini_log: state.mini_log.clone(),
+                            cost_usd: state.cost_usd,
                         };
                         (new_entries, event)
                     };

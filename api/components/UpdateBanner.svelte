@@ -3,6 +3,7 @@
   import { installUpdate } from '../lib/tauri';
 
   export let update: UpdateInfo;
+  export let onDismiss: () => void = () => {};
 
   let installing = false;
   let error = '';
@@ -36,6 +37,7 @@
   <button class="update-btn" on:click={install} disabled={installing}>
     {installing ? 'instalando...' : 'atualizar agora'}
   </button>
+  <button class="dismiss-btn" on:click={onDismiss} title="Fechar" disabled={installing}>✕</button>
 </div>
 
 <style>
@@ -48,7 +50,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    background: rgba(0, 212, 126, 0.08);
+    background: var(--bg1);
     border-top: 1px solid rgba(0, 212, 126, 0.3);
     padding: 10px 16px;
     animation: slideUp 0.2s ease;
@@ -108,5 +110,17 @@
   .update-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  .dismiss-btn {
+    background: none;
+    border: none;
+    color: var(--t3);
+    font-size: var(--sm);
+    padding: 4px 6px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .dismiss-btn:hover:not(:disabled) {
+    color: var(--t1);
   }
 </style>

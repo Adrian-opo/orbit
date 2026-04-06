@@ -17,6 +17,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     contextPercent: null,
     pendingApproval: null,
     miniLog: null,
+    costUsd: null,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
     ...overrides,

@@ -21,6 +21,8 @@ pub struct JournalState {
     pub pending_approval: Option<String>,
     pub mini_log: Vec<MiniLogEntry>,
     pub file_size: u64,
+    /// Real cost from the Claude `result` message (more accurate than token estimate).
+    pub cost_usd: Option<f64>,
 }
 
 impl Default for JournalState {
@@ -37,6 +39,7 @@ impl Default for JournalState {
             pending_approval: None,
             mini_log: Vec::new(),
             file_size: 0,
+            cost_usd: None,
         }
     }
 }
@@ -74,6 +77,7 @@ pub fn parse_journal(
             pending_approval: None,
             mini_log: prev.mini_log.clone(),
             file_size: prev.file_size,
+            cost_usd: prev.cost_usd,
         },
         None => JournalState {
             entries: Vec::new(),
@@ -87,6 +91,7 @@ pub fn parse_journal(
             pending_approval: None,
             mini_log: Vec::new(),
             file_size: 0,
+            cost_usd: None,
         },
     };
 
@@ -847,6 +852,19 @@ pub fn process_line(state: &mut JournalState, line: &str) {
                     state.status = AgentStatus::Idle;
                 }
             }
+        }
+
+        "result" => {
+            // Final message from Claude with actual cost_usd
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                if let Some(cost) = val.get("cost_usd").and_then(|v| v.as_f64()) {
+                    if cost > 0.0 {
+                        state.cost_usd =
+                            Some(state.cost_usd.map(|prev| prev + cost).unwrap_or(cost));
+                    }
+                }
+            }
+            state.status = AgentStatus::Idle;
         }
 
         _ => {}

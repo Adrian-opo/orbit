@@ -106,6 +106,7 @@ export interface SessionStatePayload {
   contextPercent: number;
   pendingApproval: string | null;
   miniLog: MiniLogEntry[];
+  costUsd: number | null;
 }
 
 export function onSessionCreated(cb: (session: Session) => void) {

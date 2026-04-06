@@ -81,6 +81,7 @@
           contextPercent: p.contextPercent,
           pendingApproval: p.pendingApproval,
           miniLog: p.miniLog,
+          costUsd: p.costUsd ?? null,
         })
       );
     });
@@ -155,7 +156,7 @@
 {/if}
 
 {#if availableUpdate}
-  <UpdateBanner update={availableUpdate} />
+  <UpdateBanner update={availableUpdate} onDismiss={() => (availableUpdate = null)} />
 {/if}
 
 <div class="layout">

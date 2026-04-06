@@ -13,6 +13,11 @@ Durante a execução de comandos longos, o resultado aparece progressivamente na
 ### 06/04 · Novo — Aviso de limite de uso da API
 Quando o limite de uso da API do Claude é atingido, o app exibe uma mensagem clara na tela em vez de simplesmente parar de responder. O aviso some automaticamente após 30 segundos.
 
+### 06/04 · Novo — Atualização automática
+O app verifica automaticamente se há uma versão nova disponível logo ao abrir.
+Quando houver, um aviso aparece na parte inferior da tela com um botão para instalar
+e reiniciar — sem precisar baixar nada manualmente.
+
 ### 06/04 · Ajuste — Indicador de sessão parada
 Sessões encerradas agora exibem uma etiqueta "stopped" no painel lateral, tornando mais fácil identificar o estado de cada sessão.
 

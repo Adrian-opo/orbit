@@ -1,17 +1,16 @@
 <script lang="ts">
-  import type { AgentState } from '../lib/types';
-  import AgentCard from './AgentCard.svelte';
+  import { sessions, selectedSessionId } from '../lib/stores/sessions';
+  import type { Session } from '../lib/stores/sessions';
   import { theme } from '../lib/stores/preferences';
   import CreateSessionDialog from './CreateSessionDialog.svelte';
 
-  export let agents: AgentState[];
-  export let selectedId: string | null;
-  export let onSelect: (id: string) => void;
-
   let showCreateDialog = false;
 
-  $: totalTokens = agents.reduce((sum, a) => sum + a.tokens.input + a.tokens.output, 0);
-  $: awaitingCount = agents.filter(a => a.status === 'input').length;
+  $: totalTokens = $sessions.reduce((sum, s) => {
+    if (!s.tokens) return sum;
+    return sum + s.tokens.input + s.tokens.output;
+  }, 0);
+  $: awaitingCount = $sessions.filter(s => s.status === 'waiting').length;
 </script>
 
 {#if showCreateDialog}
@@ -23,25 +22,37 @@
 
 <aside class="sidebar">
   <div class="sidebar-header">
-    <span class="title">Agents</span>
+    <span class="title">Sessions</span>
     <div class="header-right">
       <button class="new-session-btn" on:click={() => showCreateDialog = true} title="New Session">+ New Session</button>
       <button class="theme-toggle" onclick={() => theme.toggle()} title="Toggle theme">
         {$theme === 'dark' ? '☀' : '☾'}
       </button>
-      <span class="badge">{agents.length}</span>
+      <span class="badge">{$sessions.length}</span>
     </div>
   </div>
   <div class="sidebar-content">
-    {#if agents.length === 0}
-      <p class="empty">No agents detected</p>
+    {#if $sessions.length === 0}
+      <p class="empty">No sessions detected</p>
     {:else}
-      {#each agents as agent (agent.sessionId)}
-        <AgentCard
-          {agent}
-          selected={agent.sessionId === selectedId}
-          onClick={() => onSelect(agent.sessionId)}
-        />
+      {#each $sessions as session (session.id)}
+        <div
+          class="session-item"
+          class:selected={$selectedSessionId === session.id}
+          on:click={() => selectedSessionId.set(session.id)}
+          on:keydown={(e) => e.key === 'Enter' && selectedSessionId.set(session.id)}
+          role="button"
+          tabindex="0"
+        >
+          <div class="session-name">{session.projectName ?? session.cwd ?? 'Session'}</div>
+          <div class="session-meta">
+            <span class="status status-{session.status}">{session.status}</span>
+            <span class="model">{session.model ?? '—'}</span>
+          </div>
+          {#if session.tokens}
+            <div class="session-tokens">{Math.round((session.tokens.input + session.tokens.output) / 1000)}K tokens</div>
+          {/if}
+        </div>
       {/each}
     {/if}
   </div>
@@ -112,5 +123,50 @@
     color: var(--text-muted);
     font-size: 13px;
     text-align: center;
+  }
+  .session-item {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+  .session-item:hover { background: var(--bg-hover, rgba(255,255,255,0.05)); }
+  .session-item.selected { background: var(--bg-selected, rgba(59,130,246,0.15)); }
+  .session-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .session-meta {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 3px;
+  }
+  .status {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .status-running { background: var(--green-dim); color: var(--green); }
+  .status-working { background: var(--green-dim); color: var(--green); }
+  .status-waiting { background: var(--yellow-dim, rgba(234,179,8,0.15)); color: var(--yellow, #eab308); }
+  .status-initializing { background: var(--bg-muted, rgba(255,255,255,0.08)); color: var(--text-muted); }
+  .status-completed { background: var(--bg-muted, rgba(255,255,255,0.08)); color: var(--text-dim); }
+  .status-stopped { background: var(--bg-muted, rgba(255,255,255,0.08)); color: var(--text-dim); }
+  .status-error { background: var(--red-dim, rgba(239,68,68,0.15)); color: var(--red, #ef4444); }
+  .model {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .session-tokens {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
   }
 </style>

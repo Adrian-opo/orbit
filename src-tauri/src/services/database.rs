@@ -91,8 +91,8 @@ impl DatabaseService {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO sessions (project_id, name, cwd, status, permission_mode, model)
-             VALUES (?1, ?2, ?3, 'initializing', ?4, ?5)",
-            params![project_id, name, cwd, permission_mode, model],
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![project_id, name, cwd, crate::models::SessionStatus::Initializing.as_str(), permission_mode, model],
         )?;
         Ok(conn.last_insert_rowid())
     }
@@ -109,8 +109,8 @@ impl DatabaseService {
     pub fn update_session_pid(&self, id: SessionId, pid: i32) -> SqlResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "UPDATE sessions SET pid = ?1, status = 'running', updated_at = datetime('now') WHERE id = ?2",
-            params![pid, id],
+            "UPDATE sessions SET pid = ?1, status = ?2, updated_at = datetime('now') WHERE id = ?3",
+            params![pid, crate::models::SessionStatus::Running.as_str(), id],
         )?;
         Ok(())
     }

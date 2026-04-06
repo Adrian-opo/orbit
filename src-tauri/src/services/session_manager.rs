@@ -101,7 +101,7 @@ impl SessionManager {
             id: session_id,
             project_id: Some(project.id),
             name: session_name,
-            status: "running".to_string(),
+            status: crate::models::SessionStatus::Running.as_str().to_string(),
             worktree_path: None,
             branch_name: None,
             permission_mode: permission_mode.clone(),
@@ -239,13 +239,13 @@ impl SessionManager {
         {
             let mut m = manager.lock().unwrap();
             if let Some(active) = m.active.get_mut(&session_id) {
-                active.session.status = "completed".to_string();
+                active.session.status = crate::models::SessionStatus::Completed.as_str().to_string();
             }
             if let Some(state) = m.journal_states.get_mut(&session_id) {
                 state.status = AgentStatus::Idle;
             }
             let db = m.db.clone();
-            let _ = db.update_session_status(session_id, "completed");
+            let _ = db.update_session_status(session_id, crate::models::SessionStatus::Completed.as_str());
         }
 
         let _ = app.emit("session:stopped", serde_json::json!({ "sessionId": session_id }));
@@ -262,7 +262,7 @@ impl SessionManager {
     /// Stop a running session by removing it from active map and updating DB.
     pub fn stop_session(&mut self, session_id: SessionId) -> Result<(), String> {
         self.active.remove(&session_id);
-        let _ = self.db.update_session_status(session_id, "stopped");
+        let _ = self.db.update_session_status(session_id, crate::models::SessionStatus::Stopped.as_str());
         Ok(())
     }
 

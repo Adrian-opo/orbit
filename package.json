@@ -22,10 +22,10 @@
     "format:check": "npm run format:check:api && npm run format:check:front",
     "format:check:api": "prettier --check \"api/**/*.{ts,svelte,css}\"",
     "format:check:front": "cargo fmt --manifest-path front/Cargo.toml --check",
-    "tauri": "tauri -c front/tauri.conf.json",
-    "tauri:dev": "tauri dev -c front/tauri.conf.json",
-    "tauri:build": "tauri build -c front/tauri.conf.json",
-    "tauri:icon": "tauri icon -c front/tauri.conf.json"
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev --config front/tauri.conf.json",
+    "tauri:build": "tauri build --config front/tauri.conf.json",
+    "tauri:icon": "tauri icon --config front/tauri.conf.json"
   },
   "license": "MIT",
   "dependencies": {

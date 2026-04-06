@@ -1,0 +1,24 @@
+use tauri::State;
+
+use crate::models::Project;
+use crate::ipc::session::SessionState;
+
+#[tauri::command]
+pub fn create_project(
+    name: String,
+    path: String,
+    state: State<SessionState>,
+) -> Result<Project, String> {
+    state.0.lock().unwrap()
+        .db
+        .create_project(&name, &path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_projects(state: State<SessionState>) -> Vec<Project> {
+    state.0.lock().unwrap()
+        .db
+        .get_projects()
+        .unwrap_or_default()
+}

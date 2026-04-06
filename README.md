@@ -1,10 +1,16 @@
+<div align="center">
+
+<img src="front/icons/orbit-source.svg" width="96" height="96" alt="Orbit logo"/>
+
 # Orbit
 
-Desktop application for managing multiple [Claude Code](https://github.com/anthropics/claude-code) sessions simultaneously.
+**Desktop app for running multiple [Claude Code](https://github.com/anthropics/claude-code) agents simultaneously.**
 
 [![Build](https://img.shields.io/github/actions/workflow/status/xinnaider/orbit/build.yml?branch=master)](https://github.com/xinnaider/orbit/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform: Windows](https://img.shields.io/badge/platform-Windows-blue.svg)](#installation)
+
+</div>
 
 ---
 

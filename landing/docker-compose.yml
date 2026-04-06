@@ -1,0 +1,6 @@
+services:
+  orbit-landing:
+    image: ghcr.io/xinnaider/orbit-landing:latest
+    restart: unless-stopped
+    expose:
+      - "80"

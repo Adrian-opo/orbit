@@ -23,6 +23,24 @@ pub struct JournalState {
     pub file_size: u64,
 }
 
+impl Default for JournalState {
+    fn default() -> Self {
+        JournalState {
+            entries: Vec::new(),
+            input_tokens: 0,
+            output_tokens: 0,
+            cache_read: 0,
+            cache_write: 0,
+            model: None,
+            last_activity: None,
+            status: AgentStatus::New,
+            pending_approval: None,
+            mini_log: Vec::new(),
+            file_size: 0,
+        }
+    }
+}
+
 /// Raw JSONL entry from Claude Code logs.
 #[derive(Deserialize)]
 struct RawEntry {
@@ -516,5 +534,272 @@ fn derive_status_from_tail(path: &Path, input_tokens: u64, output_tokens: u64) -
         // Progress event → actively working
         "progress" => AgentStatus::Working,
         _ => AgentStatus::Idle,
+    }
+}
+
+/// Process a single raw JSONL line from PTY stdout and update state.
+/// This is the real-time counterpart to parse_journal (which reads files).
+pub fn process_line(state: &mut JournalState, line: &str) {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+
+    // Skip synthetic messages
+    if trimmed.contains("\"<synthetic>\"") {
+        return;
+    }
+
+    let raw: RawEntry = match serde_json::from_str(trimmed) {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+
+    let ts = raw.timestamp.clone().unwrap_or_default();
+
+    match raw.r#type.as_str() {
+        "assistant" => {
+            state.last_activity = raw.timestamp.clone();
+
+            let mut has_tool_use = false;
+            let mut end_turn = false;
+
+            if let Some(msg) = &raw.message {
+                // Extract model
+                if let Some(m) = msg.get("model").and_then(|v| v.as_str()) {
+                    state.model = Some(m.to_string());
+                }
+
+                // Extract token usage
+                if let Some(usage) = msg.get("usage") {
+                    state.input_tokens = usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0)
+                        + usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0)
+                        + usage.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                    state.output_tokens = usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                    state.cache_read = usage.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                    state.cache_write = usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                }
+
+                if let Some(stop) = msg.get("stop_reason").and_then(|v| v.as_str()) {
+                    if stop == "end_turn" {
+                        end_turn = true;
+                    }
+                }
+
+                // Extract content blocks
+                if let Some(content) = msg.get("content").and_then(|v| v.as_array()) {
+                    for block in content {
+                        let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                        match block_type {
+                            "thinking" => {
+                                let thinking_text = block.get("thinking")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                if !thinking_text.is_empty() {
+                                    state.entries.push(JournalEntry {
+                                        session_id: String::new(),
+                                        timestamp: ts.clone(),
+                                        entry_type: JournalEntryType::Thinking,
+                                        text: None,
+                                        thinking: Some(thinking_text),
+                                        thinking_duration: None,
+                                        tool: None,
+                                        tool_input: None,
+                                        output: None,
+                                        exit_code: None,
+                                        lines_changed: None,
+                                    });
+                                }
+                            }
+                            "text" => {
+                                let text = block.get("text")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                if !text.is_empty() {
+                                    state.entries.push(JournalEntry {
+                                        session_id: String::new(),
+                                        timestamp: ts.clone(),
+                                        entry_type: JournalEntryType::Assistant,
+                                        text: Some(text),
+                                        thinking: None,
+                                        thinking_duration: None,
+                                        tool: None,
+                                        tool_input: None,
+                                        output: None,
+                                        exit_code: None,
+                                        lines_changed: None,
+                                    });
+                                }
+                            }
+                            "tool_use" => {
+                                has_tool_use = true;
+                                let tool_name = block.get("name")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("unknown")
+                                    .to_string();
+                                let input = block.get("input").cloned();
+                                let target = extract_tool_target(&tool_name, &input);
+
+                                state.mini_log.push(MiniLogEntry {
+                                    tool: tool_name.clone(),
+                                    target,
+                                    result: None,
+                                    success: None,
+                                });
+                                if state.mini_log.len() > 4 {
+                                    state.mini_log.remove(0);
+                                }
+
+                                state.entries.push(JournalEntry {
+                                    session_id: String::new(),
+                                    timestamp: ts.clone(),
+                                    entry_type: JournalEntryType::ToolCall,
+                                    text: None,
+                                    thinking: None,
+                                    thinking_duration: None,
+                                    tool: Some(tool_name),
+                                    tool_input: input,
+                                    output: None,
+                                    exit_code: None,
+                                    lines_changed: None,
+                                });
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+
+            // Update status
+            if end_turn {
+                state.status = AgentStatus::Idle;
+                state.pending_approval = None;
+            } else if has_tool_use {
+                state.status = AgentStatus::Input;
+                state.pending_approval = detect_pending_approval(&state.entries);
+            } else {
+                state.status = AgentStatus::Working;
+            }
+        }
+
+        "user" => {
+            state.last_activity = raw.timestamp.clone();
+
+            if let Some(msg) = &raw.message {
+                if let Some(content) = msg.get("content") {
+                    if let Some(arr) = content.as_array() {
+                        for block in arr {
+                            if block.get("type").and_then(|v| v.as_str()) == Some("tool_result") {
+                                let output_text = block.get("content")
+                                    .and_then(|v| v.as_str())
+                                    .or_else(|| block.get("text").and_then(|v| v.as_str()))
+                                    .unwrap_or("")
+                                    .to_string();
+
+                                if let Some(last) = state.mini_log.last_mut() {
+                                    last.success = Some(!output_text.contains("error") && !output_text.contains("Error"));
+                                }
+
+                                state.entries.push(JournalEntry {
+                                    session_id: String::new(),
+                                    timestamp: ts.clone(),
+                                    entry_type: JournalEntryType::ToolResult,
+                                    text: None,
+                                    thinking: None,
+                                    thinking_duration: None,
+                                    tool: None,
+                                    tool_input: None,
+                                    output: Some(truncate_output(&output_text, 2000)),
+                                    exit_code: None,
+                                    lines_changed: None,
+                                });
+                            }
+                        }
+                    } else if let Some(text) = content.as_str() {
+                        if !text.is_empty() {
+                            state.entries.push(JournalEntry {
+                                session_id: String::new(),
+                                timestamp: ts.clone(),
+                                entry_type: JournalEntryType::User,
+                                text: Some(text.to_string()),
+                                thinking: None,
+                                thinking_duration: None,
+                                tool: None,
+                                tool_input: None,
+                                output: None,
+                                exit_code: None,
+                                lines_changed: None,
+                            });
+                        }
+                    }
+                    // After user message: Claude goes back to working
+                    state.status = AgentStatus::Working;
+                    state.pending_approval = None;
+                }
+            }
+        }
+
+        "system" => {
+            if let Some(subtype) = raw.message.as_ref()
+                .and_then(|m| m.get("subtype"))
+                .and_then(|v| v.as_str())
+            {
+                if subtype == "stop_hook_summary" {
+                    state.status = AgentStatus::Idle;
+                }
+            }
+        }
+
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod process_line_tests {
+    use super::*;
+
+    #[test]
+    fn test_process_empty_line_is_noop() {
+        let mut state = JournalState::default();
+        process_line(&mut state, "");
+        assert!(state.entries.is_empty());
+    }
+
+    #[test]
+    fn test_process_invalid_json_is_noop() {
+        let mut state = JournalState::default();
+        process_line(&mut state, "not json");
+        assert!(state.entries.is_empty());
+    }
+
+    #[test]
+    fn test_process_assistant_text_creates_entry() {
+        let mut state = JournalState::default();
+        let line = r#"{"type":"assistant","message":{"model":"claude-sonnet-4-6","content":[{"type":"text","text":"Hello!"}],"usage":{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
+        process_line(&mut state, line);
+        assert_eq!(state.entries.len(), 1);
+        assert_eq!(state.entries[0].entry_type, JournalEntryType::Assistant);
+        assert_eq!(state.entries[0].text.as_deref(), Some("Hello!"));
+        assert_eq!(state.model.as_deref(), Some("claude-sonnet-4-6"));
+        assert_eq!(state.output_tokens, 5);
+    }
+
+    #[test]
+    fn test_process_tool_use_sets_input_status() {
+        let mut state = JournalState::default();
+        let line = r#"{"type":"assistant","message":{"model":"claude-sonnet-4-6","content":[{"type":"tool_use","name":"Bash","input":{"command":"ls"}}],"usage":{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
+        process_line(&mut state, line);
+        assert_eq!(state.status, AgentStatus::Input);
+        assert_eq!(state.entries[0].entry_type, JournalEntryType::ToolCall);
+    }
+
+    #[test]
+    fn test_process_end_turn_sets_idle_status() {
+        let mut state = JournalState::default();
+        let line = r#"{"type":"assistant","message":{"model":"claude-sonnet-4-6","stop_reason":"end_turn","content":[{"type":"text","text":"Done."}],"usage":{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
+        process_line(&mut state, line);
+        assert_eq!(state.status, AgentStatus::Idle);
     }
 }

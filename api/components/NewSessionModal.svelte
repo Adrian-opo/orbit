@@ -9,7 +9,6 @@
   let path = '';
   let prompt = '';
   let model = 'auto';
-  let approveMode = false;
   let loading = false;
   let error = '';
   let diagRunning = false;
@@ -50,7 +49,7 @@
         projectPath: path.trim(),
         prompt: prompt.trim() || 'Hello',
         model: model === 'auto' ? undefined : model,
-        permissionMode: approveMode ? 'approve' : 'ignore',
+        permissionMode: 'ignore',
       });
       dispatch('done');
     } catch (e: any) {
@@ -119,13 +118,6 @@
             <option value={m.v}>{m.l}</option>
           {/each}
         </select>
-      </div>
-      <div class="field half approve-field">
-        <label class="label" for="ns-approve">approve tools</label>
-        <label class="toggle">
-          <input id="ns-approve" type="checkbox" bind:checked={approveMode} disabled={loading} />
-          <span class="toggle-track" class:on={approveMode}></span>
-        </label>
       </div>
     </div>
 
@@ -270,57 +262,6 @@
   .half {
     flex: 1;
   }
-  .approve-field {
-    justify-content: space-between;
-    flex-direction: row;
-    align-items: center;
-  }
-  .approve-field .label {
-    align-self: flex-start;
-    margin-top: 4px;
-  }
-
-  .toggle {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-  }
-  .toggle input {
-    display: none;
-  }
-  .toggle-track {
-    width: 28px;
-    height: 14px;
-    background: var(--bg3);
-    border: 1px solid var(--bd1);
-    border-radius: 7px;
-    position: relative;
-    transition:
-      background 0.2s,
-      border-color 0.2s;
-  }
-  .toggle-track::after {
-    content: '';
-    position: absolute;
-    top: 1px;
-    left: 1px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--t2);
-    transition:
-      transform 0.2s,
-      background 0.2s;
-  }
-  .toggle-track.on {
-    background: var(--ac-d);
-    border-color: var(--ac);
-  }
-  .toggle-track.on::after {
-    transform: translateX(14px);
-    background: var(--ac);
-  }
-
   .error {
     font-size: var(--sm);
     color: var(--s-error);

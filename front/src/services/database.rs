@@ -29,8 +29,9 @@ impl DatabaseService {
 
     fn migrate(&self) -> SqlResult<()> {
         let conn = self.conn.lock().unwrap();
-        // Run schema migrations
+        // Run schema migrations (errors ignored — column may already exist)
         let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN claude_session_id TEXT");
+        let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN cwd TEXT");
 
         conn.execute_batch(
             "

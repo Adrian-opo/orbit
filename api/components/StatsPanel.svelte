@@ -1,11 +1,26 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { Session } from '../lib/stores/sessions';
+  import { estimateCost, formatCost } from '../lib/cost';
+  import { getClaudeUsageStats, type ClaudeUsageStats } from '../lib/tauri';
+  import { formatTokens } from '../lib/cost';
 
   export let session: Session;
 
   $: tokens = session.tokens;
   $: totalTokens = (tokens?.input ?? 0) + (tokens?.output ?? 0);
   $: ctx = session.contextPercent ?? 0;
+  $: cost = tokens ? estimateCost(tokens, session.model) : 0;
+
+  let usage: ClaudeUsageStats | null = null;
+
+  onMount(async () => {
+    try {
+      usage = await getClaudeUsageStats();
+    } catch {
+      // not in Tauri or no stats file
+    }
+  });
 </script>
 
 <div class="stats">
@@ -29,6 +44,10 @@
     <span class="label">Total</span>
     <span class="value">{totalTokens.toLocaleString()}</span>
   </div>
+  <div class="stat-row cost">
+    <span class="label">Estimated cost</span>
+    <span class="value cost-value">{formatCost(cost)}</span>
+  </div>
   <div class="context-section">
     <div class="context-label">
       Context window: {ctx.toFixed(1)}%
@@ -46,6 +65,23 @@
     <span class="label">Model</span>
     <span class="value">{session.model ?? '—'}</span>
   </div>
+  {#if usage}
+  <div class="usage-section">
+    <div class="usage-title">Weekly usage (7d)</div>
+    <div class="stat-row">
+      <span class="label">Tokens</span>
+      <span class="value">{formatTokens(usage.weeklyTokens)}</span>
+    </div>
+    <div class="stat-row">
+      <span class="label">Today</span>
+      <span class="value">{formatTokens(usage.todayTokens)}</span>
+    </div>
+    <div class="stat-row">
+      <span class="label">Messages</span>
+      <span class="value">{usage.weeklyMessages.toLocaleString()}</span>
+    </div>
+  </div>
+  {/if}
 </div>
 
 <style>
@@ -64,8 +100,15 @@
   }
   .stat-row.total {
     font-weight: 600;
-    border-bottom: none;
+    border-bottom: 1px solid var(--border-subtle);
     margin-top: 4px;
+  }
+  .stat-row.cost {
+    border-bottom: none;
+  }
+  .cost-value {
+    color: var(--ac);
+    font-weight: 600;
   }
   .label {
     color: var(--text-muted);
@@ -98,5 +141,17 @@
   }
   .fill.danger {
     background: var(--red);
+  }
+  .usage-section {
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+  .usage-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
   }
 </style>

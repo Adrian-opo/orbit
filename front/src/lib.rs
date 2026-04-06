@@ -66,6 +66,7 @@ pub fn run() {
             commands::get_slash_commands,
             commands::list_project_files,
             commands::get_tasks,
+            commands::get_claude_usage_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

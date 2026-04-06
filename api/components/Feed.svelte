@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { JournalEntry } from '../lib/types';
   import Markdown from './Markdown.svelte';
+  import ToolCallEntry from './ToolCallEntry.svelte';
 
   export let entries: JournalEntry[] = [];
   export let status: string = '';
@@ -93,46 +94,7 @@
       </div>
     {:else if e.entryType === 'toolCall'}
       <div class="row tool">
-        <div class="row-meta">
-          <span class="row-who tool-who">{e.tool ?? 'tool'}</span>
-          <span class="row-ts">{ts(e)}</span>
-          {#if r}
-            {@const ok = r.output && !r.output.toLowerCase().includes('error')}
-            <span class="tool-status" class:ok class:fail={!ok}>
-              {ok ? '✓' : '✗'}
-            </span>
-          {/if}
-        </div>
-        <!-- Tool input -->
-        {#if e.tool === 'Bash' && e.toolInput?.command}
-          <div class="tool-cmd">
-            <span class="prompt-char">$</span>
-            <pre>{e.toolInput.command}</pre>
-          </div>
-        {:else if (e.tool === 'Read' || e.tool === 'Edit' || e.tool === 'Write') && e.toolInput?.file_path}
-          <div class="tool-cmd">
-            <span class="prompt-char"
-              >{e.tool === 'Read' ? '‹' : e.tool === 'Write' ? '›' : '~'}</span
-            >
-            <span class="tool-path">{String(e.toolInput.file_path).split(/[/\\]/).pop()}</span>
-            <span class="tool-path-full">{e.toolInput.file_path}</span>
-          </div>
-        {:else if e.tool === 'Grep' && e.toolInput?.pattern}
-          <div class="tool-cmd">
-            <span class="prompt-char">/</span>
-            <pre>{e.toolInput.pattern}</pre>
-          </div>
-        {:else if e.toolInput}
-          <div class="tool-cmd">
-            <pre>{JSON.stringify(e.toolInput, null, 2).slice(0, 200)}</pre>
-          </div>
-        {/if}
-        <!-- Tool result -->
-        {#if r?.output}
-          <div class="tool-result">
-            <pre>{r.output.slice(0, 800)}{r.output.length > 800 ? '\n…' : ''}</pre>
-          </div>
-        {/if}
+        <ToolCallEntry entry={e} resultEntry={r} />
       </div>
     {:else if e.entryType === 'system'}
       <div class="row system">
@@ -208,16 +170,6 @@
     color: var(--t0);
   }
 
-  .tool-status {
-    font-size: var(--xs);
-  }
-  .tool-status.ok {
-    color: var(--s-working);
-  }
-  .tool-status.fail {
-    color: var(--s-error);
-  }
-
   .row-body {
     font-size: var(--base);
     line-height: 1.6;
@@ -249,59 +201,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .tool-cmd {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 5px 8px;
-    background: var(--bg2);
-    border-radius: 3px;
-    border-left: 2px solid var(--tool-fg);
-    margin-bottom: 3px;
-  }
-  .prompt-char {
-    color: var(--tool-fg);
-    font-size: var(--md);
-    flex-shrink: 0;
-    margin-top: 1px;
-  }
-  .tool-cmd pre {
-    font-size: var(--sm);
-    color: var(--t0);
-    white-space: pre-wrap;
-    word-break: break-all;
-    margin: 0;
-    font-family: var(--mono);
-  }
-  .tool-path {
-    font-size: var(--md);
-    color: var(--t0);
-    font-weight: 500;
-  }
-  .tool-path-full {
-    font-size: var(--xs);
-    color: var(--t2);
-    margin-left: 4px;
-  }
-
-  .tool-result {
-    padding: 5px 8px;
-    background: var(--result-bg);
-    border-radius: 3px;
-    border-left: 2px solid var(--bd1);
-  }
-  .tool-result pre {
-    font-size: var(--sm);
-    color: var(--result-fg);
-    white-space: pre-wrap;
-    word-break: break-word;
-    margin: 0;
-    font-family: var(--mono);
-    max-height: 200px;
-    overflow-y: auto;
-    line-height: 1.5;
   }
 
   .system {

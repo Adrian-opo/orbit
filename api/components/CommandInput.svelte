@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { sendSessionMessage, getSlashCommands, listProjectFiles } from '../lib/tauri';
+  import { FileText } from 'lucide-svelte';
   import { pendingMessages } from '../lib/stores/journal';
   import type { SlashCommand } from '../lib/types';
 
@@ -14,12 +15,39 @@
   let showSuggestions = false;
   let commands: SlashCommand[] = [];
   let suggestionEls: HTMLButtonElement[] = [];
+  let suggestionsContainer: HTMLDivElement | null = null;
 
   // @ file picker state
   let projectFiles: string[] = [];
   let showFilePicker = false;
   let fileSelectedIdx = 0;
-  let filePickerEls: HTMLButtonElement[] = [];
+  let filePickerContainer: HTMLDivElement | null = null;
+
+  const hints = [
+    'Orbit keeps all your Claude agents in sync — one dashboard, infinite sessions',
+    'Each agent runs in its own orbit — isolated, parallel, always tracked',
+    'Real-time log streaming — watch your agents compute at the speed of light',
+    'Token usage and cost tracked per session — every bit accounted for',
+    'Use @ to attach files directly to your message',
+    'Use / to trigger slash commands inside any session',
+    'Sessions persist — your agents remember where they left off',
+    'Switch between agents without losing orbital momentum',
+    'Multiple Claude agents, one control center — mission control for AI',
+    'Your agents orbit the same codebase, each on their own trajectory',
+  ];
+  let hintIdx = 0;
+  let currentHint = hints[0];
+  let hintVisible = true;
+
+  const hintTimer = setInterval(() => {
+    hintVisible = false;
+    setTimeout(() => {
+      hintIdx = (hintIdx + 1) % hints.length;
+      currentHint = hints[hintIdx];
+      hintVisible = true;
+    }, 300);
+  }, 5000);
+  onDestroy(() => clearInterval(hintTimer));
 
   onMount(async () => {
     try {
@@ -31,7 +59,7 @@
 
   // Reset input and reload files when switching agents
   let prevSessionId = sessionId;
-  let prevCwd = agentCwd;
+  let prevCwd = '';
   $: {
     if (sessionId !== prevSessionId) {
       inputText = '';
@@ -104,15 +132,33 @@
 
   function scrollSelectedIntoView() {
     tick().then(() => {
-      const el = suggestionEls[selectedIdx];
-      if (el) el.scrollIntoView({ block: 'nearest' });
+      if (!suggestionsContainer) return;
+      const buttons = suggestionsContainer.querySelectorAll<HTMLElement>('.suggestion');
+      const el = buttons[selectedIdx];
+      if (!el) return;
+      const top = el.offsetTop;
+      const bottom = top + el.offsetHeight;
+      if (bottom > suggestionsContainer.scrollTop + suggestionsContainer.clientHeight) {
+        suggestionsContainer.scrollTop = bottom - suggestionsContainer.clientHeight;
+      } else if (top < suggestionsContainer.scrollTop) {
+        suggestionsContainer.scrollTop = top;
+      }
     });
   }
 
   function scrollFileSelectedIntoView() {
     tick().then(() => {
-      const el = filePickerEls[fileSelectedIdx];
-      if (el) el.scrollIntoView({ block: 'nearest' });
+      if (!filePickerContainer) return;
+      const buttons = filePickerContainer.querySelectorAll<HTMLElement>('.suggestion');
+      const el = buttons[fileSelectedIdx];
+      if (!el) return;
+      const top = el.offsetTop;
+      const bottom = top + el.offsetHeight;
+      if (bottom > filePickerContainer.scrollTop + filePickerContainer.clientHeight) {
+        filePickerContainer.scrollTop = bottom - filePickerContainer.clientHeight;
+      } else if (top < filePickerContainer.scrollTop) {
+        filePickerContainer.scrollTop = top;
+      }
     });
   }
 
@@ -238,26 +284,24 @@
 
 <div class="command-input">
   {#if showFilePicker}
-    <div class="suggestions">
+    <div class="suggestions" bind:this={filePickerContainer}>
       {#each filteredFiles as filePath, i}
         <button
-          bind:this={filePickerEls[i]}
           class="suggestion"
           class:selected={i === fileSelectedIdx}
           onclick={() => selectFile(filePath)}
           onmouseenter={() => (fileSelectedIdx = i)}
         >
-          <span class="file-icon">📄</span>
+          <span class="file-icon"><FileText size={11} /></span>
           <span class="cmd">{filePath.split('/').pop()}</span>
           <span class="desc">{filePath}</span>
         </button>
       {/each}
     </div>
   {:else if showSuggestions}
-    <div class="suggestions">
+    <div class="suggestions" bind:this={suggestionsContainer}>
       {#each filtered as item, i}
         <button
-          bind:this={suggestionEls[i]}
           class="suggestion"
           class:selected={i === selectedIdx}
           onclick={() => selectCommand(item.cmd)}
@@ -288,11 +332,15 @@
     </div>
     <button class="send-btn" onclick={handleSend}>Send</button>
   </div>
-  <div class="quick-actions">
+  <!-- quick-actions commented out — replaced by rotating hints -->
+  <!-- <div class="quick-actions">
     <button onclick={() => handleQuickAction('y')}>y</button>
     <button onclick={() => handleQuickAction('n')}>n</button>
     <button onclick={() => handleQuickAction('yes, and continue')}>yes, and continue</button>
     <button class="ctrl-c" onclick={() => handleQuickAction('\x03')}>Ctrl+C</button>
+  </div> -->
+  <div class="hint-bar" class:fade-out={!hintVisible}>
+    <span class="hint-icon">◎</span> {currentHint}
   </div>
 </div>
 
@@ -346,25 +394,28 @@
     font-size: 13px;
     cursor: pointer;
   }
-  .quick-actions {
-    display: flex;
-    gap: 6px;
+  /* .quick-actions styles kept for reference but section is hidden */
+
+  .hint-bar {
     margin-top: 6px;
-  }
-  .quick-actions button {
     font-size: 11px;
     color: var(--text-dim);
-    background: var(--bg-overlay);
-    border: none;
-    padding: 2px 6px;
-    border-radius: 4px;
-    cursor: pointer;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .quick-actions button:hover {
-    background: var(--bg-hover);
+  .hint-bar.fade-out {
+    opacity: 0;
   }
-  .quick-actions button.ctrl-c {
-    color: var(--red);
+  .hint-icon {
+    color: var(--blue);
+    font-size: 10px;
+    flex-shrink: 0;
   }
 
   /* Suggestions dropdown */
@@ -408,7 +459,9 @@
     flex-shrink: 0;
   }
   .suggestion .file-icon {
-    font-size: 12px;
+    display: flex;
+    align-items: center;
+    color: var(--text-dim);
     flex-shrink: 0;
   }
   .suggestion .desc {

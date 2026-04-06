@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { sendSessionMessage, getSlashCommands, listProjectFiles } from '../lib/tauri';
   import { pendingMessages } from '../lib/stores/journal';
   import type { SlashCommand } from '../lib/types';
@@ -18,6 +18,32 @@
   let fileSelIdx = 0;
   let sendError = '';
 
+  const hints = [
+    'Orbit keeps all your Claude agents in sync — one dashboard, infinite sessions',
+    'Each agent runs in its own orbit — isolated, parallel, always tracked',
+    'Real-time log streaming — watch your agents compute at the speed of light',
+    'Token usage and cost tracked per session — every bit accounted for',
+    'Use @ to attach files directly to your message',
+    'Use / to trigger slash commands inside any session',
+    'Sessions persist — your agents remember where they left off',
+    'Switch between agents without losing orbital momentum',
+    'Multiple Claude agents, one control center — mission control for AI',
+    'Your agents orbit the same codebase, each on their own trajectory',
+  ];
+  let hintIdx = 0;
+  let currentHint = hints[0];
+  let hintVisible = true;
+
+  const hintTimer = setInterval(() => {
+    hintVisible = false;
+    setTimeout(() => {
+      hintIdx = (hintIdx + 1) % hints.length;
+      currentHint = hints[hintIdx];
+      hintVisible = true;
+    }, 300);
+  }, 5000);
+  onDestroy(() => clearInterval(hintTimer));
+
   onMount(async () => {
     try {
       commands = await getSlashCommands();
@@ -35,12 +61,12 @@
   }
 
   // Load files when cwd changes
-  let prevCwd = cwd;
+  let prevCwd = '';
   $: if (cwd && cwd !== prevCwd) {
     prevCwd = cwd;
     listProjectFiles(cwd)
       .then((f) => (files = f))
-      .catch(() => {});
+      .catch((e) => console.warn('[InputBar] listProjectFiles failed:', e));
   }
 
   // Slash suggestions
@@ -62,17 +88,15 @@
     if (q.includes(' ')) return null;
     return q;
   }
-  $: {
-    void text;
-  }
-  $: aq = atQuery();
+  let aq: string | null = null;
+  $: aq = (() => { void text; return atQuery(); })();
   $: fileSuggestions =
     aq === null
       ? []
       : aq === ''
         ? files.slice(0, 10)
         : (() => {
-            const q = aq.toLowerCase();
+            const q = (aq as string).toLowerCase();
             const name = files.filter((f) => f.split('/').pop()!.toLowerCase().includes(q));
             const path = files.filter((f) => !name.includes(f) && f.toLowerCase().includes(q));
             return [...name, ...path].slice(0, 10);
@@ -230,11 +254,15 @@
     >
   </div>
 
-  <div class="quick-row">
+  <!-- quick-row commented out — replaced by rotating hints -->
+  <!-- <div class="quick-row">
     <button class="qb" on:click={() => quickAction('y')}>y</button>
     <button class="qb" on:click={() => quickAction('n')}>n</button>
     <button class="qb" on:click={() => quickAction('yes, continue')}>yes, continue</button>
     <button class="qb danger" on:click={() => quickAction('\x03')}>ctrl+c</button>
+  </div> -->
+  <div class="hint-bar" class:fade-out={!hintVisible}>
+    <span class="hint-icon">◎</span> {currentHint}
   </div>
 </div>
 
@@ -353,28 +381,27 @@
     opacity: 0.3;
   }
 
-  .quick-row {
-    display: flex;
-    gap: 4px;
+  /* .quick-row styles kept for reference but section is hidden */
+
+  .hint-bar {
     padding: 0 10px 7px;
-  }
-  .qb {
-    background: none;
-    border: 1px solid var(--bd);
-    border-radius: 3px;
-    color: var(--t2);
     font-size: var(--xs);
-    padding: 2px 8px;
-    transition: all 0.1s;
+    color: var(--t3);
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .qb:hover {
-    border-color: var(--bd2);
-    color: var(--t1);
+  .hint-bar.fade-out {
+    opacity: 0;
   }
-  .qb.danger {
-    color: var(--s-error);
-  }
-  .qb.danger:hover {
-    border-color: var(--s-error);
+  .hint-icon {
+    color: var(--ac);
+    font-size: 10px;
+    flex-shrink: 0;
   }
 </style>

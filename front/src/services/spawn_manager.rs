@@ -149,11 +149,7 @@ pub fn spawn_claude(config: SpawnConfig) -> Result<SpawnHandle, String> {
     })?;
 
     let mut cmd = std::process::Command::new(&claude);
-    cmd.args(["--output-format", "stream-json", "--verbose"]);
-
-    if config.permission_mode == "ignore" {
-        cmd.arg("--dangerously-skip-permissions");
-    }
+    cmd.args(["--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions"]);
 
     if let Some(ref model) = config.model {
         if model != "auto" {

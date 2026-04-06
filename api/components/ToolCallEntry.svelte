@@ -2,6 +2,9 @@
   import type { JournalEntry } from '../lib/types';
   import { diffLines } from 'diff';
   import type { Change } from 'diff';
+  import {
+    FileText, FilePen, FilePlus, Terminal, Search, Folder, Bot, Wrench, Settings, Maximize2,
+  } from 'lucide-svelte';
   import hljs from 'highlight.js/lib/core';
   import javascript from 'highlight.js/lib/languages/javascript';
   import typescript from 'highlight.js/lib/languages/typescript';
@@ -75,18 +78,18 @@
   // Code text (bash only — Write is handled via writeLines)
   $: codeText = hasBashCommand ? (entry.toolInput!.command as string) : '';
 
-  const toolIcons: Record<string, string> = {
-    read: '📄',
-    edit: '✏️',
-    write: '📝',
-    bash: '⚡',
-    grep: '🔍',
-    glob: '📁',
-    agent: '🤖',
-    skill: '🔧',
+  const toolIconMap: Record<string, typeof FileText> = {
+    read: FileText,
+    edit: FilePen,
+    write: FilePlus,
+    bash: Terminal,
+    grep: Search,
+    glob: Folder,
+    agent: Bot,
+    skill: Wrench,
   };
 
-  $: icon = toolIcons[toolClass] ?? '⚙️';
+  $: ToolIcon = toolIconMap[toolClass] ?? Settings;
 
   function extractTarget(e: JournalEntry): string {
     if (!e.toolInput) return '';
@@ -210,7 +213,7 @@
 
 <div class="tool-wrap">
   <div class="tool-header">
-    <span class="icon">{icon}</span>
+    <span class="tool-icon {toolClass}"><ToolIcon size={13} /></span>
     <span class="tool {toolClass}">{entry.tool}</span>
     <span class="target mono">{shortPath(target)}</span>
     <span class="time">{timeStr}</span>
@@ -227,7 +230,7 @@
           e.stopPropagation();
           modalOpen = true;
         }}
-        title="Fullscreen">⛶</button
+        title="Fullscreen"><Maximize2 size={11} /></button
       >
     {/if}
   </div>
@@ -312,7 +315,7 @@
     <div class="modal" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <div class="modal-title">
-          <span class="icon">{icon}</span>
+          <span class="tool-icon {toolClass}"><ToolIcon size={13} /></span>
           <span class="tool {toolClass}">{entry.tool}</span>
           <span class="target mono">{target}</span>
         </div>
@@ -397,12 +400,18 @@
     transition: background 0.15s;
   }
   .tool-header:hover {
-    background: var(--bg-hover);
+    background: var(--bg3);
   }
-  .icon {
-    font-size: 12px;
+  .tool-icon {
+    display: flex;
+    align-items: center;
     flex-shrink: 0;
   }
+  .tool-icon.read, .tool-icon.grep, .tool-icon.glob { color: var(--user-fg); }
+  .tool-icon.edit, .tool-icon.write { color: var(--tool-fg); }
+  .tool-icon.bash { color: var(--ac); }
+  .tool-icon.agent, .tool-icon.skill { color: var(--think-fg); }
+
   .tool {
     font-weight: 600;
     flex-shrink: 0;
@@ -410,23 +419,23 @@
   .tool.read,
   .tool.grep,
   .tool.glob {
-    color: var(--blue);
+    color: var(--user-fg);
   }
   .tool.edit,
   .tool.write {
-    color: var(--orange);
+    color: var(--tool-fg);
   }
   .tool.bash {
-    color: var(--green);
+    color: var(--ac);
   }
   .tool.agent {
-    color: var(--purple);
+    color: var(--think-fg);
   }
   .tool.skill {
-    color: var(--pink);
+    color: var(--think-fg);
   }
   .target {
-    color: var(--text-secondary);
+    color: var(--t1);
     font-size: 12px;
     flex: 1;
     min-width: 0;
@@ -435,7 +444,7 @@
     white-space: nowrap;
   }
   .time {
-    color: var(--text-dim);
+    color: var(--t2);
     font-size: 10px;
     flex-shrink: 0;
   }
@@ -445,18 +454,18 @@
     flex-shrink: 0;
   }
   .added {
-    color: var(--green);
+    color: var(--ac);
     font-size: 11px;
   }
   .removed {
-    color: var(--red);
+    color: var(--s-error);
     font-size: 11px;
   }
   .expand-btn {
     flex-shrink: 0;
-    background: var(--bg-overlay);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
+    background: var(--bg3);
+    border: 1px solid var(--bd1);
+    color: var(--t1);
     font-size: 11px;
     cursor: pointer;
     padding: 2px 6px;
@@ -465,9 +474,9 @@
     transition: all 0.15s;
   }
   .expand-btn:hover {
-    background: var(--bg-hover);
-    color: var(--blue);
-    border-color: var(--blue);
+    background: var(--bg4);
+    color: var(--user-fg);
+    border-color: var(--user-fg);
   }
 
   .detail {
@@ -475,7 +484,7 @@
   }
 
   .code-card {
-    border: 1px solid var(--border);
+    border: 1px solid var(--bd1);
     border-radius: 8px;
     overflow: hidden;
   }
@@ -489,9 +498,9 @@
   .code-text {
     padding: 8px 10px;
     margin: 0;
-    background: var(--bg-code);
+    background: var(--bg2);
     white-space: pre-wrap;
-    color: var(--text-secondary);
+    color: var(--t1);
   }
   .code-text code {
     font-family: inherit;
@@ -500,10 +509,10 @@
   /* Result output section */
   .result-divider {
     height: 1px;
-    background: var(--border);
+    background: var(--bd1);
   }
   .result-output {
-    background: var(--bg-code);
+    background: var(--bg2);
   }
   .result-pre {
     margin: 0;
@@ -511,12 +520,12 @@
     font-size: 11px;
     line-height: 1.5;
     white-space: pre-wrap;
-    color: var(--text-muted);
+    color: var(--t1);
   }
 
   /* Read output with line numbers */
   .read-output {
-    background: var(--bg-code);
+    background: var(--bg2);
   }
   .read-table {
     border-collapse: collapse;
@@ -526,15 +535,15 @@
     line-height: 1.6;
   }
   .read-table tr:hover {
-    background: var(--bg-hover);
+    background: var(--bg3);
   }
   .line-num {
     padding: 0 8px 0 6px;
     text-align: right;
-    color: var(--text-dim);
+    color: var(--t2);
     user-select: none;
     white-space: nowrap;
-    border-right: 1px solid var(--border);
+    border-right: 1px solid var(--bd1);
     opacity: 0.6;
     vertical-align: top;
   }
@@ -667,38 +676,35 @@
   }
 
   .detail :global(.hljs-params) {
-    color: var(--text-primary);
+    color: var(--t0);
   }
   .detail :global(.hljs-punctuation) {
-    color: var(--text-secondary);
+    color: var(--t1);
   }
 
   /* Fullscreen modal */
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.7);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 24px;
     animation: fadeIn 0.15s ease-out;
   }
   @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
   .modal {
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    background: var(--bg1);
+    border: 1px solid var(--bd2);
+    border-radius: 10px;
     width: 100%;
-    max-height: 100%;
+    max-width: 900px;
+    max-height: 90vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -708,7 +714,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--bd1);
     flex-shrink: 0;
   }
   .modal-title {
@@ -726,15 +732,15 @@
   .modal-close {
     background: none;
     border: none;
-    color: var(--text-muted);
+    color: var(--t1);
     font-size: 16px;
     cursor: pointer;
     padding: 4px 8px;
     border-radius: 6px;
   }
   .modal-close:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
+    background: var(--bg3);
+    color: var(--t0);
   }
   .modal-body {
     flex: 1;
@@ -743,11 +749,12 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    min-height: 0;
   }
   .modal-section-label {
     font-size: 11px;
     font-weight: 600;
-    color: var(--text-muted);
+    color: var(--t1);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
@@ -755,7 +762,8 @@
     font-family: 'Cascadia Code', 'Fira Code', monospace;
     font-size: 12px;
     line-height: 1.7;
-    max-height: none;
-    overflow-y: visible;
+    max-height: 60vh;
+    overflow-x: auto;
+    overflow-y: auto;
   }
 </style>

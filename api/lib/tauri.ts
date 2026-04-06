@@ -92,6 +92,17 @@ export async function getSessionTasks(sessionId: string): Promise<TaskItem[]> {
   return await invoke('get_tasks', { sessionId });
 }
 
+export interface ClaudeUsageStats {
+  weeklyTokens: number;
+  todayTokens: number;
+  weeklyMessages: number;
+  todayMessages: number;
+}
+
+export async function getClaudeUsageStats(): Promise<ClaudeUsageStats> {
+  return await invoke('get_claude_usage_stats');
+}
+
 // ── Event listeners ────────────────────────────────────────────
 
 export interface SessionOutputPayload {

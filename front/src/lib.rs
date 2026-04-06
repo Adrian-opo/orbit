@@ -17,6 +17,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Resolve app data directory for SQLite DB
             let data_dir = app
@@ -65,6 +66,8 @@ pub fn run() {
             commands::list_project_files,
             commands::get_tasks,
             commands::get_claude_usage_stats,
+            ipc::updater::check_update,
+            ipc::updater::install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -236,17 +236,38 @@
     <div class="detail">
       <div class="code-card">
         {#if hasEditDiff}
-          <div class="code-inner">
-            {#each allDiffLines as dl}
+          <div class="diff-block code-inner">
+            {#each inlineVisible as dl}
               <div class="diff-line {dl.type}">
-                <span class="diff-prefix">{dl.type === 'rem' ? '-' : '+'}</span>
-                <span class="diff-code">{@html doHighlight(dl.text, lang)}</span>
+                <span class="dl-num">{dl.lineNo}</span>
+                <span class="dl-prefix">{dl.type === 'add' ? '+' : '-'}</span>
+                <span class="dl-code">{@html doHighlight(dl.text, lang)}</span>
               </div>
             {/each}
+            {#if inlineOverflow > 0}
+              <button class="diff-overflow" onclick={() => (modalOpen = true)}>
+                ▸ +{inlineOverflow} linhas · clique para ver tudo
+              </button>
+            {/if}
           </div>
-        {:else if hasBashCommand || hasWriteContent}
+        {:else if hasWriteContent}
+          <div class="diff-block code-inner">
+            {#each writeVisible as dl}
+              <div class="diff-line add">
+                <span class="dl-num">{dl.lineNo}</span>
+                <span class="dl-prefix">+</span>
+                <span class="dl-code">{@html doHighlight(dl.text, lang)}</span>
+              </div>
+            {/each}
+            {#if writeOverflow > 0}
+              <button class="diff-overflow" onclick={() => (modalOpen = true)}>
+                ▸ +{writeOverflow} linhas · clique para ver tudo
+              </button>
+            {/if}
+          </div>
+        {:else if hasBashCommand}
           <pre class="code-inner code-text"><code
-              >{@html doHighlight(codeText, hasBashCommand ? 'bash' : lang)}</code
+              >{@html doHighlight(codeText, 'bash')}</code
             ></pre>
         {/if}
 
@@ -301,20 +322,34 @@
         {#if hasEditDiff}
           <div class="modal-section-label">Changes</div>
           <div class="code-card modal-card">
-            <div class="modal-code-scroll">
-              {#each allDiffLines as dl}
+            <div class="diff-block modal-code-scroll">
+              {#each modalLines as dl}
                 <div class="diff-line {dl.type}">
-                  <span class="diff-prefix">{dl.type === 'rem' ? '-' : '+'}</span>
-                  <span class="diff-code">{@html doHighlight(dl.text, lang)}</span>
+                  <span class="dl-num">{dl.lineNo}</span>
+                  <span class="dl-prefix">{dl.type === 'add' ? '+' : dl.type === 'rem' ? '-' : ' '}</span>
+                  <span class="dl-code">{@html doHighlight(dl.text, lang)}</span>
                 </div>
               {/each}
             </div>
           </div>
-        {:else if hasBashCommand || hasWriteContent}
-          <div class="modal-section-label">{hasBashCommand ? 'Command' : 'Content'}</div>
+        {:else if hasWriteContent}
+          <div class="modal-section-label">New File</div>
+          <div class="code-card modal-card">
+            <div class="diff-block modal-code-scroll">
+              {#each writeLines as dl}
+                <div class="diff-line add">
+                  <span class="dl-num">{dl.lineNo}</span>
+                  <span class="dl-prefix">+</span>
+                  <span class="dl-code">{@html doHighlight(dl.text, lang)}</span>
+                </div>
+              {/each}
+            </div>
+          </div>
+        {:else if hasBashCommand}
+          <div class="modal-section-label">Command</div>
           <div class="code-card modal-card">
             <pre class="modal-code-scroll code-text"><code
-                >{@html doHighlight(codeText, hasBashCommand ? 'bash' : lang)}</code
+                >{@html doHighlight(codeText, 'bash')}</code
               ></pre>
           </div>
         {/if}

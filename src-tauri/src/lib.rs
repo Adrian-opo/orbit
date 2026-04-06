@@ -52,6 +52,7 @@ pub fn run() {
             ipc::session::send_session_message,
             ipc::session::get_session_journal,
             ipc::session::check_claude,
+            ipc::session::diagnose_spawn,
             ipc::session::rename_session,
             ipc::session::delete_session,
             ipc::project::create_project,

@@ -99,19 +99,68 @@ pub fn find_claude() -> Option<String> {
 }
 
 /// Build the CommandBuilder for claude.
-/// On Windows, .cmd scripts must be run via `cmd /c` because CreateProcess
-/// does not expand .cmd extensions — it only looks for .exe/.com.
-fn claude_command() -> CommandBuilder {
+/// On Windows, .cmd scripts require cmd /c — CreateProcess only handles .exe/.com.
+/// We use the exact path from find_claude() when available.
+fn claude_command() -> Result<CommandBuilder, String> {
     #[cfg(windows)]
     {
+        // First: try to find the exact path (e.g. C:\Users\...\npm\claude.cmd)
+        if let Some(path) = find_claude() {
+            let mut cmd = CommandBuilder::new("cmd");
+            cmd.args(["/c", &path]);
+            return Ok(cmd);
+        }
+        // Fallback: rely on PATH augmentation
         let mut cmd = CommandBuilder::new("cmd");
         cmd.args(["/c", "claude"]);
-        cmd
+        Ok(cmd)
     }
     #[cfg(not(windows))]
     {
-        CommandBuilder::new("claude")
+        if let Some(path) = find_claude() {
+            return Ok(CommandBuilder::new(&path));
+        }
+        Ok(CommandBuilder::new("claude"))
     }
+}
+
+/// Spawn any process via PTY for diagnostic purposes (e.g. `echo hello`).
+pub fn spawn_test(exe: &str, args: &[&str], cwd: &std::path::Path) -> Result<String, String> {
+    use std::io::BufRead;
+
+    let pty_system = native_pty_system();
+    let pair = pty_system.openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
+        .map_err(|e| format!("openpty failed: {e}"))?;
+
+    let mut cmd = CommandBuilder::new(exe);
+    cmd.args(args);
+    cmd.cwd(cwd);
+    cmd.env("PATH", extended_path());
+
+    let child = pair.slave.spawn_command(cmd)
+        .map_err(|e| format!("spawn failed: {e}"))?;
+    drop(pair.slave);
+    std::mem::forget(child);
+
+    let reader = pair.master.try_clone_reader()
+        .map_err(|e| format!("reader failed: {e}"))?;
+
+    let mut buf = std::io::BufReader::new(reader);
+    let mut output = String::new();
+    let mut line = String::new();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+
+    loop {
+        if std::time::Instant::now() > deadline { break; }
+        line.clear();
+        match buf.read_line(&mut line) {
+            Ok(0) | Err(_) => break,
+            Ok(_) => output.push_str(&line),
+        }
+        if output.len() > 2000 { break; }
+    }
+
+    Ok(output.trim().to_string())
 }
 
 /// Spawn a Claude Code process via PTY.
@@ -127,10 +176,8 @@ pub fn spawn_claude(config: SpawnConfig) -> Result<PtyHandle, String> {
         pixel_height: 0,
     }).map_err(|e| format!("openpty failed: {e}"))?;
 
-    let mut cmd = claude_command();
+    let mut cmd = claude_command()?;
 
-    // On Windows via cmd /c, claude args go after the claude command
-    // CommandBuilder already set ["/c", "claude"] on windows, so we just push more args
     cmd.args(["--output-format", "stream-json", "--verbose"]);
 
     if config.permission_mode == "ignore" {

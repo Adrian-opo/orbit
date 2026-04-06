@@ -151,3 +151,17 @@ export async function renameSession(sessionId: number, name: string): Promise<vo
 export async function deleteSession(sessionId: number): Promise<void> {
   await invoke('delete_session', { sessionId });
 }
+
+
+export interface SpawnDiagnostic {
+  ptyWorks: boolean;
+  echoOutput: string;
+  claudeFound: boolean;
+  claudePath: string | null;
+  whichOutput: string;
+  processPath: string;
+}
+
+export async function diagnoseSpawn(): Promise<SpawnDiagnostic> {
+  return await invoke('diagnose_spawn');
+}

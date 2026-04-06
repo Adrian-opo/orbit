@@ -3,7 +3,7 @@ use tauri::{AppHandle, State};
 
 use crate::models::{Session, SessionId, JournalEntry};
 use crate::services::session_manager::SessionManager;
-use crate::services::spawn_manager::find_claude;
+use crate::services::spawn_manager::{find_claude, spawn_test};
 
 pub struct SessionState(pub Arc<Mutex<SessionManager>>);
 
@@ -82,6 +82,37 @@ pub fn check_claude() -> serde_json::Value {
             })
         }
     }
+}
+
+/// Diagnostic: test PTY spawning with a simple echo command.
+/// Returns { pty_works, claude_found, claude_path, echo_output, error }
+#[tauri::command]
+pub fn diagnose_spawn() -> serde_json::Value {
+    let claude_path = find_claude();
+    let tmp = std::env::temp_dir();
+
+    // Test 1: PTY works at all with a simple echo
+    #[cfg(windows)]
+    let echo_result = spawn_test("cmd", &["/c", "echo", "PTY_OK"], &tmp);
+    #[cfg(not(windows))]
+    let echo_result = spawn_test("echo", &["PTY_OK"], &tmp);
+
+    let pty_works = echo_result.as_ref().map(|s| s.contains("PTY_OK")).unwrap_or(false);
+
+    // Test 2: where/which claude in augmented PATH
+    #[cfg(windows)]
+    let which_result = spawn_test("cmd", &["/c", "where", "claude"], &tmp);
+    #[cfg(not(windows))]
+    let which_result = spawn_test("which", &["claude"], &tmp);
+
+    serde_json::json!({
+        "ptyWorks": pty_works,
+        "echoOutput": echo_result.unwrap_or_else(|e| format!("FAIL: {e}")),
+        "claudeFound": claude_path.is_some(),
+        "claudePath": claude_path,
+        "whichOutput": which_result.unwrap_or_else(|e| format!("FAIL: {e}")),
+        "processPath": std::env::var("PATH").unwrap_or_default().chars().take(300).collect::<String>(),
+    })
 }
 
 /// Rename a session.

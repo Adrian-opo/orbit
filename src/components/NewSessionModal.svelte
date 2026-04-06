@@ -1,7 +1,8 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
-  import { createSession } from '../lib/tauri';
+  import { createSession, diagnoseSpawn } from '../lib/tauri';
+  import type { SpawnDiagnostic } from '../lib/tauri';
 
   const dispatch = createEventDispatcher();
 
@@ -11,6 +12,14 @@
   let approveMode = false;
   let loading = false;
   let error = '';
+  let diagRunning = false;
+  let diag: SpawnDiagnostic | null = null;
+
+  async function runDiag() {
+    diagRunning = true;
+    try { diag = await diagnoseSpawn(); } catch (e: any) { error = e?.message ?? String(e); }
+    finally { diagRunning = false; }
+  }
 
   const models = [
     { v: 'auto',                   l: 'auto' },
@@ -106,7 +115,24 @@
       <p class="error">! {error}</p>
     {/if}
 
+    {#if diag}
+      <div class="diag">
+        <div class="diag-row" class:ok={diag.ptyWorks} class:fail={!diag.ptyWorks}>
+          PTY: {diag.ptyWorks ? '✓ working' : '✗ failed'} · echo="{diag.echoOutput.slice(0,30)}"
+        </div>
+        <div class="diag-row" class:ok={diag.claudeFound} class:fail={!diag.claudeFound}>
+          claude: {diag.claudeFound ? `✓ ${diag.claudePath}` : '✗ not found'}
+        </div>
+        {#if diag.whichOutput}
+          <div class="diag-row">where: {diag.whichOutput.slice(0,80)}</div>
+        {/if}
+      </div>
+    {/if}
+
     <div class="actions">
+      <button class="btn ghost" on:click={runDiag} disabled={diagRunning || loading}>
+        {diagRunning ? 'testing...' : '⚙ diagnose'}
+      </button>
       <button class="btn ghost" on:click={() => dispatch('cancel')} disabled={loading}>cancel</button>
       <button class="btn primary" on:click={submit} disabled={loading || !path || !prompt}>
         {loading ? 'spawning...' : 'start session'}
@@ -188,6 +214,14 @@
   .toggle-track.on::after { transform: translateX(14px); background: var(--ac); }
 
   .error { font-size: var(--sm); color: var(--s-error); }
+  .diag {
+    background: var(--bg3); border: 1px solid var(--bd1);
+    border-radius: 3px; padding: 8px 10px;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .diag-row { font-size: var(--xs); color: var(--t1); }
+  .diag-row.ok { color: var(--s-working); }
+  .diag-row.fail { color: var(--s-error); }
 
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
   .btn {

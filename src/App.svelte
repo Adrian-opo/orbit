@@ -19,6 +19,7 @@
   let audioCtx: AudioContext | null = null;
   let claudeCheck: ClaudeCheck | null = null;
   let unlisteners: Array<() => void> = [];
+  let spawnError: { sessionId: number; error: string } | null = null;
 
   function beep() {
     try {
@@ -71,7 +72,9 @@
 
     const u6 = onSessionError((id, error) => {
       sessions.update(l => updateSessionState(l, id, { status: 'error' }));
-      console.error('session:error', id, error);
+      spawnError = { sessionId: id, error };
+      // Auto-dismiss after 15s
+      setTimeout(() => spawnError = null, 15000);
     });
 
     // Resolve all unlisten functions and store for cleanup
@@ -82,6 +85,17 @@
 
   $: selected = getSelectedSession($sessions, $selectedSessionId);
 </script>
+
+{#if spawnError}
+  <div class="spawn-error-banner">
+    <span class="spawn-error-icon">⚠</span>
+    <div class="spawn-error-body">
+      <div class="spawn-error-title">session #{spawnError.sessionId} failed to spawn</div>
+      <div class="spawn-error-msg">{spawnError.error}</div>
+    </div>
+    <button class="spawn-error-close" on:click={() => spawnError = null}>✕</button>
+  </div>
+{/if}
 
 <div class="layout">
   <Sidebar />
@@ -136,4 +150,23 @@
   .warn-icon { color: var(--s-error); font-size: 16px; flex-shrink: 0; margin-top: 1px; }
   .warn-title { font-size: var(--md); color: var(--s-error); margin-bottom: 4px; }
   .warn-hint { font-size: var(--xs); color: var(--t1); font-style: italic; }
+
+  .spawn-error-banner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    display: flex; align-items: flex-start; gap: 10px;
+    background: rgba(224,72,72,0.12);
+    border-bottom: 1px solid rgba(224,72,72,0.35);
+    padding: 10px 14px;
+    animation: slideDown 0.2s ease;
+  }
+  @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+  .spawn-error-icon { color: var(--s-error); font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .spawn-error-body { flex: 1; min-width: 0; }
+  .spawn-error-title { font-size: var(--sm); color: var(--s-error); font-weight: 500; margin-bottom: 2px; }
+  .spawn-error-msg { font-size: var(--xs); color: var(--t1); white-space: pre-wrap; word-break: break-word; }
+  .spawn-error-close {
+    background: none; border: none; color: var(--t2);
+    font-size: 11px; padding: 2px 5px; flex-shrink: 0; cursor: pointer;
+  }
+  .spawn-error-close:hover { color: var(--t0); }
 </style>

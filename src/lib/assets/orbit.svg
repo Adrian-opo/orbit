@@ -1,0 +1,14 @@
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Orbital ring -->
+  <ellipse
+    cx="12" cy="12"
+    rx="10.2" ry="4.2"
+    stroke="currentColor"
+    stroke-width="1.4"
+    transform="rotate(-38 12 12)"
+  />
+  <!-- Central body -->
+  <circle cx="12" cy="12" r="2.6" fill="currentColor"/>
+  <!-- Satellite -->
+  <circle cx="20.4" cy="7.6" r="1.3" fill="currentColor" opacity="0.75"/>
+</svg>

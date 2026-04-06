@@ -5,6 +5,7 @@
   import ContextMenu from './ContextMenu.svelte';
   import { renameSession, deleteSession, stopSession } from '../lib/tauri';
   import { estimateCost, formatCost, formatTokens } from '../lib/cost';
+  import OrbitLogo from '../lib/assets/orbit.svg?raw';
 
   // Context menu state
   let ctxMenu: { x: number; y: number; sessionId: number; sessionName: string } | null = null;
@@ -55,7 +56,7 @@
   }
 
   function fmtModel(model: string | null): string {
-    if (!model) return '—';
+    if (!model || model === 'auto') return 'auto';
     if (model.includes('opus'))   return 'opus';
     if (model.includes('sonnet')) return 'sonnet';
     if (model.includes('haiku'))  return 'haiku';
@@ -105,8 +106,11 @@
 
 <aside class="sidebar">
   <header class="header">
-    <span class="title">sessions</span>
-    <button class="new-btn" on:click={() => showModal = true} title="New session (n)">+</button>
+    <div class="brand">
+      <span class="brand-logo">{@html OrbitLogo}</span>
+      <span class="brand-name">orbit</span>
+    </div>
+    <button class="new-btn" on:click={() => showModal = true} title="New session">+</button>
   </header>
 
   <div class="list">
@@ -181,10 +185,26 @@
     border-bottom: 1px solid var(--bd);
     flex-shrink: 0;
   }
-  .title {
-    font-size: var(--sm);
-    color: var(--t2);
-    letter-spacing: 0.08em;
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .brand-logo {
+    display: flex;
+    align-items: center;
+    color: var(--ac);
+    line-height: 0;
+  }
+  .brand-logo :global(svg) {
+    width: 16px;
+    height: 16px;
+  }
+  .brand-name {
+    font-size: var(--md);
+    font-weight: 600;
+    color: var(--t0);
+    letter-spacing: 0.12em;
     text-transform: lowercase;
   }
   .new-btn {

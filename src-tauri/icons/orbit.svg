@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Background -->
+  <rect width="128" height="128" rx="24" fill="#0D0D14"/>
+
+  <!-- Outer orbit ring -->
+  <ellipse cx="64" cy="64" rx="44" ry="22" stroke="#6C63FF" stroke-width="2.5" stroke-dasharray="0" opacity="0.5" transform="rotate(-30 64 64)"/>
+
+  <!-- Middle orbit ring -->
+  <ellipse cx="64" cy="64" rx="30" ry="15" stroke="#8B5CF6" stroke-width="2" opacity="0.7" transform="rotate(20 64 64)"/>
+
+  <!-- Core planet -->
+  <circle cx="64" cy="64" r="11" fill="url(#coreGrad)"/>
+
+  <!-- Satellite dot on outer orbit -->
+  <circle cx="102" cy="57" r="4" fill="#A78BFA" transform="rotate(-30 64 64)"/>
+
+  <!-- Satellite dot on middle orbit -->
+  <circle cx="94" cy="64" r="3" fill="#6C63FF" transform="rotate(20 64 64)"/>
+
+  <!-- Glow on core -->
+  <circle cx="64" cy="64" r="11" fill="url(#glowGrad)" opacity="0.4"/>
+
+  <defs>
+    <radialGradient id="coreGrad" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#C4B5FD"/>
+      <stop offset="100%" stop-color="#4C1D95"/>
+    </radialGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8B5CF6" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>

@@ -1,10 +1,10 @@
 [package]
-name = "agent-dashboard-v2"
+name = "orbit"
 version = "0.1.0"
-description = "A Tauri App"
+description = "Orbit — Claude agent dashboard"
 authors = ["you"]
 edition = "2021"
-default-run = "agent-dashboard-v2"
+default-run = "orbit"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -34,6 +34,7 @@ tokio = { version = "1", features = ["full"] }
 ignore = "0.4"
 rusqlite = { version = "0.31", features = ["bundled"] }
 portable-pty = "0.8"
+uuid = { version = "1", features = ["v4"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_System_Console", "Win32_Foundation"] }

@@ -3,7 +3,10 @@
   import { statusColor, statusLabel, isPulsing } from '../lib/status';
   import NewSessionModal from './NewSessionModal.svelte';
   import ContextMenu from './ContextMenu.svelte';
-  import { renameSession, deleteSession, stopSession } from '../lib/tauri';
+  import { renameSession, deleteSession, stopSession, getAppVersion } from '../lib/tauri';
+  import { onMount } from 'svelte';
+
+  let appVersion = '';
   import { estimateCost, formatCost, formatTokens } from '../lib/cost';
   import OrbitLogo from '../lib/assets/orbit.svg?raw';
 
@@ -57,6 +60,10 @@
     node.select();
     return { destroy() {} };
   }
+
+  onMount(async () => {
+    appVersion = await getAppVersion();
+  });
 
   function fmtTokens(s: (typeof $sessions)[0]): string {
     if (!s.tokens) return '—';
@@ -122,6 +129,9 @@
     <div class="brand">
       <span class="brand-logo">{@html OrbitLogo}</span>
       <span class="brand-name">orbit</span>
+      {#if appVersion}
+        <span class="brand-version">v{appVersion}</span>
+      {/if}
     </div>
     <button class="new-btn" on:click={() => (showModal = true)} title="New session">+</button>
   </header>
@@ -224,6 +234,12 @@
     color: var(--t0);
     letter-spacing: 0.12em;
     text-transform: lowercase;
+  }
+  .brand-version {
+    font-size: 10px;
+    color: var(--t3);
+    letter-spacing: 0.04em;
+    margin-top: 1px;
   }
   .new-btn {
     background: none;

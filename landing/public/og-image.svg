@@ -1,0 +1,81 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#080808"/>
+
+  <!-- Subtle grid lines -->
+  <line x1="0" y1="315" x2="1200" y2="315" stroke="#ffffff" stroke-opacity="0.03"/>
+  <line x1="600" y1="0" x2="600" y2="630" stroke="#ffffff" stroke-opacity="0.03"/>
+
+  <!-- Stars -->
+  <circle cx="120" cy="80"  r="1.5" fill="#ffffff" opacity="0.4"/>
+  <circle cx="980" cy="120" r="1"   fill="#ffffff" opacity="0.3"/>
+  <circle cx="1100" cy="400" r="2"  fill="#ffffff" opacity="0.25"/>
+  <circle cx="80"  cy="500" r="1.5" fill="#ffffff" opacity="0.35"/>
+  <circle cx="1050" cy="540" r="1"  fill="#ffffff" opacity="0.3"/>
+  <circle cx="200" cy="580" r="1"   fill="#ffffff" opacity="0.2"/>
+  <circle cx="900" cy="60"  r="1.5" fill="#ffffff" opacity="0.3"/>
+  <circle cx="300" cy="150" r="1"   fill="#ffffff" opacity="0.25"/>
+
+  <!-- Orbit rings (centered at 820, 315) -->
+  <!-- Outer ring -->
+  <ellipse cx="820" cy="315" rx="230" ry="88"
+    stroke="#00d47e" stroke-width="2" opacity="0.35"
+    transform="rotate(-38 820 315)"/>
+  <!-- Inner ring -->
+  <ellipse cx="820" cy="315" rx="148" ry="57"
+    stroke="#00d47e" stroke-width="1.2" opacity="0.18"
+    transform="rotate(-38 820 315)"/>
+  <!-- Satellite -->
+  <circle cx="820" cy="315" r="0" fill="none"/>
+  <!-- Satellite positioned on outer ring -->
+  <circle cx="1022" cy="211" r="8" fill="#00d47e" opacity="0.85">
+    <filter id="gs">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+  </circle>
+  <circle cx="1022" cy="211" r="8" fill="#00d47e" opacity="0.85"/>
+  <circle cx="1022" cy="211" r="14" fill="#00d47e" opacity="0.15"/>
+
+  <!-- Central glow -->
+  <circle cx="820" cy="315" r="50" fill="#00d47e" opacity="0.06"/>
+  <circle cx="820" cy="315" r="30" fill="#00d47e" opacity="0.10"/>
+  <circle cx="820" cy="315" r="16" fill="#00d47e" opacity="0.16"/>
+  <circle cx="820" cy="315" r="8"  fill="#00d47e" opacity="0.9"/>
+
+  <!-- Left content -->
+  <!-- Eyebrow -->
+  <text x="100" y="240"
+    font-family="'JetBrains Mono', 'Courier New', monospace"
+    font-size="16" fill="#00d47e" letter-spacing="4" opacity="0.9">
+    ● MULTI-AGENT DASHBOARD
+  </text>
+
+  <!-- Title -->
+  <text x="96" y="330"
+    font-family="'JetBrains Mono', 'Courier New', monospace"
+    font-size="96" font-weight="600" fill="#f0f0f0" letter-spacing="8">
+    orbit
+  </text>
+
+  <!-- Subtitle -->
+  <text x="100" y="390"
+    font-family="'JetBrains Mono', 'Courier New', monospace"
+    font-size="20" fill="#585858" letter-spacing="1">
+    Manage multiple Claude Code sessions
+  </text>
+  <text x="100" y="418"
+    font-family="'JetBrains Mono', 'Courier New', monospace"
+    font-size="20" fill="#585858" letter-spacing="1">
+    simultaneously.
+  </text>
+
+  <!-- Bottom meta -->
+  <text x="100" y="530"
+    font-family="'JetBrains Mono', 'Courier New', monospace"
+    font-size="14" fill="#303030" letter-spacing="2">
+    orbit.jfernando.dev  ·  Windows  ·  CC BY-NC 4.0
+  </text>
+
+  <!-- Bottom border accent -->
+  <rect x="100" y="548" width="180" height="2" fill="#00d47e" opacity="0.4" rx="1"/>
+</svg>

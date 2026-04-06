@@ -71,9 +71,12 @@ pub fn find_claude() -> Option<String> {
 
     #[cfg(windows)]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
         let out = std::process::Command::new("where")
             .arg("claude")
             .env("PATH", &aug)
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .ok()?;
         if out.status.success() {
@@ -172,6 +175,14 @@ pub fn spawn_claude(config: SpawnConfig) -> Result<SpawnHandle, String> {
     // Piped stdout — no PTY needed
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::null());
+
+    // Windows: suppress the console window that flashes on every spawn
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
 
     let mut child = cmd.spawn().map_err(|e| format!("spawn failed: {e}"))?;
 

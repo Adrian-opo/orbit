@@ -48,6 +48,7 @@
 
   export let entry: JournalEntry;
   export let resultEntry: JournalEntry | null = null;
+  export let streamingEntries: JournalEntry[] = [];
 
   let modalOpen = false;
 
@@ -275,6 +276,14 @@
           </div>
         {:else if hasBashCommand}
           <pre class="code-inner code-text"><code>{@html doHighlight(codeText, 'bash')}</code></pre>
+        {/if}
+
+        {#if streamingEntries.length > 0 && !resultEntry}
+          <div class="streaming-output">
+            {#each streamingEntries as s}
+              <pre class="streaming-line">{s.text}</pre>
+            {/each}
+          </div>
         {/if}
 
         {#if resultEntry?.output}
@@ -521,6 +530,21 @@
   }
   .code-text code {
     font-family: inherit;
+  }
+
+  /* Streaming bash output (progress events before final result) */
+  .streaming-output {
+    background: var(--bg2);
+    border-top: 1px solid var(--bd1);
+  }
+  .streaming-line {
+    margin: 0;
+    padding: 2px 10px;
+    font-size: 10px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    color: var(--t2);
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
   }
 
   /* Result output section */

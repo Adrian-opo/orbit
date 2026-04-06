@@ -434,6 +434,10 @@ fn detect_pending_approval(entries: &[JournalEntry]) -> Option<String> {
             JournalEntryType::ToolResult => return None, // tool was answered
             JournalEntryType::ToolCall => {
                 let tool = entry.tool.as_deref().unwrap_or("tool");
+                // Bash always auto-runs with --dangerously-skip-permissions
+                if tool == "Bash" {
+                    return None;
+                }
                 let target = entry
                     .tool_input
                     .as_ref()
@@ -594,10 +598,39 @@ pub fn process_line(state: &mut JournalState, line: &str) {
     let ts = raw.timestamp.clone().unwrap_or_default();
 
     match raw.r#type.as_str() {
+        "progress" => {
+            // Streaming output from a running tool (e.g. bash stdout lines)
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                let content = val
+                    .get("content")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| val.get("data").and_then(|v| v.as_str()))
+                    .or_else(|| val.get("message").and_then(|v| v.as_str()))
+                    .unwrap_or("");
+                if !content.trim().is_empty() {
+                    state.entries.push(JournalEntry {
+                        session_id: String::new(),
+                        timestamp: ts.clone(),
+                        entry_type: JournalEntryType::Progress,
+                        text: Some(content.to_string()),
+                        thinking: None,
+                        thinking_duration: None,
+                        tool: None,
+                        tool_input: None,
+                        output: None,
+                        exit_code: None,
+                        lines_changed: None,
+                    });
+                    state.status = AgentStatus::Working;
+                }
+            }
+        }
+
         "assistant" => {
             state.last_activity = raw.timestamp.clone();
 
             let mut has_tool_use = false;
+            let mut has_non_bash_tool = false;
             let mut end_turn = false;
 
             if let Some(msg) = &raw.message {
@@ -693,6 +726,9 @@ pub fn process_line(state: &mut JournalState, line: &str) {
                                     .and_then(|v| v.as_str())
                                     .unwrap_or("unknown")
                                     .to_string();
+                                if tool_name != "Bash" {
+                                    has_non_bash_tool = true;
+                                }
                                 let input = block.get("input").cloned();
                                 let target = extract_tool_target(&tool_name, &input);
 
@@ -729,9 +765,14 @@ pub fn process_line(state: &mut JournalState, line: &str) {
             if end_turn {
                 state.status = AgentStatus::Idle;
                 state.pending_approval = None;
-            } else if has_tool_use {
+            } else if has_non_bash_tool {
+                // Non-Bash tools may need approval
                 state.status = AgentStatus::Input;
                 state.pending_approval = detect_pending_approval(&state.entries);
+            } else if has_tool_use {
+                // Bash-only tools auto-run with --dangerously-skip-permissions
+                state.status = AgentStatus::Working;
+                state.pending_approval = None;
             } else {
                 state.status = AgentStatus::Working;
             }
@@ -846,11 +887,12 @@ mod process_line_tests {
     }
 
     #[test]
-    fn test_process_tool_use_sets_input_status() {
+    fn test_process_bash_tool_use_stays_working() {
+        // Bash auto-runs — status stays Working, not Input
         let mut state = JournalState::default();
         let line = r#"{"type":"assistant","message":{"model":"claude-sonnet-4-6","content":[{"type":"tool_use","name":"Bash","input":{"command":"ls"}}],"usage":{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
         process_line(&mut state, line);
-        assert_eq!(state.status, AgentStatus::Input);
+        assert_eq!(state.status, AgentStatus::Working);
         assert_eq!(state.entries[0].entry_type, JournalEntryType::ToolCall);
     }
 
@@ -951,10 +993,20 @@ mod process_line_tests {
     }
 
     #[test]
-    fn test_process_pending_approval_set_and_cleared() {
+    fn test_process_bash_does_not_set_pending_approval() {
         let mut state = JournalState::default();
-        // Tool call → pending_approval set
+        // Bash auto-runs with --dangerously-skip-permissions — no approval needed
         let tool_line = r#"{"type":"assistant","message":{"model":"m","content":[{"type":"tool_use","name":"Bash","input":{"command":"rm -rf /"}}],"usage":{"input_tokens":1,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
+        process_line(&mut state, tool_line);
+        assert!(state.pending_approval.is_none());
+        assert_eq!(state.status, AgentStatus::Working);
+    }
+
+    #[test]
+    fn test_process_non_bash_tool_sets_pending_approval() {
+        let mut state = JournalState::default();
+        // Non-Bash tools (e.g. a custom tool) may need approval
+        let tool_line = r#"{"type":"assistant","message":{"model":"m","content":[{"type":"tool_use","name":"CustomTool","input":{"file_path":"/etc/passwd"}}],"usage":{"input_tokens":1,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
         process_line(&mut state, tool_line);
         assert!(state.pending_approval.is_some());
 

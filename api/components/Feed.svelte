@@ -11,6 +11,7 @@
   interface DisplayItem {
     entry: JournalEntry;
     result: JournalEntry | null;
+    streaming: JournalEntry[];
   }
 
   $: display = (() => {
@@ -20,16 +21,26 @@
       if (skip.has(i)) continue;
       const e = entries[i];
       if (e.entryType === 'toolCall') {
-        const next = entries[i + 1];
-        if (next?.entryType === 'toolResult') {
-          items.push({ entry: e, result: next });
-          skip.add(i + 1);
-        } else {
-          items.push({ entry: e, result: null });
+        // Collect streaming progress entries and find the matching toolResult
+        const streaming: JournalEntry[] = [];
+        let result: JournalEntry | null = null;
+        for (let j = i + 1; j < entries.length; j++) {
+          if (entries[j].entryType === 'toolResult') {
+            result = entries[j];
+            skip.add(j);
+            break;
+          } else if (entries[j].entryType === 'progress') {
+            streaming.push(entries[j]);
+            skip.add(j);
+          } else {
+            break;
+          }
         }
-      } else if (e.entryType === 'toolResult') {
+        items.push({ entry: e, result, streaming });
+      } else if (e.entryType === 'toolResult' || e.entryType === 'progress') {
+        // handled above
       } else {
-        items.push({ entry: e, result: null });
+        items.push({ entry: e, result: null, streaming: [] });
       }
     }
     return items;
@@ -49,7 +60,7 @@
 </script>
 
 <div class="feed">
-  {#each display as { entry: e, result: r }, i}
+  {#each display as { entry: e, result: r, streaming: s }, i}
     {#if e.entryType === 'user'}
       <div class="row user">
         <div class="row-meta">
@@ -92,7 +103,7 @@
       </div>
     {:else if e.entryType === 'toolCall'}
       <div class="row tool">
-        <ToolCallEntry entry={e} resultEntry={r} />
+        <ToolCallEntry entry={e} resultEntry={r} streamingEntries={s} />
       </div>
     {:else if e.entryType === 'system'}
       <div class="row system">

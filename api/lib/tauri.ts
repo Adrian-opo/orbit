@@ -166,3 +166,7 @@ export interface SpawnDiagnostic {
 export async function diagnoseSpawn(): Promise<SpawnDiagnostic> {
   return await invoke('diagnose_spawn');
 }
+
+export function onSessionRateLimit(cb: (sessionId: number) => void) {
+  return listen<{ sessionId: number }>('session:rate-limit', (e) => cb(e.payload.sessionId));
+}

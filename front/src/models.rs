@@ -75,6 +75,7 @@ pub enum JournalEntryType {
     ToolCall,
     ToolResult,
     System,
+    Progress,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

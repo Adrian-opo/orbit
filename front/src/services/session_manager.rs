@@ -176,6 +176,33 @@ impl SessionManager {
         let pid = handle.pid as i32;
         let _ = db.update_session_pid(session_id, pid);
 
+        // Monitor stderr for rate limit errors in a background thread
+        let app_err = app.clone();
+        let stderr_reader = handle.stderr;
+        std::thread::spawn(move || {
+            use std::io::BufRead;
+            let mut reader = std::io::BufReader::new(stderr_reader);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                match reader.read_line(&mut line) {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => {
+                        let trimmed = line.trim().to_lowercase();
+                        if trimmed.contains("rate limit")
+                            || trimmed.contains("rate_limit")
+                            || trimmed.contains("overloaded")
+                        {
+                            let _ = app_err.emit(
+                                "session:rate-limit",
+                                serde_json::json!({ "sessionId": session_id }),
+                            );
+                        }
+                    }
+                }
+            }
+        });
+
         {
             let mut m = manager.lock().unwrap();
             if let Some(a) = m.active.get_mut(&session_id) {
@@ -264,6 +291,14 @@ impl SessionManager {
                                 }
                             }
                         }
+                    }
+
+                    // Detect rate limit errors from Claude's JSON stream
+                    if is_rate_limit_line(&trimmed) {
+                        let _ = app.emit(
+                            "session:rate-limit",
+                            serde_json::json!({ "sessionId": session_id }),
+                        );
                     }
 
                     let _ = db.insert_output(session_id, &trimmed);
@@ -387,6 +422,11 @@ impl SessionManager {
     }
 
     pub fn stop_session(&mut self, session_id: SessionId) -> Result<(), String> {
+        if let Some(a) = self.active.get(&session_id) {
+            if let Some(pid) = a.session.pid {
+                kill_pid(pid as u32);
+            }
+        }
         self.active.remove(&session_id);
         let _ = self
             .db
@@ -484,6 +524,36 @@ impl SessionManager {
             self.journal_states.insert(session.id, state);
         }
     }
+}
+
+/// Forcefully terminate a process by PID.
+fn kill_pid(pid: u32) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let _ = std::process::Command::new("taskkill")
+            .args(["/F", "/PID", &pid.to_string()])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = std::process::Command::new("kill")
+            .args(["-TERM", &pid.to_string()])
+            .output();
+    }
+}
+
+/// Check if a JSON line from Claude's stdout indicates a rate limit error.
+fn is_rate_limit_line(line: &str) -> bool {
+    let lower = line.to_lowercase();
+    (lower.contains("rate_limit") || lower.contains("rate limit") || lower.contains("overloaded"))
+        && (lower.contains("\"type\":\"error\"")
+            || lower.contains("\"type\": \"error\"")
+            || lower.contains("error_type")
+            || lower.contains("\"subtype\":\"error\""))
 }
 
 #[cfg(test)]

@@ -17,6 +17,7 @@
     onSessionStopped,
     onSessionRunning,
     onSessionError,
+    onSessionRateLimit,
   } from './lib/tauri';
   import type { ClaudeCheck } from './lib/tauri';
   import Sidebar from './components/Sidebar.svelte';
@@ -28,6 +29,8 @@
   let claudeCheck: ClaudeCheck | null = null;
   let unlisteners: Array<() => void> = [];
   let spawnError: { sessionId: number; error: string } | null = null;
+  let rateLimitError: { sessionId: number } | null = null;
+  let rateLimitDismissTimer: ReturnType<typeof setTimeout> | null = null;
 
   function beep() {
     try {
@@ -78,7 +81,7 @@
     });
 
     const u4 = onSessionStopped((id) => {
-      sessions.update((l) => updateSessionState(l, id, { status: 'completed' }));
+      sessions.update((l) => updateSessionState(l, id, { status: 'stopped' }));
     });
 
     const u5 = onSessionRunning((id, pid) => {
@@ -92,8 +95,14 @@
       setTimeout(() => (spawnError = null), 15000);
     });
 
+    const u7 = onSessionRateLimit((id) => {
+      rateLimitError = { sessionId: id };
+      if (rateLimitDismissTimer) clearTimeout(rateLimitDismissTimer);
+      rateLimitDismissTimer = setTimeout(() => (rateLimitError = null), 30000);
+    });
+
     // Resolve all unlisten functions and store for cleanup
-    Promise.all([u1, u2, u3, u4, u5, u6]).then((fns) => {
+    Promise.all([u1, u2, u3, u4, u5, u6, u7]).then((fns) => {
       unlisteners = fns;
     });
   });
@@ -102,6 +111,17 @@
 
   $: selected = getSelectedSession($sessions, $selectedSessionId);
 </script>
+
+{#if rateLimitError}
+  <div class="rate-limit-banner">
+    <span class="rate-limit-icon">⏳</span>
+    <div class="rate-limit-body">
+      <div class="rate-limit-title">rate limit atingido</div>
+      <div class="rate-limit-msg">Aguarde alguns instantes e tente novamente.</div>
+    </div>
+    <button class="rate-limit-close" on:click={() => (rateLimitError = null)}>✕</button>
+  </div>
+{/if}
 
 {#if spawnError}
   <div class="spawn-error-banner">
@@ -184,6 +204,21 @@
     font-size: var(--xs);
     color: var(--t1);
     font-style: italic;
+  }
+
+  .rate-limit-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 201;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: rgba(180, 120, 0, 0.12);
+    border-bottom: 1px solid rgba(180, 120, 0, 0.35);
+    padding: 10px 14px;
+    animation: slideDown 0.2s ease;
   }
 
   .spawn-error-banner {

@@ -23,6 +23,7 @@
   $: cost = tokens ? estimateCost(tokens, session.model) : 0;
   $: ctx = session.contextPercent ?? 0;
   $: active = isActive(session.status);
+  $: stopped = session.status === 'stopped';
 </script>
 
 <aside class="meta">
@@ -35,6 +36,8 @@
     >
     {#if active}
       <button class="stop-btn" on:click={stop} title="Stop session">■</button>
+    {:else if stopped}
+      <span class="stopped-badge" title="Session stopped — type to resume">stopped</span>
     {/if}
   </div>
 
@@ -168,6 +171,17 @@
   }
   .stop-btn:hover {
     color: var(--s-error);
+  }
+  .stopped-badge {
+    margin-left: auto;
+    margin-right: 6px;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--t3);
+    padding: 2px 5px;
+    border: 1px solid var(--bd);
+    border-radius: 3px;
+    cursor: default;
   }
 
   .content {

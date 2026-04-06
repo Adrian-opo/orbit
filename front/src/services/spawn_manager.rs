@@ -13,6 +13,7 @@ pub struct SpawnConfig {
 pub struct SpawnHandle {
     pub pid: u32,
     pub reader: Box<dyn std::io::Read + Send>,
+    pub stderr: Box<dyn std::io::Read + Send>,
 }
 
 /// Build a PATH string that includes common Claude/Node installation directories.
@@ -172,9 +173,9 @@ pub fn spawn_claude(config: SpawnConfig) -> Result<SpawnHandle, String> {
     cmd.current_dir(&config.cwd);
     cmd.env("PATH", extended_path());
 
-    // Piped stdout — no PTY needed
+    // Piped stdout and stderr — no PTY needed
     cmd.stdout(std::process::Stdio::piped());
-    cmd.stderr(std::process::Stdio::null());
+    cmd.stderr(std::process::Stdio::piped());
 
     // Windows: suppress the console window that flashes on every spawn
     #[cfg(windows)]
@@ -188,6 +189,7 @@ pub fn spawn_claude(config: SpawnConfig) -> Result<SpawnHandle, String> {
 
     let pid = child.id();
     let stdout = child.stdout.take().ok_or_else(|| "no stdout".to_string())?;
+    let stderr = child.stderr.take().ok_or_else(|| "no stderr".to_string())?;
 
     // Keep child alive until it exits naturally
     std::mem::forget(child);
@@ -195,6 +197,7 @@ pub fn spawn_claude(config: SpawnConfig) -> Result<SpawnHandle, String> {
     Ok(SpawnHandle {
         pid,
         reader: Box::new(stdout),
+        stderr: Box::new(stderr),
     })
 }
 

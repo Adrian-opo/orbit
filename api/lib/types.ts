@@ -44,7 +44,8 @@ export type JournalEntryType =
   | 'assistant'
   | 'toolCall'
   | 'toolResult'
-  | 'system';
+  | 'system'
+  | 'progress';
 
 export interface JournalEntry {
   sessionId: string;

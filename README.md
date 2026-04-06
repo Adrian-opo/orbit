@@ -69,8 +69,10 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 git clone https://github.com/xinnaider/orbit.git
 cd orbit
 npm install
-npm run tauri:dev
+npm run tauri:dev   # starts frontend + backend together
 ```
+
+`tauri:dev` runs the Vite dev server and the Rust backend in one command, with hot reload on frontend changes.
 
 ### Testing
 

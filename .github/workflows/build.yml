@@ -111,6 +111,16 @@ jobs:
             Write-Host "File: $($exe.FullName)"
           }
 
+      - name: List bundle contents (debug)
+        shell: pwsh
+        run: |
+          Write-Host "=== front/target/release/bundle ==="
+          if (Test-Path front/target/release/bundle) {
+            Get-ChildItem front/target/release/bundle -Recurse | Select-Object FullName, Length
+          } else {
+            Write-Host "Diretório não encontrado"
+          }
+
       - name: Generate latest.json for updater
         shell: pwsh
         run: |

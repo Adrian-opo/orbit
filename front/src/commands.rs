@@ -361,9 +361,7 @@ pub fn get_claude_usage_stats() -> ClaudeUsageStats {
             let date = entry.get("date").and_then(|d| d.as_str()).unwrap_or("");
             if date >= week_start.as_str() && date <= today.as_str() {
                 if let Some(by_model) = entry.get("tokensByModel").and_then(|v| v.as_object()) {
-                    let total: u64 = by_model.values()
-                        .filter_map(|v| v.as_u64())
-                        .sum();
+                    let total: u64 = by_model.values().filter_map(|v| v.as_u64()).sum();
                     weekly_tokens += total;
                     if date == today.as_str() {
                         today_tokens = total;
@@ -378,7 +376,10 @@ pub fn get_claude_usage_stats() -> ClaudeUsageStats {
         for entry in arr {
             let date = entry.get("date").and_then(|d| d.as_str()).unwrap_or("");
             if date >= week_start.as_str() && date <= today.as_str() {
-                let msgs = entry.get("messageCount").and_then(|v| v.as_u64()).unwrap_or(0);
+                let msgs = entry
+                    .get("messageCount")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
                 weekly_messages += msgs;
                 if date == today.as_str() {
                     today_messages = msgs;
@@ -387,7 +388,12 @@ pub fn get_claude_usage_stats() -> ClaudeUsageStats {
         }
     }
 
-    ClaudeUsageStats { weekly_tokens, today_tokens, weekly_messages, today_messages }
+    ClaudeUsageStats {
+        weekly_tokens,
+        today_tokens,
+        weekly_messages,
+        today_messages,
+    }
 }
 
 fn days_to_date(days: u64) -> String {
@@ -396,15 +402,32 @@ fn days_to_date(days: u64) -> String {
     let mut year = 1970u64;
     loop {
         let days_in_year = if is_leap(year) { 366 } else { 365 };
-        if remaining < days_in_year { break; }
+        if remaining < days_in_year {
+            break;
+        }
         remaining -= days_in_year;
         year += 1;
     }
     let leap = is_leap(year);
-    let month_days: [u64; 12] = [31, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let month_days: [u64; 12] = [
+        31,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
     let mut month = 1u64;
     for &md in &month_days {
-        if remaining < md { break; }
+        if remaining < md {
+            break;
+        }
         remaining -= md;
         month += 1;
     }

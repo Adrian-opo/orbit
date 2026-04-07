@@ -20,14 +20,45 @@
   $: cols = hasLeftCol && hasRightCol ? '1fr 1fr' : '1fr';
   $: rows = hasTopRow && hasBotRow ? '1fr 1fr' : '1fr';
 
-  // Reactive map so grid positions update immediately when hasLeftCol/hasRightCol/etc. change
-  $: gridAreas = Object.fromEntries(
-    (['tl', 'tr', 'bl', 'br'] as PaneId[]).map((p) => {
-      const col = hasLeftCol && hasRightCol && (p === 'tr' || p === 'br') ? 2 : 1;
-      const row = hasTopRow && hasBotRow && (p === 'bl' || p === 'br') ? 2 : 1;
-      return [p, `${row} / ${col} / ${row + 1} / ${col + 1}`];
-    })
-  ) as Record<PaneId, string>;
+  // Reactive map so grid positions update immediately when layout changes.
+  // With 3 panes, a pane alone in its row spans both columns (full width).
+  $: gridAreas = (() => {
+    const v = $splitLayout.visible;
+    const twoCol = hasLeftCol && hasRightCol;
+    const twoRow = hasTopRow && hasBotRow;
+    const result = {} as Record<PaneId, string>;
+
+    for (const p of ['tl', 'tr', 'bl', 'br'] as PaneId[]) {
+      const isRight = p === 'tr' || p === 'br';
+      const isBottom = p === 'bl' || p === 'br';
+
+      const rowStart = twoRow && isBottom ? 2 : 1;
+
+      let colStart: number, colEnd: number;
+      if (twoCol && twoRow) {
+        // Lone pane in its row → span full width
+        const rowPeers: PaneId[] = isBottom ? ['bl', 'br'] : ['tl', 'tr'];
+        const aloneInRow = rowPeers.filter((x) => x !== p).every((x) => !v.includes(x));
+        if (aloneInRow) {
+          colStart = 1;
+          colEnd = 3;
+        } else {
+          colStart = isRight ? 2 : 1;
+          colEnd = colStart + 1;
+        }
+      } else if (twoCol) {
+        colStart = isRight ? 2 : 1;
+        colEnd = colStart + 1;
+      } else {
+        colStart = 1;
+        colEnd = 2;
+      }
+
+      result[p] = `${rowStart} / ${colStart} / ${rowStart + 1} / ${colEnd}`;
+    }
+
+    return result;
+  })();
 </script>
 
 <div class="grid" style="grid-template-columns:{cols};grid-template-rows:{rows}">

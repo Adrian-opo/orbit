@@ -99,6 +99,11 @@ describe('focusPane', () => {
     focusPane('tr');
     expect(get(splitLayout).focused).toBe('tr');
   });
+
+  it('does nothing when pane is not visible', () => {
+    focusPane('tr'); // tr is not in visible (['tl'] only)
+    expect(get(splitLayout).focused).toBe('tl');
+  });
 });
 
 // ── clearSession ──────────────────────────────────────────────

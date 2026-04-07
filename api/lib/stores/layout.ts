@@ -55,16 +55,18 @@ export function closePane(paneId: PaneId): void {
 
 /** Set which pane has keyboard/MetaPanel focus. */
 export function focusPane(paneId: PaneId): void {
-  splitLayout.update((l) => ({ ...l, focused: paneId }));
+  splitLayout.update((l) => {
+    if (!l.visible.includes(paneId)) return l;
+    return { ...l, focused: paneId };
+  });
 }
 
 /** Remove a deleted/hidden session from every pane that held it. */
 export function clearSession(sessionId: number): void {
-  splitLayout.update((l) => {
-    const panes = { ...l.panes };
-    (Object.keys(panes) as PaneId[]).forEach((key) => {
-      if (panes[key] === sessionId) panes[key] = null;
-    });
-    return { ...l, panes };
-  });
+  splitLayout.update((l) => ({
+    ...l,
+    panes: Object.fromEntries(
+      Object.entries(l.panes).map(([k, v]) => [k, v === sessionId ? null : v])
+    ) as Record<PaneId, number | null>,
+  }));
 }

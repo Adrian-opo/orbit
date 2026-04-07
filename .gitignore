@@ -40,6 +40,9 @@ front/target/
 # Superpowers
 .superpowers/
 
+# Git worktrees
+.worktrees/
+
 # Tauri signing keys — never commit
 tauri.key
 tauri.key.pub

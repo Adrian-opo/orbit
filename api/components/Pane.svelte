@@ -64,13 +64,14 @@
       return;
     }
 
-    const zone = activeZone ?? 'center';
+    const zone = getZone(e, e.currentTarget as HTMLElement);
     activeZone = null;
 
     const targetPane = adjacent[paneId][zone];
     const isAlreadyVisible = targetPane && $splitLayout.visible.includes(targetPane);
+    const maxPanesReached = $splitLayout.visible.length >= 4;
 
-    if (zone === 'center' || !targetPane || (atMaxPanes && !isAlreadyVisible)) {
+    if (zone === 'center' || !targetPane || (maxPanesReached && !isAlreadyVisible)) {
       assignSession(paneId, sessionId);
     } else {
       openPane(targetPane, sessionId);
@@ -103,15 +104,16 @@
   })();
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_no_noninteractive_tabindex -->
 <div
   class="pane"
   class:focused
+  tabindex="0"
   style="grid-area:{gridArea[paneId]};{borderStyle}"
   role="region"
   aria-label="pane {paneId}"
   on:click={onClick}
-  on:keydown={(e) => e.key === 'Enter' && onClick()}
+  on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && onClick()}
   on:dragover={onDragOver}
   on:dragleave={onDragLeave}
   on:drop={onDrop}

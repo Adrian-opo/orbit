@@ -9,6 +9,7 @@
   import InputBar from './InputBar.svelte';
 
   export let session: Session;
+  export let onSplit: (() => void) | null = null;
 
   let feedEl: HTMLDivElement;
   let atBottom = true;
@@ -119,6 +120,10 @@
     </div>
   {/if}
 
+  {#if onSplit}
+    <button class="split-btn" title="Dividir painel" on:click={onSplit}>⊞</button>
+  {/if}
+
   <!-- Feed -->
   <div class="feed-wrap" bind:this={feedEl} on:scroll={onScroll}>
     {#if entries.length === 0 && $pendingMessages.length === 0}
@@ -146,6 +151,7 @@
 
 <style>
   .panel {
+    position: relative;
     flex: 1;
     min-width: 0;
     min-height: 0;
@@ -262,6 +268,35 @@
     overflow-y: auto;
     min-height: 0;
     padding: 0;
+  }
+
+  .split-btn {
+    position: absolute;
+    top: 38px;
+    right: 8px;
+    z-index: 10;
+    background: var(--bg3);
+    border: 1px solid var(--bd1);
+    color: var(--t2);
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .panel:hover .split-btn {
+    opacity: 1;
+  }
+
+  .split-btn:hover {
+    border-color: var(--ac);
+    color: var(--ac);
   }
   .feed-empty {
     display: flex;

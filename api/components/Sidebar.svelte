@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { sessions, selectedSessionId, updateSessionState } from '../lib/stores/sessions';
+  import { sessions, updateSessionState } from '../lib/stores/sessions';
+  import { splitLayout, assignSession, clearSession } from '../lib/stores/layout';
   import { statusColor, statusLabel, isPulsing } from '../lib/status';
   import NewSessionModal from './NewSessionModal.svelte';
   import ContextMenu from './ContextMenu.svelte';
@@ -101,7 +102,7 @@
             confirmDelete = null;
             await deleteSession(id);
             sessions.update((l) => l.filter((s) => s.id !== id));
-            if ($selectedSessionId === id) selectedSessionId.set(null);
+            clearSession(id);
           }}>delete</button
         >
       </div>
@@ -141,13 +142,13 @@
       <p class="empty">no sessions</p>
     {:else}
       {#each $sessions as s (s.id)}
-        {@const active = $selectedSessionId === s.id}
+        {@const active = Object.values($splitLayout.panes).includes(s.id)}
         {@const color = statusColor(s.status)}
         {@const pulsing = isPulsing(s.status)}
         <button
           class="item"
           class:active
-          on:click={() => selectedSessionId.set(s.id)}
+          on:click={() => assignSession($splitLayout.focused, s.id)}
           on:contextmenu={(e) => onContextMenu(e, s)}
         >
           <div class="item-top">

@@ -1,15 +1,5 @@
 import { writable } from 'svelte/store';
 
-// WebView2 workaround: dataTransfer.getData() returns empty string in drop events.
-// Store the dragged session ID in a plain module variable as fallback.
-let _draggingSessionId: number | null = null;
-export function setDraggingSession(id: number | null): void {
-  _draggingSessionId = id;
-}
-export function getDraggingSession(): number | null {
-  return _draggingSessionId;
-}
-
 export type PaneId = 'tl' | 'tr' | 'bl' | 'br';
 
 export interface SplitLayout {
@@ -68,6 +58,22 @@ export function focusPane(paneId: PaneId): void {
   splitLayout.update((l) => {
     if (!l.visible.includes(paneId)) return l;
     return { ...l, focused: paneId };
+  });
+}
+
+/** Open the next available adjacent pane (empty). Focuses the new pane. No-op at 4 panes. */
+export function splitPane(fromPaneId: PaneId): void {
+  const priority: Record<PaneId, PaneId[]> = {
+    tl: ['tr', 'bl'],
+    tr: ['br', 'tl'],
+    bl: ['br', 'tl'],
+    br: ['tr', 'bl'],
+  };
+  splitLayout.update((l) => {
+    if (l.visible.length >= 4) return l;
+    const target = priority[fromPaneId].find((p) => !l.visible.includes(p));
+    if (!target) return l;
+    return { ...l, visible: [...l.visible, target], focused: target };
   });
 }
 

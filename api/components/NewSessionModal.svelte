@@ -3,6 +3,7 @@
   import { open } from '@tauri-apps/plugin-dialog';
   import { createSession, diagnoseSpawn } from '../lib/tauri';
   import type { SpawnDiagnostic } from '../lib/tauri';
+  import { generateAgentName } from '../lib/android-names';
 
   const dispatch = createEventDispatcher();
 
@@ -13,6 +14,24 @@
   let error = '';
   let diagRunning = false;
   let diag: SpawnDiagnostic | null = null;
+  let agentName = '';
+  let projectSuffix = '';
+  let generatedAgent = '';
+  let generatedProject = '';
+  let useWorktree = false;
+
+  $: if (path) {
+    const p = path.split(/[/\\]/).filter(Boolean).pop() ?? '';
+    if (!generatedProject) generatedProject = p;
+    if (!generatedAgent) generatedAgent = generateAgentName();
+  }
+
+  $: resolvedAgent = agentName.trim() || generatedAgent;
+  $: resolvedProject = projectSuffix.trim() || generatedProject;
+  $: namePreview =
+    resolvedAgent && resolvedProject
+      ? `${resolvedAgent} · ${resolvedProject}`
+      : resolvedAgent || resolvedProject;
 
   async function runDiag() {
     diagRunning = true;
@@ -42,6 +61,10 @@
       error = 'project path required';
       return;
     }
+    const agent = agentName.trim() || generatedAgent || generateAgentName();
+    const project =
+      projectSuffix.trim() || generatedProject || path.split(/[/\\]/).filter(Boolean).pop() || '';
+    const finalName = project ? `${agent} · ${project}` : agent;
     loading = true;
     error = '';
     try {
@@ -50,6 +73,8 @@
         prompt: prompt.trim() || 'Hello',
         model: model === 'auto' ? undefined : model,
         permissionMode: 'ignore',
+        sessionName: finalName,
+        useWorktree,
       });
       dispatch('done');
     } catch (e: any) {
@@ -120,6 +145,37 @@
         </select>
       </div>
     </div>
+
+    <div class="field">
+      <label class="label" for="ns-agent">apelido</label>
+      <div class="nickname-row">
+        <input
+          id="ns-agent"
+          class="input"
+          bind:value={agentName}
+          placeholder={generatedAgent || '—'}
+          title="nome do agente"
+          disabled={loading}
+        />
+        <span class="nick-sep">·</span>
+        <input
+          id="ns-project"
+          class="input"
+          bind:value={projectSuffix}
+          placeholder={generatedProject || 'projeto'}
+          title="sufixo do projeto"
+          disabled={loading}
+        />
+      </div>
+      {#if namePreview}
+        <span class="name-preview">{namePreview}</span>
+      {/if}
+    </div>
+
+    <label class="toggle-row">
+      <input type="checkbox" bind:checked={useWorktree} disabled={loading} />
+      <span class="toggle-label">criar git worktree</span>
+    </label>
 
     {#if error}
       <p class="error">! {error}</p>
@@ -315,5 +371,42 @@
   .btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  .nickname-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nickname-row .input {
+    flex: 1;
+  }
+  .nick-sep {
+    color: var(--t3);
+    font-size: var(--md);
+    flex-shrink: 0;
+  }
+  .name-preview {
+    font-size: var(--xs);
+    color: var(--t3);
+    letter-spacing: 0.03em;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .toggle-row input[type='checkbox'] {
+    accent-color: var(--ac);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+  }
+  .toggle-label {
+    font-size: var(--sm);
+    color: var(--t1);
   }
 </style>

@@ -9,6 +9,7 @@
   import InputBar from './InputBar.svelte';
 
   export let session: Session;
+  export let onSplit: (() => void) | null = null;
 
   let feedEl: HTMLDivElement;
   let atBottom = true;
@@ -73,15 +74,18 @@
   <div class="header">
     <div class="header-left">
       <span class="dot" style="color:{statusClr}" class:pulse={pulsing}>●</span>
-      <span class="session-name">
+      <span
+        class="session-name"
+        title={session.name ??
+          session.projectName ??
+          session.cwd?.split(/[\\/]/).pop() ??
+          `#${session.id}`}
+      >
         {session.name ??
           session.projectName ??
           session.cwd?.split(/[\\/]/).pop() ??
           `#${session.id}`}
       </span>
-      {#if session.gitBranch}
-        <span class="branch">{session.gitBranch}</span>
-      {/if}
       <span class="status" style="color:{statusClr}">{statusStr}</span>
     </div>
     <div class="header-right">
@@ -111,12 +115,25 @@
     </div>
   </div>
 
+  <!-- Branch strip -->
+  {#if session.branchName ?? session.gitBranch}
+    {@const branchLabel = session.branchName ?? session.gitBranch ?? ''}
+    <div class="branch-strip" title={branchLabel}>
+      <span class="branch-icon">⎇</span>
+      <span class="branch-text">{branchLabel}</span>
+    </div>
+  {/if}
+
   <!-- Approval banner -->
   {#if session.pendingApproval && (session.status as string) !== 'working'}
     <div class="approval">
       <span class="approval-icon">⚑</span>
       <span class="approval-text">{session.pendingApproval}</span>
     </div>
+  {/if}
+
+  {#if onSplit}
+    <button class="split-btn" title="Dividir painel" on:click={onSplit}>⊞</button>
   {/if}
 
   <!-- Feed -->
@@ -146,6 +163,7 @@
 
 <style>
   .panel {
+    position: relative;
     flex: 1;
     min-width: 0;
     min-height: 0;
@@ -168,6 +186,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
   }
   .dot {
     font-size: 8px;
@@ -189,25 +210,47 @@
     font-size: var(--md);
     font-weight: 500;
     color: var(--t0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
-  .branch {
+  .branch-strip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 14px;
+    border-bottom: 1px solid var(--bd);
+    background: var(--bg1);
+    flex-shrink: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .branch-icon {
+    font-size: 10px;
+    color: var(--t3);
+    flex-shrink: 0;
+  }
+  .branch-text {
     font-size: var(--xs);
-    color: var(--t2);
-    background: var(--bg3);
-    border: 1px solid var(--bd);
-    border-radius: 2px;
-    padding: 0 5px;
+    color: var(--t3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .status {
     font-size: var(--xs);
     color: var(--t2);
     letter-spacing: 0.04em;
+    flex-shrink: 0;
   }
 
   .header-right {
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-shrink: 0;
+    padding-left: 12px;
   }
   .meta {
     font-size: var(--xs);
@@ -262,6 +305,35 @@
     overflow-y: auto;
     min-height: 0;
     padding: 0;
+  }
+
+  .split-btn {
+    position: absolute;
+    top: 38px;
+    right: 8px;
+    z-index: 10;
+    background: var(--bg3);
+    border: 1px solid var(--bd1);
+    color: var(--t2);
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .panel:hover .split-btn {
+    opacity: 1;
+  }
+
+  .split-btn:hover {
+    border-color: var(--ac);
+    color: var(--ac);
   }
   .feed-empty {
     display: flex;

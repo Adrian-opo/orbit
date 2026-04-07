@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use tauri::{AppHandle, Emitter};
@@ -7,6 +8,14 @@ use crate::journal_reader::{process_line, JournalState};
 use crate::models::{AgentStatus, Session, SessionId, TokenUsage};
 use crate::services::database::DatabaseService;
 use crate::services::spawn_manager::{spawn_claude, SpawnConfig};
+
+/// Reads `.git/HEAD` to detect the current branch without spawning a subprocess.
+fn detect_git_branch(cwd: &str) -> Option<String> {
+    let head = std::fs::read_to_string(Path::new(cwd).join(".git/HEAD")).ok()?;
+    head.trim()
+        .strip_prefix("ref: refs/heads/")
+        .map(|b| b.to_string())
+}
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,6 +65,7 @@ impl SessionManager {
         session_name: Option<&str>,
         permission_mode: &str,
         model: Option<&str>,
+        use_worktree: bool,
     ) -> Result<Session, String> {
         let project_name = std::path::Path::new(project_path)
             .file_name()
@@ -78,6 +88,34 @@ impl SessionManager {
             )
             .map_err(|e| e.to_string())?;
 
+        let (worktree_path_val, branch_name_val) = if use_worktree {
+            let full_name = session_name.unwrap_or(&project_name);
+            let (prefix, suffix) = full_name.split_once(" · ").unwrap_or((full_name, ""));
+            let prefix_slug = crate::services::worktree::generate_branch_slug(prefix);
+            let suffix_compact: String = suffix
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+                .to_lowercase();
+            let slug = if suffix_compact.is_empty() {
+                format!("{prefix_slug}-{session_id}")
+            } else {
+                format!("{prefix_slug}-{suffix_compact}-{session_id}")
+            };
+            let wt_path = crate::services::worktree::create_worktree(
+                std::path::Path::new(project_path),
+                &slug,
+            )?;
+            let branch = format!("orbit/{slug}");
+            let wt_str = wt_path.to_string_lossy().to_string();
+            let _ = self
+                .db
+                .update_session_worktree(session_id, &wt_str, &branch);
+            (Some(wt_str), Some(branch))
+        } else {
+            (None, None)
+        };
+
         let now = chrono::Utc::now().to_rfc3339();
         let session = Session {
             id: session_id,
@@ -86,8 +124,8 @@ impl SessionManager {
             status: crate::models::SessionStatus::Initializing
                 .as_str()
                 .to_string(),
-            worktree_path: None,
-            branch_name: None,
+            worktree_path: worktree_path_val,
+            branch_name: branch_name_val,
             permission_mode: permission_mode.to_string(),
             model: model.map(|s| s.to_string()),
             pid: None,
@@ -95,7 +133,7 @@ impl SessionManager {
             updated_at: now,
             cwd: Some(project_path.to_string()),
             project_name: Some(project_name),
-            git_branch: None,
+            git_branch: detect_git_branch(project_path),
             tokens: None,
             context_percent: None,
             pending_approval: None,
@@ -140,7 +178,11 @@ impl SessionManager {
             };
             (
                 m.db.clone(),
-                a.session.cwd.clone().unwrap_or_default(),
+                a.session
+                    .worktree_path
+                    .clone()
+                    .or_else(|| a.session.cwd.clone())
+                    .unwrap_or_default(),
                 a.session.permission_mode.clone(),
                 a.session.model.clone(),
                 a.claude_session_id.clone(),
@@ -574,7 +616,7 @@ mod tests {
         let s = mgr
             .lock()
             .unwrap()
-            .init_session("/tmp/proj", None, "ignore", None)
+            .init_session("/tmp/proj", None, "ignore", None, false)
             .unwrap();
         assert!(s.id > 0);
         assert_eq!(s.status, "initializing");
@@ -586,7 +628,7 @@ mod tests {
         let s = mgr
             .lock()
             .unwrap()
-            .init_session("/tmp/proj", None, "ignore", None)
+            .init_session("/tmp/proj", None, "ignore", None, false)
             .unwrap();
         assert!(mgr.lock().unwrap().journal_states.contains_key(&s.id));
     }
@@ -608,7 +650,7 @@ mod tests {
         let s = mgr
             .lock()
             .unwrap()
-            .init_session("/tmp/proj", None, "ignore", None)
+            .init_session("/tmp/proj", None, "ignore", None, false)
             .unwrap();
         assert!(mgr.lock().unwrap().is_session_active(s.id));
     }
@@ -619,7 +661,7 @@ mod tests {
         let s = mgr
             .lock()
             .unwrap()
-            .init_session("/tmp/proj", None, "ignore", None)
+            .init_session("/tmp/proj", None, "ignore", None, false)
             .unwrap();
         mgr.lock().unwrap().stop_session(s.id).unwrap();
         let sessions = mgr.lock().unwrap().get_sessions();
@@ -632,7 +674,7 @@ mod tests {
         let s = mgr
             .lock()
             .unwrap()
-            .init_session("/tmp/proj", None, "ignore", None)
+            .init_session("/tmp/proj", None, "ignore", None, false)
             .unwrap();
         mgr.lock().unwrap().delete_session(s.id).unwrap();
         assert_eq!(mgr.lock().unwrap().get_sessions().len(), 0);

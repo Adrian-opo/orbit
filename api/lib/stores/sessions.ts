@@ -1,4 +1,5 @@
-import { writable } from 'svelte/store';
+import { writable, derived } from 'svelte/store';
+import { splitLayout } from './layout';
 
 export interface TokenUsage {
   input: number;
@@ -25,6 +26,8 @@ export interface Session {
   cwd: string | null;
   projectName: string | null;
   gitBranch: string | null;
+  worktreePath: string | null;
+  branchName: string | null;
   tokens: TokenUsage | null;
   contextPercent: number | null;
   pendingApproval: string | null;
@@ -35,7 +38,7 @@ export interface Session {
 }
 
 export const sessions = writable<Session[]>([]);
-export const selectedSessionId = writable<number | null>(null);
+export const selectedSessionId = derived(splitLayout, ($l) => $l.panes[$l.focused] ?? null);
 
 export function getSelectedSession(list: Session[], id: number | null): Session | null {
   if (id === null) return null;

@@ -7,6 +7,7 @@
     updateSessionState,
     getSelectedSession,
   } from './lib/stores/sessions';
+  import { assignSession } from './lib/stores/layout';
   import { journal } from './lib/stores/journal';
   import {
     listSessions,
@@ -25,7 +26,7 @@
   import { checkUpdate } from './lib/tauri';
   import type { UpdateInfo } from './lib/types';
   import Sidebar from './components/Sidebar.svelte';
-  import CentralPanel from './components/CentralPanel.svelte';
+  import PaneGrid from './components/PaneGrid.svelte';
   import MetaPanel from './components/MetaPanel.svelte';
 
   let prevStatuses: Record<number, string> = {};
@@ -60,11 +61,11 @@
     const [existing, check] = await Promise.all([listSessions(), checkClaude()]);
     claudeCheck = check;
     sessions.set(existing);
-    if (existing.length > 0 && !$selectedSessionId) selectedSessionId.set(existing[0].id);
+    if (existing.length > 0 && !$selectedSessionId) assignSession('tl', existing[0].id);
 
     const u1 = onSessionCreated((s) => {
       sessions.update((l) => upsertSession(l, s));
-      if (!$selectedSessionId) selectedSessionId.set(s.id);
+      if (!$selectedSessionId) assignSession('tl', s.id);
     });
 
     const u2 = onSessionOutput(({ sessionId, entry }) => {
@@ -161,24 +162,20 @@
 
 <div class="layout">
   <Sidebar />
-  {#if selected}
-    <CentralPanel session={selected} />
-  {:else}
+  {#if claudeCheck && !claudeCheck.found}
     <div class="empty">
-      {#if claudeCheck && !claudeCheck.found}
-        <div class="claude-warn">
-          <span class="warn-icon">⚠</span>
-          <div>
-            <div class="warn-title">claude CLI not found</div>
-            <div class="warn-hint">
-              {claudeCheck.hint ?? 'npm install -g @anthropic-ai/claude-code'}
-            </div>
+      <div class="claude-warn">
+        <span class="warn-icon">⚠</span>
+        <div>
+          <div class="warn-title">claude CLI not found</div>
+          <div class="warn-hint">
+            {claudeCheck.hint ?? 'npm install -g @anthropic-ai/claude-code'}
           </div>
         </div>
-      {:else}
-        <span class="empty-hint">no session selected</span>
-      {/if}
+      </div>
     </div>
+  {:else}
+    <PaneGrid />
   {/if}
   {#if selected}
     <MetaPanel session={selected} />
@@ -198,11 +195,6 @@
     align-items: center;
     justify-content: center;
     min-width: 0;
-  }
-  .empty-hint {
-    font-size: var(--sm);
-    color: var(--t2);
-    letter-spacing: 0.02em;
   }
   .claude-warn {
     display: flex;

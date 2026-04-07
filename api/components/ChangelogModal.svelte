@@ -4,18 +4,15 @@
   export let changelogContent: string;
   export let currentVersion: string;
   export let onClose: () => void;
-
-  function handleOverlayClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) onClose();
-  }
 </script>
 
+<svelte:window on:keydown={(e) => e.key === 'Escape' && onClose()} />
 <div
   class="overlay"
   role="dialog"
   aria-modal="true"
   tabindex="-1"
-  on:click={handleOverlayClick}
+  on:click|self={onClose}
   on:keydown={(e) => e.key === 'Escape' && onClose()}
 >
   <div class="modal">
@@ -45,6 +42,7 @@
   }
   .modal {
     width: 480px;
+    max-width: 94vw;
     max-height: 520px;
     background: var(--bg2);
     border: 1px solid var(--bd2);

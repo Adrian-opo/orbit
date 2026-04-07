@@ -185,16 +185,3 @@ export async function checkUpdate(): Promise<UpdateInfo | null> {
 export async function installUpdate(): Promise<void> {
   await invoke('install_update');
 }
-
-export interface OrbitSessionStatus {
-  cost: number;
-  fiveHourPct: number;
-  fiveHourReset: number;
-  sevenDayPct: number;
-  sevenDayReset: number;
-  contextPct: number;
-}
-
-export async function readSessionStatus(pid: number): Promise<OrbitSessionStatus | null> {
-  return invoke<OrbitSessionStatus | null>('read_session_status', { pid });
-}

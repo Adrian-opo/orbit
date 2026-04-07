@@ -126,6 +126,7 @@
   aria-label="pane {paneId}"
   on:click={onClick}
   on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && onClick()}
+  on:dragenter|preventDefault
   on:dragover={onDragOver}
   on:dragleave={onDragLeave}
   on:drop={onDrop}

@@ -80,8 +80,8 @@
           session.cwd?.split(/[\\/]/).pop() ??
           `#${session.id}`}
       </span>
-      {#if session.gitBranch}
-        <span class="branch">{session.gitBranch}</span>
+      {#if session.branchName ?? session.gitBranch}
+        <span class="branch">{session.branchName ?? session.gitBranch}</span>
       {/if}
       <span class="status" style="color:{statusClr}">{statusStr}</span>
     </div>

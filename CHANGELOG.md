@@ -4,6 +4,9 @@
 
 ## Abril 2026
 
+### 07/04 · Melhoria — Branch ativa exibida no cabeçalho do painel
+O cabeçalho de cada painel agora mostra corretamente o branch em que o Claude está trabalhando. Para sessões com worktree isolado, exibe o branch do worktree (`orbit/<nome>`); para sessões normais, exibe o branch do repositório.
+
 ### 07/04 · Novo — Painéis divididos (split panes)
 O Orbit agora permite visualizar até 4 sessões do Claude Code simultaneamente.
 Arraste qualquer sessão da barra lateral para a borda de um painel para abrir

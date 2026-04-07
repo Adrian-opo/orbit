@@ -99,6 +99,7 @@ impl DatabaseService {
         Ok(project)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create_session(
         &self,
         project_id: Option<i64>,

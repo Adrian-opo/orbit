@@ -7,14 +7,8 @@
 </script>
 
 <svelte:window on:keydown={(e) => e.key === 'Escape' && onClose()} />
-<div
-  class="overlay"
-  role="dialog"
-  aria-modal="true"
-  tabindex="-1"
-  on:click|self={onClose}
-  on:keydown={(e) => e.key === 'Escape' && onClose()}
->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<div class="overlay" role="dialog" aria-modal="true" tabindex="-1" on:click|self={onClose}>
   <div class="modal">
     <div class="modal-header">
       <div class="modal-title">

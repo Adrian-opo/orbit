@@ -4,7 +4,8 @@
   import { statusColor, statusLabel, isPulsing } from '../lib/status';
   import NewSessionModal from './NewSessionModal.svelte';
   import ContextMenu from './ContextMenu.svelte';
-  import { renameSession, deleteSession, stopSession, getAppVersion } from '../lib/tauri';
+  import RenameSessionModal from './RenameSessionModal.svelte';
+  import { deleteSession, stopSession, getAppVersion } from '../lib/tauri';
   import { onMount } from 'svelte';
 
   let appVersion = '';
@@ -13,7 +14,7 @@
 
   // Context menu state
   let ctxMenu: { x: number; y: number; sessionId: number; sessionName: string } | null = null;
-  let renaming: { id: number; value: string } | null = null;
+  let renameTarget: { id: number; name: string } | null = null;
   let confirmDelete: { id: number; name: string } | null = null;
 
   function onContextMenu(e: MouseEvent, s: (typeof $sessions)[0]) {
@@ -32,7 +33,7 @@
     ctxMenu = null;
 
     if (action === 'rename') {
-      renaming = { id: sessionId, value: sessionName };
+      renameTarget = { id: sessionId, name: sessionName };
     } else if (action === 'delete') {
       confirmDelete = { id: sessionId, name: sessionName };
     } else if (action === 'stop') {
@@ -44,25 +45,9 @@
     }
   }
 
-  async function submitRename() {
-    if (!renaming) return;
-    const { id, value } = renaming;
-    renaming = null;
-    if (!value.trim()) return;
-    await renameSession(id, value.trim());
-    sessions.update((l) => updateSessionState(l, id, { name: value.trim() }));
-  }
-
   export let onOpenChangelog: () => void = () => {};
 
   let showModal = false;
-
-  // Svelte action: auto-focus and select when mounted
-  function focusOnMount(node: HTMLInputElement) {
-    node.focus();
-    node.select();
-    return { destroy() {} };
-  }
 
   onMount(async () => {
     appVersion = await getAppVersion();
@@ -112,6 +97,19 @@
   </div>
 {/if}
 
+{#if renameTarget}
+  <RenameSessionModal
+    sessionId={renameTarget.id}
+    sessionName={renameTarget.name}
+    on:done={(e) => {
+      const { id, name } = e.detail;
+      sessions.update((l) => updateSessionState(l, id, { name }));
+      renameTarget = null;
+    }}
+    on:cancel={() => (renameTarget = null)}
+  />
+{/if}
+
 {#if ctxMenu}
   <ContextMenu
     x={ctxMenu.x}
@@ -157,20 +155,7 @@
         >
           <div class="item-top">
             <span class="dot" style="color:{color}" class:pulse={pulsing}>●</span>
-            {#if renaming?.id === s.id}
-              <input
-                class="rename-input"
-                bind:value={renaming.value}
-                on:keydown={(e) => {
-                  if (e.key === 'Enter') submitRename();
-                  if (e.key === 'Escape') renaming = null;
-                }}
-                on:blur={submitRename}
-                use:focusOnMount
-              />
-            {:else}
-              <span class="name">{displayName(s)}</span>
-            {/if}
+            <span class="name">{displayName(s)}</span>
             <span class="status" style="color:{color}">{statusLabel(s.status)}</span>
           </div>
           <div class="item-meta">
@@ -413,18 +398,6 @@
     border-color: var(--s-error);
   }
 
-  .rename-input {
-    flex: 1;
-    min-width: 0;
-    background: var(--bg3);
-    border: 1px solid var(--ac);
-    border-radius: 2px;
-    color: var(--t0);
-    font-size: var(--md);
-    font-family: var(--mono);
-    padding: 1px 5px;
-    outline: none;
-  }
   .approval-dot {
     color: var(--s-input);
     margin-left: 4px;

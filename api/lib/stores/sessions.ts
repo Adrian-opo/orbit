@@ -25,6 +25,8 @@ export interface Session {
   cwd: string | null;
   projectName: string | null;
   gitBranch: string | null;
+  worktreePath: string | null;
+  branchName: string | null;
   tokens: TokenUsage | null;
   contextPercent: number | null;
   pendingApproval: string | null;

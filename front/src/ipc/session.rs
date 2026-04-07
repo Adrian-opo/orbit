@@ -29,6 +29,8 @@ pub fn create_session(
             session_name.as_deref(),
             &mode,
             model.as_deref(),
+            None,
+            None,
         )?
     };
 

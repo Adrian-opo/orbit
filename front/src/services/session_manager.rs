@@ -56,6 +56,8 @@ impl SessionManager {
         session_name: Option<&str>,
         permission_mode: &str,
         model: Option<&str>,
+        ssh_host: Option<&str>,
+        ssh_user: Option<&str>,
     ) -> Result<Session, String> {
         let project_name = std::path::Path::new(project_path)
             .file_name()
@@ -75,6 +77,8 @@ impl SessionManager {
                 project_path,
                 permission_mode,
                 model,
+                ssh_host,
+                ssh_user,
             )
             .map_err(|e| e.to_string())?;
 
@@ -94,6 +98,8 @@ impl SessionManager {
             created_at: now.clone(),
             updated_at: now,
             cwd: Some(project_path.to_string()),
+            ssh_host: ssh_host.map(|s| s.to_string()),
+            ssh_user: ssh_user.map(|s| s.to_string()),
             project_name: Some(project_name),
             git_branch: None,
             tokens: None,
@@ -574,7 +580,7 @@ mod tests {
         let s = mgr
             .lock()
             .unwrap()
-            .init_session("/tmp/proj", None, "ignore", None)
+            .init_session("/tmp/proj", None, "ignore", None, None, None)
             .unwrap();
         assert!(s.id > 0);
         assert_eq!(s.status, "initializing");
@@ -586,7 +592,7 @@ mod tests {
         let s = mgr
             .lock()
             .unwrap()
-            .init_session("/tmp/proj", None, "ignore", None)
+            .init_session("/tmp/proj", None, "ignore", None, None, None)
             .unwrap();
         assert!(mgr.lock().unwrap().journal_states.contains_key(&s.id));
     }
@@ -608,7 +614,7 @@ mod tests {
         let s = mgr
             .lock()
             .unwrap()
-            .init_session("/tmp/proj", None, "ignore", None)
+            .init_session("/tmp/proj", None, "ignore", None, None, None)
             .unwrap();
         assert!(mgr.lock().unwrap().is_session_active(s.id));
     }
@@ -619,7 +625,7 @@ mod tests {
         let s = mgr
             .lock()
             .unwrap()
-            .init_session("/tmp/proj", None, "ignore", None)
+            .init_session("/tmp/proj", None, "ignore", None, None, None)
             .unwrap();
         mgr.lock().unwrap().stop_session(s.id).unwrap();
         let sessions = mgr.lock().unwrap().get_sessions();
@@ -632,7 +638,7 @@ mod tests {
         let s = mgr
             .lock()
             .unwrap()
-            .init_session("/tmp/proj", None, "ignore", None)
+            .init_session("/tmp/proj", None, "ignore", None, None, None)
             .unwrap();
         mgr.lock().unwrap().delete_session(s.id).unwrap();
         assert_eq!(mgr.lock().unwrap().get_sessions().len(), 0);
@@ -643,7 +649,7 @@ mod tests {
     fn test_restore_from_db_rebuilds_journal() {
         let db = Arc::new(DatabaseService::open_in_memory().unwrap());
         let sid = db
-            .create_session(None, None, "/tmp", "ignore", None)
+            .create_session(None, None, "/tmp", "ignore", None, None, None)
             .unwrap();
         let line = r#"{"type":"assistant","message":{"model":"claude-sonnet-4-6","content":[{"type":"text","text":"Hi!"}],"usage":{"input_tokens":5,"output_tokens":3,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
         db.insert_output(sid, line).unwrap();

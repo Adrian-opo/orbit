@@ -32,6 +32,8 @@ impl DatabaseService {
         // Run schema migrations (errors ignored — column may already exist)
         let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN claude_session_id TEXT");
         let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN cwd TEXT");
+        let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN ssh_host TEXT");
+        let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN ssh_user TEXT");
 
         conn.execute_batch(
             "
@@ -54,6 +56,8 @@ impl DatabaseService {
                 pid               INTEGER,
                 cwd               TEXT,
                 claude_session_id TEXT,
+                ssh_host          TEXT,
+                ssh_user          TEXT,
                 created_at        TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
             );
@@ -102,18 +106,22 @@ impl DatabaseService {
         cwd: &str,
         permission_mode: &str,
         model: Option<&str>,
+        ssh_host: Option<&str>,
+        ssh_user: Option<&str>,
     ) -> SqlResult<SessionId> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO sessions (project_id, name, cwd, status, permission_mode, model)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO sessions (project_id, name, cwd, status, permission_mode, model, ssh_host, ssh_user)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 project_id,
                 name,
                 cwd,
                 crate::models::SessionStatus::Initializing.as_str(),
                 permission_mode,
-                model
+                model,
+                ssh_host,
+                ssh_user,
             ],
         )?;
         Ok(conn.last_insert_rowid())
@@ -141,7 +149,8 @@ impl DatabaseService {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, project_id, name, status, worktree_path, branch_name,
-                    permission_mode, model, pid, cwd, created_at, updated_at
+                    permission_mode, model, pid, cwd, created_at, updated_at,
+                    ssh_host, ssh_user
              FROM sessions ORDER BY created_at DESC",
         )?;
         let sessions = stmt
@@ -159,6 +168,8 @@ impl DatabaseService {
                     created_at: row.get(10)?,
                     updated_at: row.get(11)?,
                     cwd: row.get(9)?,
+                    ssh_host: row.get(12)?,
+                    ssh_user: row.get(13)?,
                     project_name: None,
                     git_branch: None,
                     tokens: None,
@@ -175,7 +186,8 @@ impl DatabaseService {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, project_id, name, status, worktree_path, branch_name,
-                    permission_mode, model, pid, cwd, created_at, updated_at
+                    permission_mode, model, pid, cwd, created_at, updated_at,
+                    ssh_host, ssh_user
              FROM sessions WHERE id = ?1",
         )?;
         let session = stmt
@@ -193,6 +205,8 @@ impl DatabaseService {
                     created_at: row.get(10)?,
                     updated_at: row.get(11)?,
                     cwd: row.get(9)?,
+                    ssh_host: row.get(12)?,
+                    ssh_user: row.get(13)?,
                     project_name: None,
                     git_branch: None,
                     tokens: None,
@@ -314,7 +328,15 @@ mod tests {
     fn test_create_session() {
         let db = DatabaseService::open_in_memory().unwrap();
         let id = db
-            .create_session(None, Some("task 1"), "/tmp/proj", "ignore", None)
+            .create_session(
+                None,
+                Some("task 1"),
+                "/tmp/proj",
+                "ignore",
+                None,
+                None,
+                None,
+            )
             .unwrap();
         assert!(id > 0);
         let sessions = db.get_sessions().unwrap();
@@ -327,7 +349,7 @@ mod tests {
     fn test_update_session_status() {
         let db = DatabaseService::open_in_memory().unwrap();
         let id = db
-            .create_session(None, None, "/tmp/proj", "ignore", None)
+            .create_session(None, None, "/tmp/proj", "ignore", None, None, None)
             .unwrap();
         db.update_session_status(id, "running").unwrap();
         let sessions = db.get_sessions().unwrap();
@@ -338,7 +360,7 @@ mod tests {
     fn test_insert_and_get_outputs() {
         let db = DatabaseService::open_in_memory().unwrap();
         let id = db
-            .create_session(None, None, "/tmp/proj", "ignore", None)
+            .create_session(None, None, "/tmp/proj", "ignore", None, None, None)
             .unwrap();
         db.insert_output(id, r#"{"type":"assistant"}"#).unwrap();
         db.insert_output(id, r#"{"type":"user"}"#).unwrap();
@@ -351,7 +373,7 @@ mod tests {
     fn test_get_session() {
         let db = DatabaseService::open_in_memory().unwrap();
         let id = db
-            .create_session(None, Some("test"), "/tmp/proj", "ignore", None)
+            .create_session(None, Some("test"), "/tmp/proj", "ignore", None, None, None)
             .unwrap();
         let session = db.get_session(id).unwrap();
         assert!(session.is_some());
@@ -365,7 +387,7 @@ mod tests {
     fn test_update_session_pid_sets_running() {
         let db = DatabaseService::open_in_memory().unwrap();
         let id = db
-            .create_session(None, None, "/tmp/proj", "ignore", None)
+            .create_session(None, None, "/tmp/proj", "ignore", None, None, None)
             .unwrap();
         assert_eq!(db.get_session(id).unwrap().unwrap().status, "initializing");
 
@@ -406,6 +428,8 @@ mod tests {
                 "/myapp",
                 "approve",
                 Some("claude-sonnet-4-6"),
+                None,
+                None,
             )
             .unwrap();
 
@@ -420,7 +444,7 @@ mod tests {
     fn test_outputs_ordered_by_insertion() {
         let db = DatabaseService::open_in_memory().unwrap();
         let id = db
-            .create_session(None, None, "/tmp", "ignore", None)
+            .create_session(None, None, "/tmp", "ignore", None, None, None)
             .unwrap();
 
         for i in 0..5 {
@@ -438,8 +462,12 @@ mod tests {
     #[test]
     fn test_outputs_isolated_per_session() {
         let db = DatabaseService::open_in_memory().unwrap();
-        let id1 = db.create_session(None, None, "/a", "ignore", None).unwrap();
-        let id2 = db.create_session(None, None, "/b", "ignore", None).unwrap();
+        let id1 = db
+            .create_session(None, None, "/a", "ignore", None, None, None)
+            .unwrap();
+        let id2 = db
+            .create_session(None, None, "/b", "ignore", None, None, None)
+            .unwrap();
 
         db.insert_output(id1, r#"{"session":1}"#).unwrap();
         db.insert_output(id2, r#"{"session":2}"#).unwrap();
@@ -448,5 +476,35 @@ mod tests {
         assert_eq!(db.get_outputs(id2).unwrap().len(), 1);
         assert!(db.get_outputs(id1).unwrap()[0].contains("1"));
         assert!(db.get_outputs(id2).unwrap()[0].contains("2"));
+    }
+
+    #[test]
+    fn test_create_session_with_ssh() {
+        let db = DatabaseService::open_in_memory().unwrap();
+        let id = db
+            .create_session(
+                None,
+                Some("vps task"),
+                "/home/user/project",
+                "ignore",
+                None,
+                Some("vps.example.com"),
+                Some("deploy"),
+            )
+            .unwrap();
+        let session = db.get_session(id).unwrap().unwrap();
+        assert_eq!(session.ssh_host, Some("vps.example.com".to_string()));
+        assert_eq!(session.ssh_user, Some("deploy".to_string()));
+    }
+
+    #[test]
+    fn test_create_local_session_ssh_fields_null() {
+        let db = DatabaseService::open_in_memory().unwrap();
+        let id = db
+            .create_session(None, None, "/tmp/proj", "ignore", None, None, None)
+            .unwrap();
+        let session = db.get_session(id).unwrap().unwrap();
+        assert!(session.ssh_host.is_none());
+        assert!(session.ssh_user.is_none());
     }
 }

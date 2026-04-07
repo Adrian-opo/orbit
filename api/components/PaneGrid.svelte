@@ -1,5 +1,6 @@
 <script lang="ts">
   import { splitLayout } from '../lib/stores/layout';
+  import type { PaneId } from '../lib/stores/layout';
   import { sessions } from '../lib/stores/sessions';
   import type { Session } from '../lib/stores/sessions';
   import Pane from './Pane.svelte';
@@ -9,16 +10,28 @@
     return $sessions.find((s) => s.id === sessionId) ?? null;
   }
 
-  $: hasRight = $splitLayout.visible.includes('tr') || $splitLayout.visible.includes('br');
-  $: hasBottom = $splitLayout.visible.includes('bl') || $splitLayout.visible.includes('br');
-  $: cols = hasRight ? '1fr 1fr' : '1fr';
-  $: rows = hasBottom ? '1fr 1fr' : '1fr';
+  // Need 2 columns only when panes exist on BOTH left and right sides
+  $: hasLeftCol = $splitLayout.visible.some((p) => p === 'tl' || p === 'bl');
+  $: hasRightCol = $splitLayout.visible.some((p) => p === 'tr' || p === 'br');
+  // Need 2 rows only when panes exist on BOTH top and bottom sides
+  $: hasTopRow = $splitLayout.visible.some((p) => p === 'tl' || p === 'tr');
+  $: hasBotRow = $splitLayout.visible.some((p) => p === 'bl' || p === 'br');
+
+  $: cols = hasLeftCol && hasRightCol ? '1fr 1fr' : '1fr';
+  $: rows = hasTopRow && hasBotRow ? '1fr 1fr' : '1fr';
+
+  function gridArea(paneId: PaneId): string {
+    const col = hasLeftCol && hasRightCol && (paneId === 'tr' || paneId === 'br') ? 2 : 1;
+    const row = hasTopRow && hasBotRow && (paneId === 'bl' || paneId === 'br') ? 2 : 1;
+    return `${row} / ${col} / ${row + 1} / ${col + 1}`;
+  }
 </script>
 
 <div class="grid" style="grid-template-columns:{cols};grid-template-rows:{rows}">
   {#each $splitLayout.visible as paneId (paneId)}
     <Pane
       {paneId}
+      gridArea={gridArea(paneId)}
       session={getSession($splitLayout.panes[paneId])}
       focused={$splitLayout.focused === paneId}
       canClose={$splitLayout.visible.length > 1}

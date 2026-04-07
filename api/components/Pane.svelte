@@ -5,18 +5,11 @@
   import CentralPanel from './CentralPanel.svelte';
 
   export let paneId: PaneId;
+  export let gridArea: string;
   export let session: Session | null;
   export let focused: boolean;
   export let canClose: boolean;
   export let atMaxPanes: boolean;
-
-  // Map pane ID to CSS grid position (row-start / col-start / row-end / col-end)
-  const gridArea: Record<PaneId, string> = {
-    tl: '1 / 1 / 2 / 2',
-    tr: '1 / 2 / 2 / 3',
-    bl: '2 / 1 / 3 / 2',
-    br: '2 / 2 / 3 / 3',
-  };
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_no_noninteractive_tabindex -->
@@ -24,7 +17,7 @@
   class="pane"
   class:focused
   tabindex="0"
-  style="grid-area:{gridArea[paneId]}"
+  style="grid-area:{gridArea}"
   role="region"
   aria-label="pane {paneId}"
   on:click={() => focusPane(paneId)}

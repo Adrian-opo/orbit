@@ -67,9 +67,16 @@
     background: var(--bg);
   }
 
-  .pane.focused {
-    outline: 1px solid var(--bd2);
-    outline-offset: -1px;
+  .pane.focused::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--ac);
+    z-index: 5;
+    pointer-events: none;
   }
 
   .close-btn,

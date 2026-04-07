@@ -214,6 +214,7 @@ npm run dev:mock
 ### Git
 - Commits in English, conventional prefix: `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`
 - Never commit with `--no-verify`
+- **Commit by logical context, not by step.** The pre-commit hook runs Prettier, rustfmt, ESLint, svelte-check, and Clippy on every commit — committing after each small step wastes tokens and time. Group related changes into one commit per meaningful unit of work (e.g. one commit for a new utility + its tests, one for the new component, one for the wiring). A feature with 3 tasks → 2–3 commits, not 10.
 
 #### Git hook: `pre-commit`
 Roda automaticamente antes de todo commit:

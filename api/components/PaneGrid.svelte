@@ -20,18 +20,21 @@
   $: cols = hasLeftCol && hasRightCol ? '1fr 1fr' : '1fr';
   $: rows = hasTopRow && hasBotRow ? '1fr 1fr' : '1fr';
 
-  function gridArea(paneId: PaneId): string {
-    const col = hasLeftCol && hasRightCol && (paneId === 'tr' || paneId === 'br') ? 2 : 1;
-    const row = hasTopRow && hasBotRow && (paneId === 'bl' || paneId === 'br') ? 2 : 1;
-    return `${row} / ${col} / ${row + 1} / ${col + 1}`;
-  }
+  // Reactive map so grid positions update immediately when hasLeftCol/hasRightCol/etc. change
+  $: gridAreas = Object.fromEntries(
+    (['tl', 'tr', 'bl', 'br'] as PaneId[]).map((p) => {
+      const col = hasLeftCol && hasRightCol && (p === 'tr' || p === 'br') ? 2 : 1;
+      const row = hasTopRow && hasBotRow && (p === 'bl' || p === 'br') ? 2 : 1;
+      return [p, `${row} / ${col} / ${row + 1} / ${col + 1}`];
+    })
+  ) as Record<PaneId, string>;
 </script>
 
 <div class="grid" style="grid-template-columns:{cols};grid-template-rows:{rows}">
   {#each $splitLayout.visible as paneId (paneId)}
     <Pane
       {paneId}
-      gridArea={gridArea(paneId)}
+      gridArea={gridAreas[paneId]}
       session={getSession($splitLayout.panes[paneId])}
       focused={$splitLayout.focused === paneId}
       canClose={$splitLayout.visible.length > 1}

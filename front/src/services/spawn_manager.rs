@@ -256,10 +256,8 @@ fn spawn_ssh(config: SpawnConfig, host: &str, user: &str) -> Result<SpawnHandle,
         "-o",
         "StrictHostKeyChecking=accept-new",
         &format!("{}@{}", user, host),
-        "bash",
-        "-lc",
-        &remote_script,
     ]);
+    cmd.arg(format!("bash -lc {}", posix_escape(&remote_script)));
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
 

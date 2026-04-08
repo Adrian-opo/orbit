@@ -28,16 +28,33 @@ else
   G=''; BG=''; W=''; D=''; R=''; N=''
 fi
 
-step()    { printf "  ${G}◆${N} %s\n" "$1"; }
-info()    { printf "    ${D}%s${N}\n" "$1"; }
-success() { printf "  ${BG}✓${N} %s\n" "$1"; }
-fail()    { printf "  ${R}✗ ERROR:${N} %s\n" "$1" >&2; exit 1; }
-sep()     { printf "  ${D}───────────────────────────────────${N}\n"; }
+# ── Symbols (Unicode if locale is UTF-8, ASCII fallback otherwise) ─────────────
+if locale charmap 2>/dev/null | grep -qi utf; then
+  SYM_STEP=$'\u25C6'   # ◆
+  SYM_OK=$'\u2713'     # ✓
+  SYM_ERR=$'\u2717'    # ✗
+  SYM_SEP=$'\u2500'    # ─
+  SYM_BLOCK=$'\u2588'  # █
+  SYM_LIGHT=$'\u2591'  # ░
+else
+  SYM_STEP='>>'
+  SYM_OK='OK'
+  SYM_ERR='!!'
+  SYM_SEP='-'
+  SYM_BLOCK='#'
+  SYM_LIGHT='.'
+fi
+
+step()    { printf "  ${G}%s${N} %s\n"       "$SYM_STEP" "$1"; }
+info()    { printf "    ${D}%s${N}\n"         "$1"; }
+success() { printf "  ${BG}%s${N} %s\n"      "$SYM_OK"   "$1"; }
+fail()    { printf "  ${R}%s ERROR:${N} %s\n" "$SYM_ERR"  "$1" >&2; exit 1; }
+sep()     { printf "  ${D}%s${N}\n" "$(printf '%0.s'"$SYM_SEP" {1..35})"; }
 
 make_bar() {
     local filled=$1 empty=$2 bar='' i
-    for ((i = 0; i < filled; i++)); do bar+='█'; done
-    for ((i = 0; i < empty;  i++)); do bar+='░'; done
+    for ((i = 0; i < filled; i++)); do bar+="$SYM_BLOCK"; done
+    for ((i = 0; i < empty;  i++)); do bar+="$SYM_LIGHT"; done
     printf '%s' "$bar"
 }
 
@@ -81,12 +98,16 @@ download_with_progress() {
 # ── Header ────────────────────────────────────────────────────────────────────
 clear
 printf '\n'
-printf "${G}  ██████╗ ██████╗ ██████╗ ██╗████████╗${N}\n"
-printf "${G} ██╔═══██╗██╔══██╗██╔══██╗██║╚══██╔══╝${N}\n"
-printf "${G} ██║   ██║██████╔╝██████╔╝██║   ██║   ${N}\n"
-printf "${G} ██║   ██║██╔══██╗██╔══██╗██║   ██║   ${N}\n"
-printf "${G} ╚██████╔╝██║  ██╗██████╔╝██║   ██║   ${N}\n"
-printf "${G}  ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝  ${N}\n"
+if locale charmap 2>/dev/null | grep -qi utf; then
+  printf "${G}  ██████╗ ██████╗ ██████╗ ██╗████████╗${N}\n"
+  printf "${G} ██╔═══██╗██╔══██╗██╔══██╗██║╚══██╔══╝${N}\n"
+  printf "${G} ██║   ██║██████╔╝██████╔╝██║   ██║   ${N}\n"
+  printf "${G} ██║   ██║██╔══██╗██╔══██╗██║   ██║   ${N}\n"
+  printf "${G} ╚██████╔╝██║  ██╗██████╔╝██║   ██║   ${N}\n"
+  printf "${G}  ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝  ${N}\n"
+else
+  printf "${G}  *** O R B I T ***${N}\n"
+fi
 printf '\n'
 printf "${W}  Claude Code Agent Dashboard${N}\n"
 printf '\n'

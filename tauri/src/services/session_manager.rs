@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use tauri::{AppHandle, Emitter};
 
@@ -155,13 +155,13 @@ impl SessionManager {
     /// Phase 2 (async): spawn Claude with `-p "prompt"`.
     /// Each message spawns a new process. Uses `--resume` for follow-ups.
     pub fn do_spawn(
-        manager: Arc<Mutex<SessionManager>>,
+        manager: Arc<RwLock<SessionManager>>,
         app: AppHandle,
         session_id: SessionId,
         prompt: String,
     ) {
         let (db, cwd, permission_mode, model, claude_session_id) = {
-            let m = manager.lock().unwrap_or_else(|e| e.into_inner());
+            let m = manager.write().unwrap_or_else(|e| e.into_inner());
             let a = match m.active.get(&session_id) {
                 Some(a) => a,
                 None => {
@@ -243,7 +243,7 @@ impl SessionManager {
         });
 
         {
-            let mut m = manager.lock().unwrap_or_else(|e| e.into_inner());
+            let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
             if let Some(a) = m.active.get_mut(&session_id) {
                 a.session.status = crate::models::SessionStatus::Running;
                 a.session.pid = Some(pid);
@@ -274,7 +274,7 @@ impl SessionManager {
         let _ = db.insert_output(session_id, &user_line);
 
         {
-            let mut m = manager.lock().unwrap_or_else(|e| e.into_inner());
+            let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
             let state = m.journal_states.entry(session_id).or_default();
             state.entries.push(user_entry.clone());
         }
@@ -299,7 +299,7 @@ impl SessionManager {
 
     /// Read JSON lines from Claude's stdout, parse, emit events.
     fn reader_loop(
-        manager: Arc<Mutex<SessionManager>>,
+        manager: Arc<RwLock<SessionManager>>,
         app: AppHandle,
         session_id: SessionId,
         reader: Box<dyn std::io::Read + Send>,
@@ -323,7 +323,7 @@ impl SessionManager {
                     // Extract and persist Claude session ID from system/init message
                     if let Ok(val) = serde_json::from_str::<serde_json::Value>(&trimmed) {
                         if let Some(claude_id) = val.get("session_id").and_then(|v| v.as_str()) {
-                            let mut m = manager.lock().unwrap_or_else(|e| e.into_inner());
+                            let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
                             if let Some(a) = m.active.get_mut(&session_id) {
                                 if a.claude_session_id.is_none() {
                                     a.claude_session_id = Some(claude_id.to_string());
@@ -345,7 +345,7 @@ impl SessionManager {
                     let _ = db.insert_output(session_id, &trimmed);
 
                     let (new_entries, state_event) = {
-                        let mut m = manager.lock().unwrap_or_else(|e| e.into_inner());
+                        let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
                         let cwd = m
                             .active
                             .get(&session_id)
@@ -412,7 +412,7 @@ impl SessionManager {
         }
 
         {
-            let mut m = manager.lock().unwrap_or_else(|e| e.into_inner());
+            let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
             if let Some(a) = m.active.get_mut(&session_id) {
                 a.session.status = crate::models::SessionStatus::Completed;
             }
@@ -434,14 +434,14 @@ impl SessionManager {
     /// Send a follow-up message by spawning a new Claude process with --resume.
     /// Reads session data from DB so it works even after app restart.
     pub fn send_message(
-        manager: Arc<Mutex<SessionManager>>,
+        manager: Arc<RwLock<SessionManager>>,
         app: AppHandle,
         session_id: SessionId,
         text: String,
     ) -> Result<(), String> {
         // Re-add to active map if missing (e.g. after app restart)
         {
-            let mut m = manager.lock().unwrap_or_else(|e| e.into_inner());
+            let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
             if !m.active.contains_key(&session_id) {
                 // Load from DB
                 let session =
@@ -638,8 +638,8 @@ mod tests {
     use super::*;
     use crate::test_utils::{assistant_with_tokens, make_db, seed_outputs, TestCase};
 
-    fn make_manager() -> Arc<Mutex<SessionManager>> {
-        Arc::new(Mutex::new(SessionManager::new(make_db())))
+    fn make_manager() -> Arc<RwLock<SessionManager>> {
+        Arc::new(RwLock::new(SessionManager::new(make_db())))
     }
 
     // ── init_session ─────────────────────────────────────────────────────
@@ -650,7 +650,7 @@ mod tests {
         t.phase("Act");
         let mgr = make_manager();
         let s = mgr
-            .lock()
+            .write()
             .unwrap()
             .init_session("/tmp/proj", None, "ignore", None, false)
             .expect("init failed");
@@ -669,14 +669,14 @@ mod tests {
         t.phase("Act");
         let mgr = make_manager();
         let s = mgr
-            .lock()
+            .write()
             .unwrap()
             .init_session("/tmp/proj", None, "ignore", None, false)
             .expect("init failed");
         t.phase("Assert");
         t.ok(
             "journal_state entry created",
-            mgr.lock().unwrap().journal_states.contains_key(&s.id),
+            mgr.write().unwrap().journal_states.contains_key(&s.id),
         );
     }
 
@@ -686,14 +686,14 @@ mod tests {
         t.phase("Act");
         let mgr = make_manager();
         let s = mgr
-            .lock()
+            .write()
             .unwrap()
             .init_session("/tmp/proj", None, "ignore", None, false)
             .expect("init failed");
         t.phase("Assert");
         t.ok(
             "session is active",
-            mgr.lock().unwrap().is_session_active(s.id),
+            mgr.write().unwrap().is_session_active(s.id),
         );
     }
 
@@ -705,14 +705,17 @@ mod tests {
         t.phase("Seed");
         let mgr = make_manager();
         let s = mgr
-            .lock()
+            .write()
             .unwrap()
             .init_session("/tmp/proj", None, "ignore", None, false)
             .expect("init failed");
         t.phase("Act");
-        mgr.lock().unwrap().stop_session(s.id).expect("stop failed");
+        mgr.write()
+            .unwrap()
+            .stop_session(s.id)
+            .expect("stop failed");
         t.phase("Assert");
-        let sessions = mgr.lock().unwrap().get_sessions();
+        let sessions = mgr.write().unwrap().get_sessions();
         t.eq(
             "status is stopped",
             &sessions[0].status,
@@ -728,17 +731,17 @@ mod tests {
         t.phase("Seed");
         let mgr = make_manager();
         let s = mgr
-            .lock()
+            .write()
             .unwrap()
             .init_session("/tmp/proj", None, "ignore", None, false)
             .expect("init failed");
         t.phase("Act");
-        mgr.lock()
+        mgr.write()
             .unwrap()
             .delete_session(s.id)
             .expect("delete failed");
         t.phase("Assert");
-        let mut m = mgr.lock().unwrap();
+        let mut m = mgr.write().unwrap();
         t.ok("not in active map", !m.is_session_active(s.id));
         t.ok(
             "journal_state removed",
@@ -755,17 +758,17 @@ mod tests {
         t.phase("Seed");
         let mgr = make_manager();
         let s = mgr
-            .lock()
+            .write()
             .unwrap()
             .init_session("/tmp/proj", Some("old-name"), "ignore", None, false)
             .expect("init failed");
         t.phase("Act");
-        mgr.lock()
+        mgr.write()
             .unwrap()
             .rename_session(s.id, "new-name")
             .expect("rename failed");
         t.phase("Assert");
-        let sessions = mgr.lock().unwrap().get_sessions();
+        let sessions = mgr.write().unwrap().get_sessions();
         t.eq(
             "name updated",
             sessions[0].name.as_deref(),
@@ -782,7 +785,7 @@ mod tests {
         t.phase("Seed — no sessions exist");
         let mgr = make_manager();
         t.phase("Act — verify DB has no session 999");
-        let m = mgr.lock().unwrap();
+        let m = mgr.write().unwrap();
         let db_result = m.db.get_session(999).expect("db query ok");
         drop(m);
         t.phase("Assert");

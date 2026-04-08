@@ -1,16 +1,21 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use tauri::{AppHandle, State};
 
 use crate::models::{JournalEntry, Session, SessionId};
 use crate::services::session_manager::SessionManager;
 use crate::services::spawn_manager::find_claude;
 
-pub struct SessionState(pub Arc<Mutex<SessionManager>>);
+pub struct SessionState(pub Arc<RwLock<SessionManager>>);
 
 impl SessionState {
-    /// Acquire the session manager, recovering from a poisoned Mutex.
-    pub fn lock(&self) -> std::sync::MutexGuard<'_, SessionManager> {
-        self.0.lock().unwrap_or_else(|e| e.into_inner())
+    /// Acquire a write guard, recovering from a poisoned RwLock.
+    pub fn write(&self) -> std::sync::RwLockWriteGuard<'_, SessionManager> {
+        self.0.write().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Acquire a read guard, recovering from a poisoned RwLock.
+    pub fn read(&self) -> std::sync::RwLockReadGuard<'_, SessionManager> {
+        self.0.read().unwrap_or_else(|e| e.into_inner())
     }
 }
 
@@ -32,7 +37,7 @@ pub fn create_session(
     let mode = permission_mode.unwrap_or_else(|| "ignore".to_string());
 
     let session = {
-        let mut m = state.lock();
+        let mut m = state.write();
         m.init_session(
             &project_path,
             session_name.as_deref(),
@@ -57,7 +62,7 @@ pub fn create_session(
 
 #[tauri::command]
 pub fn list_sessions(state: State<SessionState>) -> Vec<Session> {
-    state.lock().get_sessions()
+    state.write().get_sessions()
 }
 
 #[tauri::command]
@@ -66,7 +71,7 @@ pub fn stop_session(
     state: State<SessionState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    state.lock().stop_session(session_id)?;
+    state.write().stop_session(session_id)?;
     use tauri::Emitter;
     let _ = app.emit(
         "session:stopped",
@@ -87,7 +92,7 @@ pub fn send_session_message(
 
 #[tauri::command]
 pub fn get_session_journal(session_id: SessionId, state: State<SessionState>) -> Vec<JournalEntry> {
-    state.lock().get_journal(session_id)
+    state.write().get_journal(session_id)
 }
 
 /// Diagnostic: check if claude CLI is available and return its path or an error message.
@@ -185,11 +190,11 @@ pub fn rename_session(
     name: String,
     state: State<SessionState>,
 ) -> Result<(), String> {
-    state.lock().rename_session(session_id, &name)
+    state.write().rename_session(session_id, &name)
 }
 
 /// Delete a session (removes from DB, stops if running).
 #[tauri::command]
 pub fn delete_session(session_id: SessionId, state: State<SessionState>) -> Result<(), String> {
-    state.lock().delete_session(session_id)
+    state.write().delete_session(session_id)
 }

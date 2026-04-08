@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::Path;
 
+use super::processor::{extract_tool_target, truncate_output};
 use super::state::{detect_pending_approval, JournalState, RawEntry};
 use crate::models::*;
 
@@ -309,71 +310,6 @@ pub fn parse_journal(
 
     state.file_size = file_size;
     state
-}
-
-/// Extract a short target description from tool input (used by parse_journal).
-fn extract_tool_target(tool: &str, input: &Option<serde_json::Value>) -> String {
-    let input = match input {
-        Some(v) => v,
-        None => return String::new(),
-    };
-
-    match tool {
-        "Bash" => input
-            .get("command")
-            .and_then(|v| v.as_str())
-            .map(|cmd| {
-                let first = cmd.lines().next().unwrap_or(cmd);
-                if first.len() > 60 {
-                    format!("{}...", char_boundary(first, 60))
-                } else {
-                    first.to_string()
-                }
-            })
-            .unwrap_or_default(),
-        "Read" | "Edit" | "Write" => input
-            .get("file_path")
-            .and_then(|v| v.as_str())
-            .map(|p| p.rsplit(&['/', '\\']).next().unwrap_or(p).to_string())
-            .unwrap_or_default(),
-        "Grep" => input
-            .get("pattern")
-            .and_then(|v| v.as_str())
-            .map(|p| {
-                if p.len() > 30 {
-                    format!("{}...", char_boundary(p, 30))
-                } else {
-                    p.to_string()
-                }
-            })
-            .unwrap_or_default(),
-        "Agent" => input
-            .get("description")
-            .and_then(|v| v.as_str())
-            .unwrap_or("subagent")
-            .to_string(),
-        _ => String::new(),
-    }
-}
-
-/// Find the largest char boundary <= max bytes (stable replacement for floor_char_boundary)
-fn char_boundary(s: &str, max: usize) -> &str {
-    if s.len() <= max {
-        return s;
-    }
-    let mut end = max;
-    while end > 0 && !s.is_char_boundary(end) {
-        end -= 1;
-    }
-    &s[..end]
-}
-
-fn truncate_output(text: &str, max: usize) -> String {
-    if text.len() <= max {
-        text.to_string()
-    } else {
-        format!("{}...", char_boundary(text, max))
-    }
 }
 
 /// Flexible contains check that handles optional spaces around colons in JSON.

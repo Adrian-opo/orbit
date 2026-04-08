@@ -4,7 +4,7 @@ use super::state::{detect_pending_approval, JournalState, RawEntry};
 use crate::models::*;
 
 /// Extract a short target description from tool input.
-fn extract_tool_target(tool: &str, input: &Option<Value>) -> String {
+pub(super) fn extract_tool_target(tool: &str, input: &Option<Value>) -> String {
     let input = match input {
         Some(v) => v,
         None => return String::new(),
@@ -49,7 +49,7 @@ fn extract_tool_target(tool: &str, input: &Option<Value>) -> String {
 }
 
 /// Find the largest char boundary <= max bytes (stable replacement for floor_char_boundary)
-fn char_boundary(s: &str, max: usize) -> &str {
+pub(super) fn char_boundary(s: &str, max: usize) -> &str {
     if s.len() <= max {
         return s;
     }
@@ -60,7 +60,7 @@ fn char_boundary(s: &str, max: usize) -> &str {
     &s[..end]
 }
 
-fn truncate_output(text: &str, max: usize) -> String {
+pub(super) fn truncate_output(text: &str, max: usize) -> String {
     if text.len() <= max {
         text.to_string()
     } else {

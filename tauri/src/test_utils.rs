@@ -232,66 +232,108 @@ impl Drop for TestCase {
 
 /// A valid `assistant` line with a text block.
 pub fn assistant_text(text: &str) -> String {
-    let text_j = serde_json::to_string(text).expect("assistant_text: serialize text");
-    format!(
-        r#"{{"type":"assistant","timestamp":"2026-01-01T00:00:00Z","message":{{"model":"claude-sonnet-4-6","stop_reason":null,"content":[{{"type":"text","text":{text_j}}}],"usage":{{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}}}}"#
-    )
+    serde_json::json!({
+        "type": "assistant",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "message": {
+            "model": "claude-sonnet-4-6",
+            "stop_reason": null,
+            "content": [{"type": "text", "text": text}],
+            "usage": {"input_tokens": 10, "output_tokens": 5,
+                      "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}
+        }
+    })
+    .to_string()
 }
 
 /// A valid `assistant` line with `stop_reason: end_turn`.
 pub fn assistant_end_turn(text: &str) -> String {
-    let text_j = serde_json::to_string(text).expect("assistant_end_turn: serialize text");
-    format!(
-        r#"{{"type":"assistant","timestamp":"2026-01-01T00:00:00Z","message":{{"model":"claude-sonnet-4-6","stop_reason":"end_turn","content":[{{"type":"text","text":{text_j}}}],"usage":{{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}}}}"#
-    )
+    serde_json::json!({
+        "type": "assistant",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "message": {
+            "model": "claude-sonnet-4-6",
+            "stop_reason": "end_turn",
+            "content": [{"type": "text", "text": text}],
+            "usage": {"input_tokens": 10, "output_tokens": 5,
+                      "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}
+        }
+    })
+    .to_string()
 }
 
 /// A valid `assistant` line with a thinking block.
 pub fn assistant_thinking(thinking: &str) -> String {
-    let thinking_j =
-        serde_json::to_string(thinking).expect("assistant_thinking: serialize thinking");
-    format!(
-        r#"{{"type":"assistant","timestamp":"2026-01-01T00:00:00Z","message":{{"model":"claude-sonnet-4-6","stop_reason":null,"content":[{{"type":"thinking","thinking":{thinking_j}}}],"usage":{{"input_tokens":5,"output_tokens":2,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}}}}"#
-    )
+    serde_json::json!({
+        "type": "assistant",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "message": {
+            "model": "claude-sonnet-4-6",
+            "stop_reason": null,
+            "content": [{"type": "thinking", "thinking": thinking}],
+            "usage": {"input_tokens": 5, "output_tokens": 2,
+                      "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}
+        }
+    })
+    .to_string()
 }
 
 /// A valid `assistant` line with a `tool_use` block.
-/// `input_json` must be a valid JSON object string, e.g. `r#"{"command":"ls"}"#`.
-pub fn assistant_tool_use(tool: &str, input_json: &str) -> String {
-    let tool_j = serde_json::to_string(tool).expect("assistant_tool_use: serialize tool");
-    format!(
-        r#"{{"type":"assistant","timestamp":"2026-01-01T00:00:00Z","message":{{"model":"claude-sonnet-4-6","stop_reason":null,"content":[{{"type":"tool_use","id":"toolu_01","name":{tool_j},"input":{input_json}}}],"usage":{{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}}}}"#
-    )
+///
+/// `input` must be a `serde_json::Value` object. Use `serde_json::json!({...})`.
+pub fn assistant_tool_use(tool: &str, input: serde_json::Value) -> String {
+    serde_json::json!({
+        "type": "assistant",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "message": {
+            "model": "claude-sonnet-4-6",
+            "stop_reason": null,
+            "content": [{"type": "tool_use", "id": "toolu_01", "name": tool, "input": input}],
+            "usage": {"input_tokens": 10, "output_tokens": 5,
+                      "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}
+        }
+    })
+    .to_string()
 }
 
 /// A valid `user` line with plain text content.
 pub fn user_text(text: &str) -> String {
-    let text_j = serde_json::to_string(text).expect("user_text: serialize text");
-    format!(
-        r#"{{"type":"user","timestamp":"2026-01-01T00:00:01Z","message":{{"content":{text_j}}}}}"#
-    )
+    serde_json::json!({
+        "type": "user",
+        "timestamp": "2026-01-01T00:00:01Z",
+        "message": {"content": text}
+    })
+    .to_string()
 }
 
 /// A valid `user` line with a `tool_result` block.
 pub fn tool_result(content: &str) -> String {
-    let content_j = serde_json::to_string(content).expect("tool_result: serialize content");
-    format!(
-        r#"{{"type":"user","timestamp":"2026-01-01T00:00:01Z","message":{{"content":[{{"type":"tool_result","tool_use_id":"toolu_01","content":{content_j}}}]}}}}"#
-    )
+    serde_json::json!({
+        "type": "user",
+        "timestamp": "2026-01-01T00:00:01Z",
+        "message": {
+            "content": [{"type": "tool_result", "tool_use_id": "toolu_01", "content": content}]
+        }
+    })
+    .to_string()
 }
 
 /// A `system` stop_hook_summary line.
-pub fn system_stop_hook() -> String {
-    r#"{"type":"system","timestamp":"2026-01-01T00:00:02Z","message":{"subtype":"stop_hook_summary"}}"#.to_string()
+pub fn system_stop_hook() -> &'static str {
+    r#"{"type":"system","timestamp":"2026-01-01T00:00:02Z","message":{"subtype":"stop_hook_summary"}}"#
 }
 
 /// A `progress` line with streaming content.
 pub fn progress_line(content: &str) -> String {
-    let content_j = serde_json::to_string(content).expect("progress_line: serialize content");
-    format!(r#"{{"type":"progress","timestamp":"2026-01-01T00:00:00Z","content":{content_j}}}"#)
+    serde_json::json!({
+        "type": "progress",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "content": content
+    })
+    .to_string()
 }
 
-/// An `assistant` line with token counts set explicitly.
+/// An `assistant` line with explicit token counts.
 pub fn assistant_with_tokens(
     text: &str,
     input: u64,
@@ -299,10 +341,22 @@ pub fn assistant_with_tokens(
     cache_write: u64,
     cache_read: u64,
 ) -> String {
-    let text_j = serde_json::to_string(text).expect("assistant_with_tokens: serialize text");
-    format!(
-        r#"{{"type":"assistant","timestamp":"2026-01-01T00:00:00Z","message":{{"model":"claude-sonnet-4-6","stop_reason":null,"content":[{{"type":"text","text":{text_j}}}],"usage":{{"input_tokens":{input},"output_tokens":{output},"cache_creation_input_tokens":{cache_write},"cache_read_input_tokens":{cache_read}}}}}}}"#
-    )
+    serde_json::json!({
+        "type": "assistant",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "message": {
+            "model": "claude-sonnet-4-6",
+            "stop_reason": null,
+            "content": [{"type": "text", "text": text}],
+            "usage": {
+                "input_tokens": input,
+                "output_tokens": output,
+                "cache_creation_input_tokens": cache_write,
+                "cache_read_input_tokens": cache_read
+            }
+        }
+    })
+    .to_string()
 }
 
 // ─── Database Fixtures ────────────────────────────────────────────────────────
@@ -442,12 +496,12 @@ mod tests {
             assistant_text(r#"he said "hi" and she said "bye""#),
             assistant_end_turn("done"),
             assistant_thinking("let me think about this..."),
-            assistant_tool_use("Bash", r#"{"command":"ls -la"}"#),
+            assistant_tool_use("Bash", serde_json::json!({"command": "ls -la"})),
             user_text("fix the bug"),
             tool_result("file1.rs\nfile2.rs"),
             progress_line("stdout chunk"),
             assistant_with_tokens("response", 10, 5, 2, 3),
-            system_stop_hook(),
+            system_stop_hook().to_string(),
         ];
         for line in &lines {
             assert!(
@@ -455,5 +509,27 @@ mod tests {
                 "builder produced invalid JSON:\n{line}"
             );
         }
+    }
+
+    #[test]
+    fn make_db_returns_usable_database() {
+        let db = make_db();
+        let sessions = db.get_sessions().expect("get_sessions failed");
+        assert!(sessions.is_empty());
+    }
+
+    #[test]
+    fn seed_session_returns_positive_id() {
+        let db = make_db();
+        let id = seed_session(&db);
+        assert!(id > 0);
+    }
+
+    #[test]
+    fn write_jsonl_creates_readable_file_with_correct_lines() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = write_jsonl(&dir, "test.jsonl", &["line1", "line2"]);
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(content, "line1\nline2\n");
     }
 }

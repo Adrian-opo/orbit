@@ -12,6 +12,7 @@ on:
       - 'media/**'
       - 'LICENSE'
       - 'landing/**'
+      - 'scripts/**'
   pull_request:
     branches: [master]
     paths-ignore:
@@ -21,6 +22,7 @@ on:
       - 'media/**'
       - 'LICENSE'
       - 'landing/**'
+      - 'scripts/**'
   workflow_dispatch:
 
 permissions:

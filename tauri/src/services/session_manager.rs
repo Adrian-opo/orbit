@@ -298,7 +298,14 @@ impl SessionManager {
             },
         );
 
-        Self::reader_loop(Arc::clone(&manager), app, session_id, handle.reader, db);
+        Self::reader_loop(
+            Arc::clone(&manager),
+            app,
+            session_id,
+            handle.reader,
+            db,
+            handle.child,
+        );
     }
 
     /// Read JSON lines from Claude's stdout, parse, emit events.
@@ -308,6 +315,7 @@ impl SessionManager {
         session_id: SessionId,
         reader: Box<dyn std::io::Read + Send>,
         db: Arc<DatabaseService>,
+        mut child: std::process::Child,
     ) {
         use std::io::BufRead;
         let mut reader = std::io::BufReader::new(reader);
@@ -432,6 +440,9 @@ impl SessionManager {
             "session:stopped",
             serde_json::json!({ "sessionId": session_id }),
         );
+
+        // Collect exit status — prevents zombie on Unix, releases handle on Windows
+        let _ = child.wait();
     }
 
     /// Send a follow-up message by spawning a new Claude process with --resume.

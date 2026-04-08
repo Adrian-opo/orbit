@@ -323,13 +323,22 @@ impl SessionManager {
                     // Extract and persist Claude session ID from system/init message
                     if let Ok(val) = serde_json::from_str::<serde_json::Value>(&trimmed) {
                         if let Some(claude_id) = val.get("session_id").and_then(|v| v.as_str()) {
-                            let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
-                            if let Some(a) = m.active.get_mut(&session_id) {
-                                if a.claude_session_id.is_none() {
-                                    a.claude_session_id = Some(claude_id.to_string());
-                                    // Persist to DB for restart recovery
-                                    let _ = db.update_claude_session_id(session_id, claude_id);
+                            let should_persist = {
+                                let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
+                                if let Some(a) = m.active.get_mut(&session_id) {
+                                    if a.claude_session_id.is_none() {
+                                        a.claude_session_id = Some(claude_id.to_string());
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
                                 }
+                            };
+                            // Persist to DB after releasing the write lock
+                            if should_persist {
+                                let _ = db.update_claude_session_id(session_id, claude_id);
                             }
                         }
                     }

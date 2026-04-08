@@ -10,7 +10,7 @@ pub fn create_project(
     state: State<SessionState>,
 ) -> Result<Project, String> {
     state
-        .write()
+        .read()
         .db
         .create_project(&name, &path)
         .map_err(|e| e.to_string())

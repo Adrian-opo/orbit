@@ -483,9 +483,10 @@ impl SessionManager {
         Ok(())
     }
 
-    pub fn get_sessions(&self) -> Vec<Session> {
+    pub fn get_sessions(&mut self) -> Vec<Session> {
         let mut sessions = self.db.get_sessions().unwrap_or_default();
         for s in &mut sessions {
+            self.load_session_journal(s.id);
             if let Some(state) = self.journal_states.get(&s.id) {
                 let window = state
                     .model
@@ -515,7 +516,8 @@ impl SessionManager {
         sessions
     }
 
-    pub fn get_journal(&self, session_id: SessionId) -> Vec<crate::models::JournalEntry> {
+    pub fn get_journal(&mut self, session_id: SessionId) -> Vec<crate::models::JournalEntry> {
+        self.load_session_journal(session_id);
         self.journal_states
             .get(&session_id)
             .map(|state| {
@@ -530,6 +532,22 @@ impl SessionManager {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// Load journal state for `session_id` from DB into `journal_states` if not already present.
+    fn load_session_journal(&mut self, session_id: SessionId) {
+        if self.journal_states.contains_key(&session_id) {
+            return;
+        }
+        let rows = match self.db.get_outputs(session_id) {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+        let mut state = JournalState::default();
+        for line in &rows {
+            process_line(&mut state, line);
+        }
+        self.journal_states.insert(session_id, state);
     }
 
     pub fn is_session_active(&self, session_id: SessionId) -> bool {
@@ -551,26 +569,15 @@ impl SessionManager {
     }
 
     pub fn restore_from_db(&mut self) {
-        let sessions = match self.db.get_sessions() {
-            Ok(s) => s,
-            Err(_) => return,
-        };
-        for session in sessions {
-            if self.journal_states.contains_key(&session.id) {
-                continue;
-            }
-            let rows = match self.db.get_outputs(session.id) {
-                Ok(r) => r,
-                Err(_) => continue,
-            };
-            if rows.is_empty() {
-                continue;
-            }
-            let mut state = JournalState::default();
-            for line in &rows {
-                process_line(&mut state, line);
-            }
-            self.journal_states.insert(session.id, state);
+        let session_ids: Vec<SessionId> = self
+            .db
+            .get_sessions()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|s| s.id)
+            .collect();
+        for id in session_ids {
+            self.load_session_journal(id);
         }
     }
 }
@@ -723,7 +730,7 @@ mod tests {
             .delete_session(s.id)
             .expect("delete failed");
         t.phase("Assert");
-        let m = mgr.lock().unwrap();
+        let mut m = mgr.lock().unwrap();
         t.ok("not in active map", !m.is_session_active(s.id));
         t.ok(
             "journal_state removed",
@@ -914,6 +921,42 @@ mod tests {
             "normal assistant line",
             !is_rate_limit_line(r#"{"type":"assistant","text":"hello world"}"#),
         );
+    }
+
+    // ── lazy journal loading ──────────────────────────────────────────────
+
+    #[test]
+    fn should_not_preload_journal_state_on_creation() {
+        let mut t = TestCase::new("should_not_preload_journal_state_on_creation");
+        t.phase("Seed — DB has session with outputs, manager is fresh (no restore)");
+        let db = make_db();
+        let sid = db
+            .create_session(None, None, "/tmp", "ignore", None)
+            .expect("session");
+        seed_outputs(&db, sid, &[&crate::test_utils::assistant_text("hello")]);
+        t.phase("Act — create manager without calling restore_from_db");
+        let sm = SessionManager::new(Arc::clone(&db));
+        t.phase("Assert — journal not loaded yet");
+        t.ok(
+            "journal_states empty before first access",
+            !sm.journal_states.contains_key(&sid),
+        );
+    }
+
+    #[test]
+    fn should_lazy_load_journal_on_first_get_journal() {
+        let mut t = TestCase::new("should_lazy_load_journal_on_first_get_journal");
+        t.phase("Seed");
+        let db = make_db();
+        let sid = db
+            .create_session(None, None, "/tmp", "ignore", None)
+            .expect("session");
+        seed_outputs(&db, sid, &[&crate::test_utils::assistant_text("hello")]);
+        t.phase("Act — get_journal triggers lazy load");
+        let mut sm = SessionManager::new(Arc::clone(&db));
+        let journal = sm.get_journal(sid);
+        t.phase("Assert");
+        t.len("one entry loaded on demand", &journal, 1);
     }
 
     // ── get_journal ───────────────────────────────────────────────────────

@@ -32,11 +32,7 @@ pub fn run() {
             let db_path = data_dir.join("agent-dashboard.db");
             let db = Arc::new(DatabaseService::open(&db_path).expect("Could not open database"));
 
-            let session_manager = {
-                let mut sm = SessionManager::new(db);
-                sm.restore_from_db();
-                Arc::new(Mutex::new(sm))
-            };
+            let session_manager = Arc::new(Mutex::new(SessionManager::new(db)));
             app.manage(SessionState(session_manager));
 
             // Set window icon programmatically — bypasses Windows icon cache in dev mode

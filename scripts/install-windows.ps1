@@ -6,24 +6,32 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
 $repo = 'xinnaider/orbit'
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
-function Write-Step    { param($m) Write-Host "  `u{25C6} $m" -ForegroundColor Green }
+# ── Symbols (PS 5.1-compatible — no `u{} escape syntax) ──────────────────────
+$S_DIAMOND = [char]0x25C6   # ◆
+$S_CHECK   = [char]0x2713   # ✓
+$S_CROSS   = [char]0x2717   # ✗
+$S_SEP     = [char]0x2500   # ─
+$S_BLOCK   = [char]0x2588   # █
+$S_LIGHT   = [char]0x2591   # ░
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+function Write-Step    { param($m) Write-Host "  $S_DIAMOND $m" -ForegroundColor Green }
 function Write-Info    { param($m) Write-Host "    $m" -ForegroundColor DarkGray }
-function Write-Success { param($m) Write-Host "  `u{2713} $m" -ForegroundColor Green }
-function Write-Fail    { param($m) Write-Host "  `u{2717} $m" -ForegroundColor Red; exit 1 }
-function Write-Sep     { Write-Host "  $([string][char]0x2500 * 35)" -ForegroundColor DarkGray }
+function Write-Success { param($m) Write-Host "  $S_CHECK $m" -ForegroundColor Green }
+function Write-Fail    { param($m) Write-Host "  $S_CROSS $m" -ForegroundColor Red; exit 1 }
+function Write-Sep     { Write-Host "  $(($S_SEP.ToString()) * 35)" -ForegroundColor DarkGray }
 
 function Show-Progress {
     param([long]$bytes, [long]$total, [int]$pct)
     $filled = [math]::Min([int]($pct / 5), 20)
     $empty  = 20 - $filled
-    $bar    = ([string]"`u{2588}" * $filled) + ([string]"`u{2591}" * $empty)
+    $bar    = ($S_BLOCK.ToString() * $filled) + ($S_LIGHT.ToString() * $empty)
     $dlMB   = [math]::Round($bytes / 1MB, 1)
     $totMB  = [math]::Round($total / 1MB, 1)
     Write-Host "`r    [$bar] $pct%  $dlMB MB / $totMB MB  " -NoNewline -ForegroundColor Green
 }
 
-# ── Header ───────────────────────────────────────────────────────────────────
+# ── Header ────────────────────────────────────────────────────────────────────
 Clear-Host
 Write-Host ''
 Write-Host '  ██████╗ ██████╗ ██████╗ ██╗████████╗' -ForegroundColor Green
@@ -78,14 +86,31 @@ finally {
 }
 
 $finalMB = [math]::Round((Get-Item $dest).Length / 1MB, 1)
-Write-Host "`r    [$([string]"`u{2588}" * 20)] 100%  $finalMB MB / $finalMB MB  " -ForegroundColor Green
+$fullBar = $S_BLOCK.ToString() * 20
+Write-Host "`r    [$fullBar] 100%  $finalMB MB / $finalMB MB  " -ForegroundColor Green
 Write-Host ''
 
 # ── Install ───────────────────────────────────────────────────────────────────
+# The NSIS installer self-elevates via UAC, spawning a new elevated process.
+# Start-Process -Wait only tracks the initial (non-elevated) launcher, which
+# exits immediately after spawning the elevated child. We instead launch the
+# installer and poll until no process with that name is running.
 Write-Step 'Running installer...'
-Write-Info '(the installation window will open)'
+Write-Info '(complete the installation, then return here)'
 Write-Host ''
-Start-Process -FilePath $dest -Wait
+
+$installerName = [System.IO.Path]::GetFileNameWithoutExtension($dest)
+Start-Process -FilePath $dest
+
+# Brief pause so the process list catches the elevated child before we poll
+Start-Sleep -Seconds 2
+
+$deadline = (Get-Date).AddMinutes(15)
+while ((Get-Date) -lt $deadline) {
+    $procs = Get-Process | Where-Object { $_.Name -like "$installerName*" -or $_.Name -like '*orbit*setup*' -or $_.Name -like '*orbit*install*' }
+    if (-not $procs) { break }
+    Start-Sleep -Milliseconds 800
+}
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 Remove-Item $dest -ErrorAction SilentlyContinue

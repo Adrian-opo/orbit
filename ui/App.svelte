@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
   import {
     sessions,
     selectedSessionId,
@@ -41,6 +42,7 @@
   let rateLimitError: { sessionId: number } | null = null;
   let rateLimitDismissTimer: ReturnType<typeof setTimeout> | null = null;
   let availableUpdate: UpdateInfo | null = null;
+  let updateError: string | null = null;
   let updateInterval: ReturnType<typeof setInterval> | null = null;
   let showChangelog = false;
   let changelogContent = '';
@@ -106,9 +108,12 @@
       const prev = prevStatuses[p.sessionId];
       if (p.status === 'input' && prev && prev !== 'input') beep();
       prevStatuses[p.sessionId] = p.status;
+      // 'idle' and 'new' are agent-level pauses emitted while the process is still running.
+      // Map them to 'running' so the working indicator stays visible until session:stopped fires.
+      const sessionStatus = p.status === 'idle' || p.status === 'new' ? 'running' : p.status;
       sessions.update((l) =>
         updateSessionState(l, p.sessionId, {
-          status: p.status as any,
+          status: sessionStatus as any,
           tokens: p.tokens,
           contextPercent: p.contextPercent,
           pendingApproval: p.pendingApproval,
@@ -149,8 +154,8 @@
       try {
         const info = await checkUpdate();
         if (info) availableUpdate = info;
-      } catch (_e) {
-        // silencioso — falha de rede não afeta o uso do app
+      } catch (e) {
+        updateError = e instanceof Error ? e.message : String(e);
       }
     }
 
@@ -164,7 +169,27 @@
   });
 
   $: selected = getSelectedSession($sessions, $selectedSessionId);
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'F12') {
+      // openDevtools() exists at runtime when the devtools Tauri feature is enabled
+      // but is not included in the published TypeScript types
+      (getCurrentWebviewWindow() as unknown as { openDevtools(): void }).openDevtools();
+    }
+  }
 </script>
+
+<svelte:window on:keydown={handleKeydown} />
+
+{#if updateError}
+  <Banner
+    variant="error"
+    icon="⚠"
+    title="update check failed"
+    message={updateError}
+    onDismiss={() => (updateError = null)}
+  />
+{/if}
 
 {#if rateLimitError}
   <Banner

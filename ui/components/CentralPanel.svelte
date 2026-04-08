@@ -26,7 +26,11 @@
     }
   }
 
-  $: if (session) loadHistory(session.id);
+  let loadedId: number | null = null;
+  $: if (session?.id != null && session.id !== loadedId) {
+    loadedId = session.id;
+    loadHistory(session.id);
+  }
 
   // Clear pending only when assistant responds (not on user entry echo)
   $: {
@@ -36,6 +40,9 @@
     }
     scrollIfNeeded();
   }
+
+  // Scroll when a pending message is added so the user sees it immediately
+  $: if ($pendingMessages) scrollIfNeeded();
 
   async function scrollIfNeeded() {
     if (!atBottom) return;
@@ -311,6 +318,7 @@
   .feed-wrap {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     min-height: 0;
     padding: 0;
   }

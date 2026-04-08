@@ -28,7 +28,8 @@ export default defineConfig(async () => ({
     },
     fs: {
       // Allow serving files from the ui/ root (App.svelte, app.css, etc.)
-      allow: ["ui", "static", "node_modules", ".svelte-kit"],
+      // Also allow the root project's node_modules (worktrees share the parent's node_modules)
+      allow: ["ui", "static", "node_modules", ".svelte-kit", "../../node_modules"],
     },
   },
 }));

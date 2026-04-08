@@ -4,11 +4,23 @@
 
 ## April 2026
 
+### 04/08 · Fix — Auto-updater now works on Windows and Linux
+The "check for updates" feature was silently failing on all platforms because the update server URL was missing the architecture suffix. Users on v0.3.0 will now correctly receive an update prompt when opening the app.
+
+### 04/08 · Fix — Message display delay and working indicator
+Sending a message now shows it in the chat immediately and without flickering. The "working" indicator (animated dots) now appears as soon as Claude starts processing a request and stays visible throughout — previously it could disappear briefly or not show at all right after sending. The fix also reduces unnecessary background work that was slowing down the feed during active sessions.
+
+### 04/08 · New — Linux/Ubuntu support
+Orbit now runs on Ubuntu 22.04+ and other Linux distributions with a desktop environment (GNOME, KDE Plasma, and others). Install with a single command that downloads the app, adds it to your application launcher, and sets up automatic updates — no manual steps required. Once installed, Orbit updates itself in the background just like on Windows.
+
 ### 04/07 · New — Meta panel toggle
 The stats panel on the right can now be hidden or shown with a single click. Use the `›` button in the panel header to collapse it; a thin `‹` strip appears on the right edge so you can bring it back at any time. The preference is saved and restored between sessions.
 
 ### 04/07 · Fix — Button positioning in split panes
-The scroll-to-bottom button no longer overlaps the adjacent panel when two panes are open side by side — it now stays anchored to the left side of its own panel. The split and close buttons are now aligned in a consistent right-side column, stacking predictably without clashing, and the split button no longer shifts position based on whether the branch strip is visible.
+The scroll-to-bottom button now stays anchored to the bottom-right of its own panel and no longer overlaps the adjacent panel when two panes are open side by side. The split and close buttons moved into the panel header so they always sit in the top-right corner regardless of whether the branch strip is visible, and no longer clash with each other.
+
+### 04/07 · Improvement — Rename session modal
+Renaming a session now opens a modal with two separate fields — the agent codename and the project suffix — pre-filled from the current name. A live preview shows the final result before saving.
 
 ### 04/07 · New — In-app changelog
 The app now shows a changelog modal on first launch after an update. You can also reopen it anytime by clicking the version badge in the sidebar.

@@ -14,10 +14,11 @@ pub struct SpawnHandle {
     pub pid: u32,
     pub reader: Box<dyn std::io::Read + Send>,
     pub stderr: Box<dyn std::io::Read + Send>,
+    pub child: std::process::Child,
 }
 
 /// Build a PATH string that includes common Claude/Node installation directories.
-fn extended_path() -> String {
+pub(crate) fn extended_path() -> String {
     let current = std::env::var("PATH").unwrap_or_default();
 
     #[cfg(windows)]
@@ -51,14 +52,25 @@ fn extended_path() -> String {
     {
         let extra: Vec<String> = dirs::home_dir()
             .map(|h| {
-                vec![
+                let mut paths = vec![
                     h.join(".local").join("bin").to_string_lossy().into_owned(),
                     h.join(".npm-global")
                         .join("bin")
                         .to_string_lossy()
                         .into_owned(),
                     "/usr/local/bin".to_string(),
-                ]
+                ];
+                // nvm: add every installed node version's bin dir
+                let nvm_root = h.join(".nvm").join("versions").join("node");
+                if let Ok(entries) = std::fs::read_dir(&nvm_root) {
+                    for entry in entries.flatten() {
+                        let bin = entry.path().join("bin");
+                        if bin.exists() {
+                            paths.push(bin.to_string_lossy().into_owned());
+                        }
+                    }
+                }
+                paths
             })
             .unwrap_or_default();
         format!("{}:{}", extra.join(":"), current)
@@ -105,7 +117,7 @@ pub fn find_claude() -> Option<String> {
         }
     }
 
-    // 2. Common locations
+    // 2. Common static locations
     #[cfg(windows)]
     if let Some(home) = dirs::home_dir() {
         let candidates = [
@@ -129,7 +141,22 @@ pub fn find_claude() -> Option<String> {
 
     #[cfg(not(windows))]
     {
-        for p in &["/usr/local/bin/claude", "/opt/homebrew/bin/claude"] {
+        // Static fallbacks for Linux and macOS
+        let mut candidates = vec![
+            "/usr/local/bin/claude".to_string(),
+            "/opt/homebrew/bin/claude".to_string(), // macOS Homebrew
+        ];
+        // Add ~/.local/bin/claude (common npm global prefix on Linux)
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(
+                home.join(".local")
+                    .join("bin")
+                    .join("claude")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+        for p in &candidates {
             if std::path::Path::new(p).exists() {
                 return Some(p.to_string());
             }
@@ -191,47 +218,121 @@ pub fn spawn_claude(config: SpawnConfig) -> Result<SpawnHandle, String> {
     let stdout = child.stdout.take().ok_or_else(|| "no stdout".to_string())?;
     let stderr = child.stderr.take().ok_or_else(|| "no stderr".to_string())?;
 
-    // Keep child alive until it exits naturally
-    std::mem::forget(child);
-
     Ok(SpawnHandle {
         pid,
         reader: Box::new(stdout),
         stderr: Box::new(stderr),
+        child,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::TestCase;
 
     #[test]
-    fn test_extended_path_includes_current() {
+    fn should_include_current_path_in_extended_path() {
+        let mut t = TestCase::new("should_include_current_path_in_extended_path");
+        t.phase("Act");
         let path = extended_path();
         let current = std::env::var("PATH").unwrap_or_default();
+        t.phase("Assert");
         if !current.is_empty() {
-            assert!(path.contains(&current));
+            t.ok(
+                "current PATH is contained in extended PATH",
+                path.contains(&current),
+            );
+        } else {
+            t.ok(
+                "extended PATH is non-empty even without current PATH",
+                !path.is_empty(),
+            );
         }
     }
 
     #[test]
-    fn test_find_claude_no_panic() {
-        let _ = find_claude();
+    fn should_include_local_bin_in_extended_path() {
+        let mut t = TestCase::new("should_include_local_bin_in_extended_path");
+        t.phase("Act");
+        let path = extended_path();
+        t.phase("Assert");
+        if let Some(home) = dirs::home_dir() {
+            let local_bin = home
+                .join(".local")
+                .join("bin")
+                .to_string_lossy()
+                .into_owned();
+            t.ok(
+                "~/.local/bin is in extended PATH",
+                path.contains(&local_bin),
+            );
+        } else {
+            t.ok("no home dir — skip", true);
+        }
     }
 
     #[test]
-    fn test_spawn_bad_path_returns_error() {
+    fn should_not_panic_when_find_claude_is_called() {
+        let mut t = TestCase::new("should_not_panic_when_find_claude_is_called");
+        t.phase("Act");
+        let _result = find_claude(); // may return None if not installed — that's fine
+        t.phase("Assert");
+        t.ok("find_claude completes without panic", true);
+    }
+
+    #[test]
+    fn should_return_err_with_descriptive_message_when_claude_not_found() {
+        let mut t =
+            TestCase::new("should_return_err_with_descriptive_message_when_claude_not_found");
+        t.phase("Act");
+        // Use a cwd that doesn't exist to guarantee spawn failure regardless of claude install
         let result = spawn_claude(SpawnConfig {
             session_id: 0,
-            cwd: std::env::temp_dir(),
+            cwd: std::path::PathBuf::from("/nonexistent/path/xyz"),
             permission_mode: "ignore".to_string(),
             model: None,
             prompt: "test".to_string(),
             claude_session_id: None,
         });
-        // Either succeeds (claude installed) or returns descriptive error
-        if let Err(e) = result {
-            assert!(!e.is_empty());
+        t.phase("Assert");
+        // Either claude is installed and spawn fails on bad cwd (Err), or claude is not installed
+        // (Err). Either way, we must get an Err with a non-empty message.
+        if let Err(ref msg) = result {
+            t.ok("error message is non-empty", !msg.is_empty());
+        } else {
+            // Claude installed AND somehow accepted /nonexistent path — log and skip
+            t.ok(
+                "spawn succeeded (claude installed, cwd error deferred)",
+                true,
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn should_include_nvm_bin_dirs_in_extended_path_when_present() {
+        let mut t = TestCase::new("should_include_nvm_bin_dirs_in_extended_path_when_present");
+        t.phase("Act");
+        let path = extended_path();
+        t.phase("Assert");
+        if let Some(home) = dirs::home_dir() {
+            let nvm_root = home.join(".nvm").join("versions").join("node");
+            if nvm_root.exists() {
+                let has_nvm = std::fs::read_dir(&nvm_root)
+                    .map(|entries| {
+                        entries.flatten().any(|e| {
+                            let bin = e.path().join("bin").to_string_lossy().into_owned();
+                            path.contains(&bin)
+                        })
+                    })
+                    .unwrap_or(false);
+                t.ok("nvm bin dirs present in extended PATH", has_nvm);
+            } else {
+                t.ok("nvm not installed — skip", true);
+            }
+        } else {
+            t.ok("no home dir — skip", true);
         }
     }
 }

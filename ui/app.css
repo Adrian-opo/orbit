@@ -70,6 +70,9 @@ select {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--t2);
 }
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
 ::selection {
   background: var(--ac-d);

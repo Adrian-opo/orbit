@@ -8,7 +8,7 @@ Guia de referência para o Claude Code trabalhar neste repositório.
 
 Orbit é um **dashboard desktop para gerenciar múltiplas sessões do Claude Code em paralelo**, construído com Tauri 2 (Rust + Svelte). Permite criar sessões, acompanhar output em tempo real, visualizar diffs de arquivos, tasks e tokens consumidos.
 
-- Plataforma: **Windows 10 1903+**
+- Plataformas: **Windows 10 1903+**, **Ubuntu 22.04+** (e outras distros Linux com webkit2gtk 4.1)
 - Identificador: `com.josefernando.orbit`
 - Repositório: `github.com/xinnaider/orbit`
 
@@ -257,6 +257,33 @@ on screen instead of silently stopping.
 
 ---
 
+## Self-Improvement Loop
+
+**No início de cada sessão:** leia `docs/lessons.md` se existir e aplique as lições registradas.
+
+**Após qualquer correção do usuário:**
+1. Identifique o padrão do erro (não apenas o caso específico)
+2. Adicione uma entrada em `docs/lessons.md` com:
+   - **Regra**: o que fazer (ou não fazer)
+   - **Por quê**: motivação / o que deu errado
+   - **Quando aplicar**: contexto em que a regra vale
+3. Itere nas lições existentes se o mesmo erro se repetir — refine a regra, não apenas acumule entradas
+
+O arquivo `docs/lessons.md` é versionado no repositório para que todos os colaboradores e agentes se beneficiem das lições aprendidas.
+
+---
+
+## Specs de features
+
+Toda feature nova deve ter uma spec em `docs/specs/` antes de ser implementada.
+
+- Nome do arquivo: `docs/specs/<nome-da-feature>.md` (kebab-case)
+- Conteúdo mínimo: objetivo, comportamento esperado, casos de borda, critérios de aceitação
+- A spec deve ser criada ou atualizada **antes** de escrever código
+- Ao iniciar uma sessão em uma branch de feature, leia a spec correspondente se existir
+
+---
+
 ## CI (GitHub Actions)
 
 **Lint job** (todo PR/push):
@@ -265,8 +292,9 @@ on screen instead of silently stopping.
 3. `cargo clippy -- -D warnings`
 4. `eslint + svelte-check`
 
-**Build job** (após lint passar):
-- `npm run tauri:build` → `.exe` + `.msi` no Windows
+**Build jobs** (após lint passar):
+- **Windows** (`windows-latest`): `npm run tauri:build` → `.exe` + `.msi`; gera `latest-windows-x86_64.json`
+- **Linux** (`ubuntu-latest`): `npm run tauri:build` → `.AppImage` + `.deb`; gera `latest-linux-x86_64.json`
 - Upload como artifact (30 dias)
 - Tag `v*` → GitHub Release com instaladores
 - Push em `master` → nightly release automático

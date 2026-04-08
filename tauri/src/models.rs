@@ -256,8 +256,13 @@ impl rusqlite::types::FromSql for SessionStatus {
             "running" => SessionStatus::Running,
             "waiting" => SessionStatus::Waiting,
             "completed" => SessionStatus::Completed,
+            "stopped" => SessionStatus::Stopped,
             "error" => SessionStatus::Error,
-            _ => SessionStatus::Stopped,
+            _ => {
+                return Err(rusqlite::types::FromSqlError::Other(
+                    format!("unknown SessionStatus: {s}").into(),
+                ))
+            }
         })
     }
 }

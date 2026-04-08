@@ -112,7 +112,7 @@ impl DatabaseService {
                 project_id,
                 name,
                 cwd,
-                crate::models::SessionStatus::Initializing.as_str(),
+                crate::models::SessionStatus::Initializing,
                 permission_mode,
                 model
             ],
@@ -120,7 +120,11 @@ impl DatabaseService {
         Ok(conn.last_insert_rowid())
     }
 
-    pub fn update_session_status(&self, id: SessionId, status: &str) -> SqlResult<()> {
+    pub fn update_session_status(
+        &self,
+        id: SessionId,
+        status: crate::models::SessionStatus,
+    ) -> SqlResult<()> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "UPDATE sessions SET status = ?1, updated_at = datetime('now') WHERE id = ?2",
@@ -133,7 +137,7 @@ impl DatabaseService {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "UPDATE sessions SET pid = ?1, status = ?2, updated_at = datetime('now') WHERE id = ?3",
-            params![pid, crate::models::SessionStatus::Running.as_str(), id],
+            params![pid, crate::models::SessionStatus::Running, id],
         )?;
         Ok(())
     }
@@ -383,8 +387,8 @@ mod tests {
         t.len("one session", &sessions, 1);
         t.eq(
             "status is initializing",
-            sessions[0].status.as_str(),
-            "initializing",
+            &sessions[0].status,
+            &crate::models::SessionStatus::Initializing,
         );
     }
 
@@ -411,14 +415,14 @@ mod tests {
         let db = make_db();
         let id = seed_session(&db);
         t.phase("Act");
-        db.update_session_status(id, "running")
+        db.update_session_status(id, crate::models::SessionStatus::Running)
             .expect("update failed");
         t.phase("Assert");
         let sessions = db.get_sessions().expect("get_sessions failed");
         t.eq(
             "status updated to running",
-            sessions[0].status.as_str(),
-            "running",
+            &sessions[0].status,
+            &crate::models::SessionStatus::Running,
         );
     }
 
@@ -432,7 +436,11 @@ mod tests {
         db.update_session_pid(id, 12345).expect("update_pid failed");
         t.phase("Assert");
         let s = db.get_session(id).expect("get failed").expect("missing");
-        t.eq("status is running", s.status.as_str(), "running");
+        t.eq(
+            "status is running",
+            &s.status,
+            &crate::models::SessionStatus::Running,
+        );
         t.eq("pid stored", s.pid, Some(12345));
     }
 
@@ -592,7 +600,8 @@ mod tests {
         let sid = db
             .create_session(None, None, "/tmp", "ignore", None)
             .expect("session");
-        db.update_session_status(sid, "stopped").expect("update");
+        db.update_session_status(sid, crate::models::SessionStatus::Stopped)
+            .expect("update");
         t.phase("Act");
         let sessions = db.get_sessions().expect("get");
         t.phase("Assert");

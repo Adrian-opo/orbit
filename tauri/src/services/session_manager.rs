@@ -201,10 +201,7 @@ impl SessionManager {
         let handle = match spawn_claude(config) {
             Ok(h) => h,
             Err(e) => {
-                let _ = db.update_session_status(
-                    session_id,
-                    crate::models::SessionStatus::Error.as_str(),
-                );
+                let _ = db.update_session_status(session_id, crate::models::SessionStatus::Error);
                 let _ = app.emit(
                     "session:error",
                     serde_json::json!({
@@ -422,10 +419,7 @@ impl SessionManager {
             if let Some(state) = m.journal_states.get_mut(&session_id) {
                 state.status = AgentStatus::Idle;
             }
-            let _ = db.update_session_status(
-                session_id,
-                crate::models::SessionStatus::Completed.as_str(),
-            );
+            let _ = db.update_session_status(session_id, crate::models::SessionStatus::Completed);
         }
 
         let _ = app.emit(
@@ -485,7 +479,7 @@ impl SessionManager {
         self.active.remove(&session_id);
         let _ = self
             .db
-            .update_session_status(session_id, crate::models::SessionStatus::Stopped.as_str());
+            .update_session_status(session_id, crate::models::SessionStatus::Stopped);
         Ok(())
     }
 

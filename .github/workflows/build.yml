@@ -85,7 +85,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: front -> tauri/target
+          workspaces: tauri -> tauri/target
           shared-key: "rust-windows"
 
       - name: Install Node dependencies

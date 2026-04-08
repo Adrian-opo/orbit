@@ -106,9 +106,12 @@
       const prev = prevStatuses[p.sessionId];
       if (p.status === 'input' && prev && prev !== 'input') beep();
       prevStatuses[p.sessionId] = p.status;
+      // 'idle' and 'new' are agent-level pauses emitted while the process is still running.
+      // Map them to 'running' so the working indicator stays visible until session:stopped fires.
+      const sessionStatus = p.status === 'idle' || p.status === 'new' ? 'running' : p.status;
       sessions.update((l) =>
         updateSessionState(l, p.sessionId, {
-          status: p.status as any,
+          status: sessionStatus as any,
           tokens: p.tokens,
           contextPercent: p.contextPercent,
           pendingApproval: p.pendingApproval,

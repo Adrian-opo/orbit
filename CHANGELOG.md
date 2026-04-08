@@ -4,6 +4,9 @@
 
 ## April 2026
 
+### 04/08 · Fix — Message display delay and working indicator
+Sending a message now shows it in the chat immediately and without flickering. The "working" indicator (animated dots) now appears as soon as Claude starts processing a request and stays visible throughout — previously it could disappear briefly or not show at all right after sending. The fix also reduces unnecessary background work that was slowing down the feed during active sessions.
+
 ### 04/08 · New — Linux/Ubuntu support
 Orbit now runs on Ubuntu 22.04+ and other Linux distributions with a desktop environment (GNOME, KDE Plasma, and others). Install with a single command that downloads the app, adds it to your application launcher, and sets up automatic updates — no manual steps required. Once installed, Orbit updates itself in the background just like on Windows.
 

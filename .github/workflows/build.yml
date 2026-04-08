@@ -44,7 +44,7 @@ jobs:
 
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: front -> tauri/target
+          workspaces: tauri -> tauri/target
           shared-key: "rust-windows"
 
       - run: npm ci
@@ -296,19 +296,14 @@ jobs:
           filename=$(basename "$appimage")
           download_url="https://github.com/xinnaider/orbit/releases/download/v${version}/${filename}"
 
-          cat > latest-linux-x86_64.json <<JSON
-          {
-            "version": "${version}",
-            "notes": "See the full changelog at https://github.com/xinnaider/orbit/releases/tag/v${version}",
-            "pub_date": "${pub_date}",
-            "platforms": {
-              "linux-x86_64": {
-                "signature": "${signature}",
-                "url": "${download_url}"
-              }
-            }
-          }
-          JSON
+          jq -n \
+            --arg version  "$version" \
+            --arg notes    "See the full changelog at https://github.com/xinnaider/orbit/releases/tag/v${version}" \
+            --arg pub_date "$pub_date" \
+            --arg sig      "$signature" \
+            --arg url      "$download_url" \
+            '{version: $version, notes: $notes, pub_date: $pub_date, platforms: {"linux-x86_64": {signature: $sig, url: $url}}}' \
+            > latest-linux-x86_64.json
 
           echo "latest-linux-x86_64.json generated:"
           cat latest-linux-x86_64.json

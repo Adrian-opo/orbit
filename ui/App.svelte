@@ -41,6 +41,7 @@
   let rateLimitError: { sessionId: number } | null = null;
   let rateLimitDismissTimer: ReturnType<typeof setTimeout> | null = null;
   let availableUpdate: UpdateInfo | null = null;
+  let updateError: string | null = null;
   let updateInterval: ReturnType<typeof setInterval> | null = null;
   let showChangelog = false;
   let changelogContent = '';
@@ -152,8 +153,8 @@
       try {
         const info = await checkUpdate();
         if (info) availableUpdate = info;
-      } catch (_e) {
-        // silencioso — falha de rede não afeta o uso do app
+      } catch (e) {
+        updateError = e instanceof Error ? e.message : String(e);
       }
     }
 
@@ -168,6 +169,16 @@
 
   $: selected = getSelectedSession($sessions, $selectedSessionId);
 </script>
+
+{#if updateError}
+  <Banner
+    variant="error"
+    icon="⚠"
+    title="update check failed"
+    message={updateError}
+    onDismiss={() => (updateError = null)}
+  />
+{/if}
 
 {#if rateLimitError}
   <Banner

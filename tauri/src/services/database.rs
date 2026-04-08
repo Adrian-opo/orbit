@@ -277,11 +277,13 @@ impl DatabaseService {
 
     pub fn delete_session(&self, id: SessionId) -> SqlResult<()> {
         let conn = self.conn.lock().unwrap();
+        conn.execute_batch("BEGIN")?;
         conn.execute(
             "DELETE FROM session_outputs WHERE session_id = ?1",
             params![id],
         )?;
         conn.execute("DELETE FROM sessions WHERE id = ?1", params![id])?;
+        conn.execute_batch("COMMIT")?;
         Ok(())
     }
 

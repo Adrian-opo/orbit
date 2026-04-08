@@ -187,15 +187,25 @@ mod tests {
     #[test]
     fn should_not_panic_on_multibyte_truncation() {
         let mut t = TestCase::new("should_not_panic_on_multibyte_truncation");
-        // "é" is 2 bytes — placing it straddling byte 77 would panic with &desc[..77]
+        // The string is: 76 'x' bytes + "é" (2 bytes) + 10 'y' bytes
+        // truncate_desc at 77 bytes should: find boundary at 76 (start of é), truncate there,
+        // append "..."
         let long_desc = format!("{}é{}", "x".repeat(76), "y".repeat(10));
         t.phase("Act");
         let result = truncate_desc(&long_desc, 77);
         t.phase("Assert");
-        t.ok("does not panic", true);
         t.ok(
             "result is valid UTF-8",
             std::str::from_utf8(result.as_bytes()).is_ok(),
+        );
+        t.eq(
+            "truncated at char boundary",
+            result.as_str(),
+            &format!("{}...", "x".repeat(76)),
+        );
+        t.ok(
+            "result fits in max_bytes + ellipsis",
+            result.len() <= 77 + 3,
         );
     }
 }

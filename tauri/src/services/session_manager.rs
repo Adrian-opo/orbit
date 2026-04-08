@@ -855,6 +855,73 @@ mod tests {
         t.eq("output_tokens restored", tokens.output, 5u64);
     }
 
+    // ── ascii_ci_contains ─────────────────────────────────────────────────────
+
+    #[test]
+    fn should_find_needle_case_insensitively() {
+        let mut t = TestCase::new("should_find_needle_case_insensitively");
+        t.phase("Assert");
+        t.ok("exact match", ascii_ci_contains("rate_limit", "rate_limit"));
+        t.ok(
+            "upper needle",
+            ascii_ci_contains("RATE_LIMIT", "rate_limit"),
+        );
+        t.ok(
+            "mixed case haystack",
+            ascii_ci_contains("Rate_Limit_Error", "rate_limit"),
+        );
+        t.ok(
+            "not found",
+            !ascii_ci_contains("something else", "rate_limit"),
+        );
+        t.ok("empty haystack", !ascii_ci_contains("", "rate_limit"));
+        t.ok(
+            "needle longer than haystack",
+            !ascii_ci_contains("rt", "rate_limit"),
+        );
+    }
+
+    // ── is_rate_limit_line ────────────────────────────────────────────────────
+
+    #[test]
+    fn should_detect_rate_limit_error_line() {
+        let mut t = TestCase::new("should_detect_rate_limit_error_line");
+        t.phase("Assert — canonical rate limit JSON");
+        t.ok(
+            "rate_limit + type:error",
+            is_rate_limit_line(
+                r#"{"type":"error","error":{"type":"rate_limit_error","message":"..."}}"#,
+            ),
+        );
+        t.ok(
+            "overloaded + type:error",
+            is_rate_limit_line(r#"{"type":"error","error":{"type":"overloaded_error"}}"#),
+        );
+        t.ok(
+            "rate limit (with space) + type: error (with space)",
+            is_rate_limit_line(r#"{"type": "error","message":"rate limit exceeded"}"#),
+        );
+    }
+
+    #[test]
+    fn should_not_flag_non_rate_limit_lines() {
+        let mut t = TestCase::new("should_not_flag_non_rate_limit_lines");
+        t.phase("Assert — lines that should NOT trigger");
+        t.ok(
+            "rate_limit without error marker",
+            !is_rate_limit_line(r#"{"type":"assistant","text":"rate_limit info"}"#),
+        );
+        t.ok(
+            "overloaded without error",
+            !is_rate_limit_line(r#"overloaded"#),
+        );
+        t.ok("empty line", !is_rate_limit_line(""));
+        t.ok(
+            "normal assistant line",
+            !is_rate_limit_line(r#"{"type":"assistant","text":"hello world"}"#),
+        );
+    }
+
     // ── get_journal ───────────────────────────────────────────────────────
 
     #[test]

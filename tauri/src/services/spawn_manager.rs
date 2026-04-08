@@ -17,7 +17,7 @@ pub struct SpawnHandle {
 }
 
 /// Build a PATH string that includes common Claude/Node installation directories.
-fn extended_path() -> String {
+pub(crate) fn extended_path() -> String {
     let current = std::env::var("PATH").unwrap_or_default();
 
     #[cfg(windows)]
@@ -51,14 +51,25 @@ fn extended_path() -> String {
     {
         let extra: Vec<String> = dirs::home_dir()
             .map(|h| {
-                vec![
+                let mut paths = vec![
                     h.join(".local").join("bin").to_string_lossy().into_owned(),
                     h.join(".npm-global")
                         .join("bin")
                         .to_string_lossy()
                         .into_owned(),
                     "/usr/local/bin".to_string(),
-                ]
+                ];
+                // nvm: add every installed node version's bin dir
+                let nvm_root = h.join(".nvm").join("versions").join("node");
+                if let Ok(entries) = std::fs::read_dir(&nvm_root) {
+                    for entry in entries.flatten() {
+                        let bin = entry.path().join("bin");
+                        if bin.exists() {
+                            paths.push(bin.to_string_lossy().into_owned());
+                        }
+                    }
+                }
+                paths
             })
             .unwrap_or_default();
         format!("{}:{}", extra.join(":"), current)
@@ -105,7 +116,7 @@ pub fn find_claude() -> Option<String> {
         }
     }
 
-    // 2. Common locations
+    // 2. Common static locations
     #[cfg(windows)]
     if let Some(home) = dirs::home_dir() {
         let candidates = [
@@ -129,7 +140,22 @@ pub fn find_claude() -> Option<String> {
 
     #[cfg(not(windows))]
     {
-        for p in &["/usr/local/bin/claude", "/opt/homebrew/bin/claude"] {
+        // Static fallbacks for Linux and macOS
+        let mut candidates = vec![
+            "/usr/local/bin/claude".to_string(),
+            "/opt/homebrew/bin/claude".to_string(), // macOS Homebrew
+        ];
+        // Add ~/.local/bin/claude (common npm global prefix on Linux)
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(
+                home.join(".local")
+                    .join("bin")
+                    .join("claude")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+        for p in &candidates {
             if std::path::Path::new(p).exists() {
                 return Some(p.to_string());
             }
@@ -211,6 +237,56 @@ mod tests {
         let current = std::env::var("PATH").unwrap_or_default();
         if !current.is_empty() {
             assert!(path.contains(&current));
+        }
+    }
+
+    #[test]
+    fn test_extended_path_includes_local_bin() {
+        let path = extended_path();
+        // On all platforms, ~/.local/bin must be included
+        if let Some(home) = dirs::home_dir() {
+            let local_bin = home
+                .join(".local")
+                .join("bin")
+                .to_string_lossy()
+                .into_owned();
+            assert!(
+                path.contains(&local_bin),
+                "PATH missing ~/.local/bin: {path}"
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn test_extended_path_includes_nvm_if_present() {
+        // Scaffolding for a future HOME-overridable version of extended_path().
+        // extended_path() reads the real HOME, not tmp, so these lines don't
+        // participate in the assertion below — they're left as a starting point
+        // for parameterized testing once HOME injection is supported.
+        let tmp = tempfile::TempDir::new().unwrap();
+        let fake_nvm_bin = tmp.path().join(".nvm/versions/node/v20.0.0/bin");
+        std::fs::create_dir_all(&fake_nvm_bin).unwrap();
+
+        // Temporarily override HOME — not possible without unsafe env manipulation,
+        // so this test just checks that extended_path() runs without panic and
+        // that if the user has nvm, the path is non-empty.
+        let path = extended_path();
+        assert!(!path.is_empty());
+        // If the real user has nvm installed, verify at least one nvm bin appears
+        if let Some(home) = dirs::home_dir() {
+            let nvm_root = home.join(".nvm").join("versions").join("node");
+            if nvm_root.exists() {
+                let has_nvm_in_path = std::fs::read_dir(&nvm_root)
+                    .map(|entries| {
+                        entries.flatten().any(|e| {
+                            let bin = e.path().join("bin").to_string_lossy().into_owned();
+                            path.contains(&bin)
+                        })
+                    })
+                    .unwrap_or(false);
+                assert!(has_nvm_in_path, "nvm bin dirs not found in PATH: {path}");
+            }
         }
     }
 

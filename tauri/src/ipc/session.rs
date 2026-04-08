@@ -130,32 +130,7 @@ pub fn diagnose_spawn() -> serde_json::Value {
         .unwrap_or_else(|e| format!("which failed: {e}"));
 
     // 3. `claude --version` using augmented PATH
-    let aug_path = {
-        let current = std::env::var("PATH").unwrap_or_default();
-        #[cfg(windows)]
-        if let Some(home) = dirs::home_dir() {
-            format!(
-                "{};{};{};{}",
-                home.join("AppData")
-                    .join("Roaming")
-                    .join("npm")
-                    .to_string_lossy(),
-                home.join("AppData")
-                    .join("Local")
-                    .join("pnpm")
-                    .to_string_lossy(),
-                home.join("AppData")
-                    .join("Local")
-                    .join("nvm")
-                    .to_string_lossy(),
-                current
-            )
-        } else {
-            current
-        }
-        #[cfg(not(windows))]
-        current
-    };
+    let aug_path = crate::services::spawn_manager::extended_path();
 
     #[cfg(windows)]
     let version_out = {

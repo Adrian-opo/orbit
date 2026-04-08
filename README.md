@@ -9,6 +9,7 @@
 [![Build](https://img.shields.io/github/actions/workflow/status/xinnaider/orbit/build.yml?branch=master)](https://github.com/xinnaider/orbit/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 [![Platform: Windows](https://img.shields.io/badge/platform-Windows-blue.svg)](#installation)
+[![Platform: Linux](https://img.shields.io/badge/platform-Linux-orange.svg)](#installation)
 
 [orbit.jfernando.dev](https://orbit.jfernando.dev)
 
@@ -30,19 +31,43 @@
 
 ### Requirements
 
-- **Windows 10 1903+**
 - **[Claude Code CLI](https://github.com/anthropics/claude-code)** installed and logged in:
   ```bash
   npm install -g @anthropic-ai/claude-code
   claude login
   ```
 
-### Download
+---
+
+### Windows (10 1903+)
 
 1. Go to [Releases](https://github.com/xinnaider/orbit/releases/latest)
 2. Download the `.exe` installer
 3. Run the installer
 4. Open Orbit, click **+** to create your first session
+
+Orbit updates itself automatically when a new version is available.
+
+---
+
+### Linux (Ubuntu 22.04+ · Debian · KDE · other distros)
+
+**One-line installer** — downloads the AppImage, creates a desktop entry (shows up in your app launcher), and sets up auto-updates:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xinnaider/orbit/master/scripts/install-linux.sh | bash
+```
+
+Then open Orbit from your application menu or run:
+
+```bash
+~/.local/share/orbit/orbit.AppImage
+```
+
+Orbit will update itself automatically when a new version is available.
+
+> **Requirements:** `curl`, `fuse2` (pre-installed on most desktop distros).
+> On Ubuntu: `sudo apt install fuse libfuse2` if not present.
 
 ## Contributing
 

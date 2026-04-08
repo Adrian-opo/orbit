@@ -232,10 +232,10 @@ impl SessionManager {
                 match reader.read_line(&mut line) {
                     Ok(0) | Err(_) => break,
                     Ok(_) => {
-                        let trimmed = line.trim().to_lowercase();
-                        if trimmed.contains("rate limit")
-                            || trimmed.contains("rate_limit")
-                            || trimmed.contains("overloaded")
+                        let trimmed = line.trim();
+                        if ascii_ci_contains(trimmed, "rate limit")
+                            || ascii_ci_contains(trimmed, "rate_limit")
+                            || ascii_ci_contains(trimmed, "overloaded")
                         {
                             let _ = app_err.emit(
                                 "session:rate-limit",
@@ -609,14 +609,27 @@ fn kill_pid(pid: u32) {
     }
 }
 
+/// Case-insensitive substring search without allocation (ASCII only).
+fn ascii_ci_contains(haystack: &str, needle: &str) -> bool {
+    let h = haystack.as_bytes();
+    let n = needle.as_bytes();
+    if h.len() < n.len() {
+        return false;
+    }
+    h.windows(n.len()).any(|w| w.eq_ignore_ascii_case(n))
+}
+
 /// Check if a JSON line from Claude's stdout indicates a rate limit error.
+/// Uses byte-level case-insensitive search — zero allocation.
 fn is_rate_limit_line(line: &str) -> bool {
-    let lower = line.to_lowercase();
-    (lower.contains("rate_limit") || lower.contains("rate limit") || lower.contains("overloaded"))
-        && (lower.contains("\"type\":\"error\"")
-            || lower.contains("\"type\": \"error\"")
-            || lower.contains("error_type")
-            || lower.contains("\"subtype\":\"error\""))
+    let has_rate = ascii_ci_contains(line, "rate_limit")
+        || ascii_ci_contains(line, "rate limit")
+        || ascii_ci_contains(line, "overloaded");
+    let has_error = ascii_ci_contains(line, "\"type\":\"error\"")
+        || ascii_ci_contains(line, "\"type\": \"error\"")
+        || ascii_ci_contains(line, "error_type")
+        || ascii_ci_contains(line, "\"subtype\":\"error\"");
+    has_rate && has_error
 }
 
 #[cfg(test)]

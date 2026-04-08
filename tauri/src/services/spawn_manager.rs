@@ -260,7 +260,10 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn test_extended_path_includes_nvm_if_present() {
-        // Create a fake nvm node version directory
+        // Scaffolding for a future HOME-overridable version of extended_path().
+        // extended_path() reads the real HOME, not tmp, so these lines don't
+        // participate in the assertion below — they're left as a starting point
+        // for parameterized testing once HOME injection is supported.
         let tmp = tempfile::TempDir::new().unwrap();
         let fake_nvm_bin = tmp.path().join(".nvm/versions/node/v20.0.0/bin");
         std::fs::create_dir_all(&fake_nvm_bin).unwrap();

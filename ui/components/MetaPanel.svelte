@@ -55,9 +55,6 @@
       >agents</button
     >
     <span class="tabs-spacer"></span>
-    {#if stopped}
-      <span class="stopped-badge" title="Session stopped — type to resume">stopped</span>
-    {/if}
     <button class="collapse-btn" on:click={() => metaPanelVisible.set(false)} title="Hide panel"
       >›</button
     >
@@ -200,16 +197,6 @@
   }
   .collapse-btn:hover {
     color: var(--t0);
-  }
-  .stopped-badge {
-    margin-right: 6px;
-    font-size: 9px;
-    letter-spacing: 0.08em;
-    color: var(--t3);
-    padding: 2px 5px;
-    border: 1px solid var(--bd);
-    border-radius: 3px;
-    cursor: default;
   }
 
   .content {

@@ -44,6 +44,8 @@
       } catch (_e) {
         /* no-op */
       }
+    } else if (action === 'mute') {
+      mutedSessions.toggle(String(sessionId));
     }
   }
 
@@ -113,12 +115,14 @@
 {/if}
 
 {#if ctxMenu}
+  {@const isMuted = mutedSessions.isMuted($mutedSessions, String(ctxMenu.sessionId))}
   <ContextMenu
     x={ctxMenu.x}
     y={ctxMenu.y}
     items={[
       { label: 'Rename', action: 'rename', danger: false },
-      { label: 'Stop', action: 'stop', danger: false },
+      { label: isMuted ? '🔊 Unmute' : '🔇 Mute', action: 'mute', danger: false },
+      { label: 'Force Stop', action: 'stop', danger: false },
       { label: '—', action: 'divider', divider: true },
       { label: 'Delete', action: 'delete', danger: true },
     ]}

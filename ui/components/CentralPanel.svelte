@@ -183,12 +183,14 @@
         <span>session #{session.id} · {statusStr}</span>
       </div>
     {:else}
-      <Feed
-        bind:this={feedComponent}
-        {entries}
-        status={session.status}
-        on:bottomchange={onFeedBottomChange}
-      />
+      {#key session.id}
+        <Feed
+          bind:this={feedComponent}
+          {entries}
+          status={session.status}
+          on:bottomchange={onFeedBottomChange}
+        />
+      {/key}
       {#each $pendingMessages as msg (msg.id)}
         <div class="pending-msg">
           <span class="pending-arrow">›</span>

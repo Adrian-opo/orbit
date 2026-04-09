@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick, createEventDispatcher } from 'svelte';
+  import { onMount, onDestroy, tick, createEventDispatcher } from 'svelte';
   import type { JournalEntry } from '../lib/types';
   import Markdown from './Markdown.svelte';
   import ToolCallEntry from './ToolCallEntry.svelte';
@@ -80,20 +80,17 @@
     if (heights[index] === h) return;
     heights[index] = h;
     if (rafId === null) {
-      // Capture anchor before the flush: distance from scrollTop to the top of startIndex.
-      // After heights change, restore that distance to prevent the content from jumping.
-      const anchorOffset = scrollerEl ? scrollTop - offsets[startIndex] : 0;
-      const anchorIndex = startIndex;
+      // Snapshot isAtBottom before the async flush — the layout change may briefly
+      // report "not at bottom" even though the user never scrolled away.
+      const wasAtBottom = isAtBottom;
       rafId = requestAnimationFrame(() => {
         rafId = null;
         heights = heights.slice(); // single reactive flush for the whole frame
-        // After Svelte updates the DOM, restore scroll position relative to anchor item.
-        tick().then(() => {
-          if (scrollerEl && !isAtBottom) {
-            scrollerEl.scrollTop = offsets[anchorIndex] + anchorOffset;
-            scrollTop = scrollerEl.scrollTop;
-          }
-        });
+        if (wasAtBottom) {
+          tick().then(() => {
+            if (scrollerEl) scrollerEl.scrollTop = scrollerEl.scrollHeight;
+          });
+        }
       });
     }
   }
@@ -182,6 +179,13 @@
     if (scrollerEl) {
       clientHeight = scrollerEl.clientHeight;
       scrollerEl.scrollTop = scrollerEl.scrollHeight;
+    }
+  });
+
+  onDestroy(() => {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
     }
   });
 

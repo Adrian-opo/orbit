@@ -55,9 +55,7 @@
       >agents</button
     >
     <span class="tabs-spacer"></span>
-    {#if active}
-      <button class="stop-btn" on:click={stop} title="Stop session">■</button>
-    {:else if stopped}
+    {#if stopped}
       <span class="stopped-badge" title="Session stopped — type to resume">stopped</span>
     {/if}
     <button class="collapse-btn" on:click={() => metaPanelVisible.set(false)} title="Hide panel"
@@ -142,7 +140,7 @@
       <TasksList sessionId={String(session.id)} />
     {:else}
       <SubagentsPanel
-        sessionId={String(session.id)}
+        sessionId={session.id}
         subagents={session.subagents ?? []}
         {refreshing}
         onRefresh={refreshAgents}
@@ -188,17 +186,6 @@
   }
   .tabs-spacer {
     flex: 1;
-  }
-  .stop-btn {
-    margin-right: 4px;
-    background: none;
-    border: none;
-    color: var(--t2);
-    font-size: 10px;
-    padding: 4px 6px;
-  }
-  .stop-btn:hover {
-    color: var(--s-error);
   }
   .collapse-btn {
     margin-left: auto;

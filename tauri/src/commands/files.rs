@@ -1,8 +1,25 @@
+use crate::ipc::session::SessionState;
 use crate::journal;
 use crate::models::*;
+use tauri::State;
 
 #[tauri::command]
-pub fn get_subagent_journal(session_id: String, subagent_id: String) -> Vec<JournalEntry> {
+pub fn get_subagent_journal(
+    session_id: SessionId,
+    subagent_id: String,
+    state: State<SessionState>,
+) -> Vec<JournalEntry> {
+    // Resolve the numeric session ID to the Claude session UUID,
+    // which is used as the directory name under ~/.claude/projects/<project>/
+    let claude_id = {
+        let m = state.read();
+        m.db.get_claude_session_id(session_id).ok().flatten()
+    };
+    let claude_session_id = match claude_id {
+        Some(id) => id,
+        None => return vec![],
+    };
+
     let projects_dir = match dirs::home_dir() {
         Some(h) => h.join(".claude").join("projects"),
         None => return vec![],
@@ -16,13 +33,13 @@ pub fn get_subagent_journal(session_id: String, subagent_id: String) -> Vec<Jour
     for project_entry in entries.flatten() {
         let jsonl_path = project_entry
             .path()
-            .join(&session_id)
+            .join(&claude_session_id)
             .join("subagents")
             .join(format!("{}.jsonl", &subagent_id));
 
         if jsonl_path.exists() {
-            let state = journal::parse_journal(&jsonl_path, 0, None);
-            let mut result = state.entries;
+            let journal_state = journal::parse_journal(&jsonl_path, 0, None);
+            let mut result = journal_state.entries;
             for entry in &mut result {
                 entry.session_id = subagent_id.clone();
             }

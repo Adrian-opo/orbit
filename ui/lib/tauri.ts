@@ -67,7 +67,7 @@ export async function listProjects() {
 }
 
 export async function getSubagentJournal(
-  sessionId: string,
+  sessionId: number,
   subagentId: string
 ): Promise<JournalEntry[]> {
   return await invoke('get_subagent_journal', { sessionId, subagentId });

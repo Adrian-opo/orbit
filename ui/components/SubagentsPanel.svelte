@@ -3,7 +3,7 @@
   import { getSubagentJournal } from '../lib/tauri';
   import Feed from './Feed.svelte';
 
-  export let sessionId: string;
+  export let sessionId: number;
   export let subagents: SubagentInfo[];
   export let refreshing = false;
   export let onRefresh: (() => void) | null = null;
@@ -68,7 +68,7 @@
     {#each subagents as agent}
       <button class="agent {cls(agent.status)}" on:click={() => openLog(agent)}>
         <span class="agent-icon">{icon(agent.status)}</span>
-        <span class="agent-name">{agent.agentType}</span>
+        <span class="agent-name">{agent.description || agent.agentType}</span>
       </button>
     {/each}
   {/if}

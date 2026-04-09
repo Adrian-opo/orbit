@@ -5,9 +5,8 @@
 
   export let sessionId: string;
   export let subagents: SubagentInfo[];
-
-  $: running = subagents.filter((a) => a.status === 'running');
-  $: done = subagents.filter((a) => a.status === 'done');
+  export let refreshing = false;
+  export let onRefresh: (() => void) | null = null;
 
   let modalAgent: SubagentInfo | null = null;
   let modalEntries: JournalEntry[] = [];
@@ -31,80 +30,66 @@
   }
 
   function handleBackdropClick(e: MouseEvent) {
-    if ((e.target as HTMLElement).classList.contains('modal-backdrop')) {
-      closeModal();
-    }
+    if ((e.target as HTMLElement).classList.contains('modal-backdrop')) closeModal();
   }
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') closeModal();
   }
 
-  function statusColor(status: string): string {
-    return status === 'done' ? 'var(--s-working)' : 'var(--s-input)';
+  function icon(status: string) {
+    if (status === 'done') return '✓';
+    if (status === 'running') return '▸';
+    return '○';
+  }
+
+  function cls(status: string) {
+    if (status === 'done') return 'done';
+    if (status === 'running') return 'active';
+    return 'pending';
   }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window on:keydown={handleKeydown} />
 
-<div class="subagents">
+<div class="agents">
+  <div class="agents-header">
+    <span class="count">{subagents.length} agent{subagents.length !== 1 ? 's' : ''}</span>
+    {#if onRefresh}
+      <button class="refresh-btn" on:click={onRefresh} disabled={refreshing} title="Refresh">
+        {refreshing ? '…' : '↺'}
+      </button>
+    {/if}
+  </div>
+
   {#if subagents.length === 0}
-    <p class="empty">No sub-agents spawned</p>
+    <p class="empty">no sub-agents</p>
   {:else}
-    {#if running.length > 0}
-      <div class="section">
-        <div class="section-header">
-          <span class="dot running"></span> Running ({running.length})
-        </div>
-        {#each running as agent}
-          <button class="agent-row running-row" onclick={() => openLog(agent)}>
-            <div class="agent-top">
-              <span class="agent-type">{agent.agentType}</span>
-              <span class="badge badge-running">running</span>
-            </div>
-            {#if agent.description}
-              <div class="agent-desc">{agent.description}</div>
-            {/if}
-            <div class="view-hint">Click to view log</div>
-          </button>
-        {/each}
-      </div>
-    {/if}
-
-    {#if done.length > 0}
-      <div class="section">
-        <div class="section-header">
-          <span class="dot done"></span> Completed ({done.length})
-        </div>
-        {#each done as agent}
-          <button class="agent-row done-row" onclick={() => openLog(agent)}>
-            <div class="agent-top">
-              <span class="agent-type">{agent.agentType}</span>
-              <span class="badge badge-done">done</span>
-            </div>
-            {#if agent.description}
-              <div class="agent-desc">{agent.description}</div>
-            {/if}
-            <div class="view-hint">Click to view log</div>
-          </button>
-        {/each}
-      </div>
-    {/if}
+    {#each subagents as agent}
+      <button class="agent {cls(agent.status)}" on:click={() => openLog(agent)}>
+        <span class="agent-icon">{icon(agent.status)}</span>
+        <span class="agent-name">{agent.agentType}</span>
+      </button>
+    {/each}
   {/if}
 </div>
 
 {#if modalAgent}
   <div
     class="modal-backdrop"
-    onclick={handleBackdropClick}
-    onkeydown={(e) => e.key === 'Escape' && closeModal()}
+    on:click={handleBackdropClick}
+    on:keydown={handleKeydown}
     role="dialog"
     tabindex="-1"
   >
     <div class="modal">
       <div class="modal-header">
         <div class="header-left">
-          <span class="dot-status" style="color:{statusColor(modalAgent.status)}">●</span>
+          <span
+            class="dot-status"
+            class:dot-done={modalAgent.status === 'done'}
+            class:dot-running={modalAgent.status === 'running'}>●</span
+          >
           <span class="modal-type">{modalAgent.agentType}</span>
           <span
             class="modal-status"
@@ -114,9 +99,7 @@
             {modalAgent.status}
           </span>
         </div>
-        <div class="header-right">
-          <button class="modal-close" onclick={closeModal}>×</button>
-        </div>
+        <button class="modal-close" on:click={closeModal}>×</button>
       </div>
       {#if modalAgent.description}
         <div class="desc-strip">
@@ -126,9 +109,9 @@
       {/if}
       <div class="modal-body">
         {#if loading}
-          <p class="loading">Loading log...</p>
+          <p class="loading">loading log…</p>
         {:else if modalEntries.length === 0}
-          <p class="loading">No log entries found</p>
+          <p class="loading">no log entries</p>
         {:else}
           <Feed entries={modalEntries} status={modalAgent.status} />
         {/if}
@@ -138,114 +121,98 @@
 {/if}
 
 <style>
-  .subagents {
-    padding: 8px;
-  }
-  .empty {
-    color: var(--t2);
-    font-size: 12px;
-    text-align: center;
-    padding: 20px;
-  }
-  .section {
-    margin-bottom: 12px;
-  }
-  .section-header {
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--t2);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
+  .agents {
+    padding: 10px 12px;
     display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    display: inline-block;
-    flex-shrink: 0;
-  }
-  .dot.running {
-    background: var(--s-input);
-  }
-  .dot.done {
-    background: var(--s-working);
+    flex-direction: column;
+    gap: 8px;
   }
 
-  .agent-row {
-    display: block;
-    width: 100%;
-    text-align: left;
-    padding: 7px 9px;
-    border-radius: 5px;
-    margin-bottom: 2px;
-    background: var(--bg2);
-    border: 1px solid transparent;
-    cursor: pointer;
-    font-family: var(--mono);
-    color: inherit;
-    transition: border-color 0.12s;
-  }
-  .agent-row:hover {
-    border-color: var(--bd1);
-    background: var(--bg3);
-  }
-  .agent-row.running-row {
-    border-left: 2px solid var(--s-input);
-  }
-  .agent-row.done-row {
-    border-left: 2px solid var(--s-working);
-  }
-
-  .agent-top {
+  .agents-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    margin-bottom: 2px;
   }
-  .agent-type {
-    font-size: 12px;
-    font-weight: 500;
+
+  .count {
+    font-size: var(--xs);
+    color: var(--t3);
+    letter-spacing: 0.06em;
+  }
+
+  .refresh-btn {
+    background: none;
+    border: none;
+    color: var(--t2);
+    font-size: 11px;
+    padding: 2px 4px;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .refresh-btn:hover {
     color: var(--t0);
   }
-  .badge {
-    font-size: 10px;
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-weight: 500;
+  .refresh-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
-  .badge-running {
-    background: rgba(232, 160, 48, 0.12);
-    color: var(--s-input);
+
+  .empty {
+    font-size: var(--xs);
+    color: var(--t3);
+    padding: 4px 0;
   }
-  .badge-done {
-    background: rgba(0, 212, 126, 0.1);
+
+  .agent {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 3px 0;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .agent:hover .agent-name {
+    color: var(--t0);
+  }
+
+  .agent-icon {
+    font-size: var(--xs);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .done .agent-icon {
     color: var(--s-working);
   }
-
-  .agent-desc {
-    font-size: 11px;
-    color: var(--t1);
-    margin-top: 2px;
-    line-height: 1.4;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .active .agent-icon {
+    color: var(--s-input);
   }
-  .view-hint {
-    font-size: 10px;
+  .pending .agent-icon {
     color: var(--t3);
-    margin-top: 3px;
   }
 
+  .agent-name {
+    font-size: var(--xs);
+    color: var(--t1);
+    line-height: 1.4;
+    transition: color 0.1s;
+  }
+  .done .agent-name {
+    color: var(--t2);
+  }
+  .active .agent-name {
+    color: var(--t0);
+  }
+
+  /* ── modal ────────────────────────────────────────────────────────────── */
   .modal-backdrop {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
+    inset: 0;
     background: rgba(0, 0, 0, 0.6);
     display: flex;
     align-items: center;
@@ -263,7 +230,6 @@
     flex-direction: column;
     overflow: hidden;
   }
-
   .modal-header {
     display: flex;
     align-items: center;
@@ -285,7 +251,15 @@
     font-size: 8px;
     line-height: 1;
     flex-shrink: 0;
+    color: var(--t3);
   }
+  .dot-done {
+    color: var(--s-working);
+  }
+  .dot-running {
+    color: var(--s-input);
+  }
+
   .modal-type {
     font-size: 12px;
     font-weight: 500;
@@ -300,17 +274,13 @@
     letter-spacing: 0.04em;
     flex-shrink: 0;
   }
-  .modal-status.status-done {
+  .status-done {
     color: var(--s-working);
   }
-  .modal-status.status-running {
+  .status-running {
     color: var(--s-input);
   }
 
-  .header-right {
-    flex-shrink: 0;
-    padding-left: 12px;
-  }
   .modal-close {
     background: var(--bg3);
     border: 1px solid var(--bd1);
@@ -328,6 +298,7 @@
     transition:
       border-color 0.15s,
       color 0.15s;
+    flex-shrink: 0;
   }
   .modal-close:hover {
     border-color: var(--s-error);
@@ -342,7 +313,6 @@
     border-bottom: 1px solid var(--bd);
     background: var(--bg1);
     flex-shrink: 0;
-    min-width: 0;
     overflow: hidden;
   }
   .desc-icon {

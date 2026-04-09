@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [master]
+    branches: [master, dev]
     tags:
       - 'v*'
     paths-ignore:
@@ -14,7 +14,7 @@ on:
       - 'landing/**'
       - 'scripts/**'
   pull_request:
-    branches: [master]
+    branches: [master, dev]
     paths-ignore:
       - '**.md'
       - '.github/ISSUE_TEMPLATE/**'
@@ -105,6 +105,21 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
+      - name: Stamp dev version + patch updater endpoint (dev branch only)
+        if: github.ref == 'refs/heads/dev'
+        shell: pwsh
+        run: |
+          $conf = Get-Content tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          # Append -dev.<run_number> so updater sees a newer version each build
+          $conf.version = "$($conf.version)-dev.${{ github.run_number }}"
+          # Point updater to nightly release instead of stable latest
+          $conf.plugins.updater.endpoints = @(
+            "https://github.com/xinnaider/orbit/releases/download/nightly/latest-{{target}}-{{arch}}.json"
+          )
+          $conf | ConvertTo-Json -Depth 10 | Set-Content tauri/tauri.conf.json -Encoding utf8NoBOM
+          Write-Host "Version stamped: $($conf.version)"
+          Write-Host "Updater endpoint: $($conf.plugins.updater.endpoints[0])"
+
       - name: Build Tauri app
         run: npm run tauri:build
         env:
@@ -138,9 +153,20 @@ jobs:
       - name: Generate latest-windows-x86_64.json for updater
         shell: pwsh
         run: |
+          $isDev = "${{ github.ref }}" -eq "refs/heads/dev"
           $version = "${{ github.ref_name }}"
-          if (-not $version.StartsWith("v")) { $version = "0.0.0-nightly" }
-          $version = $version.TrimStart("v")
+          if ($version.StartsWith("v")) {
+            $version = $version.TrimStart("v")
+            $releaseTag = "v$version"
+          } elseif ($isDev) {
+            # Version was stamped as X.Y.Z-dev.<run> by the previous step
+            $conf = Get-Content tauri/tauri.conf.json -Raw | ConvertFrom-Json
+            $version = $conf.version
+            $releaseTag = "nightly"
+          } else {
+            $version = "0.0.0-nightly"
+            $releaseTag = "nightly-${{ github.run_number }}"
+          }
 
           # Tauri 2 signs the .exe directly — look for .exe.sig
           $exe = Get-ChildItem tauri/target/release/bundle/nsis -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -157,7 +183,7 @@ jobs:
 
           $signature = Get-Content $sigFile -Raw
           $pubDate = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
-          $downloadUrl = "https://github.com/xinnaider/orbit/releases/download/v$version/$($exe.Name)"
+          $downloadUrl = "https://github.com/xinnaider/orbit/releases/download/$releaseTag/$($exe.Name)"
 
           $latestJson = @{
             version   = $version
@@ -201,10 +227,18 @@ jobs:
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "make_latest=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$GITHUB_REF" == refs/heads/dev ]]; then
+            # Fixed tag — always overwritten, never promoted to "latest"
+            echo "tag=nightly" >> "$GITHUB_OUTPUT"
+            echo "name=Nightly (dev)" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "make_latest=false" >> "$GITHUB_OUTPUT"
           else
             echo "tag=nightly-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
             echo "name=nightly-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "make_latest=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create Release
@@ -214,6 +248,7 @@ jobs:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.name }}
           prerelease: ${{ steps.meta.outputs.prerelease }}
+          make_latest: ${{ steps.meta.outputs.make_latest }}
           files: |
             tauri/target/release/bundle/msi/*.msi
             tauri/target/release/bundle/msi/*.msi.sig

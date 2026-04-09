@@ -121,7 +121,14 @@ jobs:
           Write-Host "Updater endpoint: $($conf.plugins.updater.endpoints[0])"
 
       - name: Build Tauri app
-        run: npm run tauri:build
+        shell: pwsh
+        run: |
+          # MSI requires numeric-only pre-release (Windows versioning) — skip it for dev builds
+          if ("${{ github.ref }}" -eq "refs/heads/dev") {
+            npm run tauri:build -- --bundles nsis
+          } else {
+            npm run tauri:build
+          }
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

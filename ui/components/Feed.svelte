@@ -68,6 +68,7 @@
 
   let visibleFrom = 0; // index into display[] from which we render
   let isAtBottom = true;
+  let lastScrollTop = 0;
   let scrollerEl: HTMLDivElement;
 
   // When display grows, reset visibleFrom to show the tail if at bottom.
@@ -94,11 +95,26 @@
     if (!scrollerEl) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollerEl;
 
-    const newAtBottom = scrollHeight - scrollTop - clientHeight < 50;
-    if (newAtBottom !== isAtBottom) {
-      isAtBottom = newAtBottom;
-      dispatch('bottomchange', { atBottom: isAtBottom });
+    const atBottom = scrollHeight - scrollTop - clientHeight < 80;
+
+    if (atBottom) {
+      // Reached bottom — always resume following
+      if (!isAtBottom) {
+        isAtBottom = true;
+        dispatch('bottomchange', { atBottom: true });
+      }
+    } else if (scrollTop < lastScrollTop) {
+      // User scrolled UP intentionally — stop following.
+      // Ignore scroll events caused by content insertion (scrollHeight grows,
+      // scrollTop stays the same or increases) so we don't lose follow-mode
+      // just because new entries arrived.
+      if (isAtBottom) {
+        isAtBottom = false;
+        dispatch('bottomchange', { atBottom: false });
+      }
     }
+
+    lastScrollTop = scrollTop;
 
     // Near the top — load previous chunk
     if (scrollTop < 80 && visibleFrom > 0) {
@@ -129,7 +145,10 @@
     if (!scrollerEl) return;
     visibleFrom = Math.max(0, display.length - PAGE_SIZE);
     tick().then(() => {
-      if (scrollerEl) scrollerEl.scrollTop = scrollerEl.scrollHeight;
+      if (scrollerEl) {
+        scrollerEl.scrollTop = scrollerEl.scrollHeight;
+        lastScrollTop = scrollerEl.scrollTop;
+      }
     });
     isAtBottom = true;
   }

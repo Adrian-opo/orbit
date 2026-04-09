@@ -107,55 +107,52 @@
         {/if}
       {/if}
       <span class="model">{fmtModel(session.model)}</span>
-      <button
-        class="action-btn mute-btn"
-        class:muted
-        title={muted ? 'Unmute session' : 'Mute session'}
-        on:click={() => toggleMute(String(session.id))}
-      >
-        {#if muted}
-          <svg
-            width="11"
-            height="11"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-            <line x1="23" y1="9" x2="17" y2="15"></line>
-            <line x1="17" y1="9" x2="23" y2="15"></line>
-          </svg>
-        {:else}
-          <svg
-            width="11"
-            height="11"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-          </svg>
-        {/if}
-      </button>
-      {#if onSplit || onClose}
-        <div class="header-actions">
-          {#if onSplit}
-            <button class="action-btn" title="Split panel" on:click={onSplit}>⊞</button>
-          {/if}
-          {#if onClose}
-            <button class="action-btn close-action" title="Close panel" on:click={onClose}>×</button
+      <div class="header-actions">
+        <button
+          class="action-btn mute-btn"
+          class:muted
+          title={muted ? 'Unmute session' : 'Mute session'}
+          on:click={() => toggleMute(String(session.id))}
+        >
+          {#if muted}
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             >
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <line x1="23" y1="9" x2="17" y2="15"></line>
+              <line x1="17" y1="9" x2="23" y2="15"></line>
+            </svg>
+          {:else}
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+            </svg>
           {/if}
-        </div>
-      {/if}
+        </button>
+        {#if onSplit}
+          <button class="action-btn" title="Split panel" on:click={onSplit}>⊞</button>
+        {/if}
+        {#if onClose}
+          <button class="action-btn close-action" title="Close panel" on:click={onClose}>×</button>
+        {/if}
+      </div>
     </div>
   </div>
 

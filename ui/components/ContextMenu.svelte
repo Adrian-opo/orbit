@@ -3,8 +3,13 @@
 
   export let x = 0;
   export let y = 0;
-  export let items: Array<{ label: string; action: string; danger?: boolean; divider?: boolean }> =
-    [];
+  export let items: Array<{
+    label: string;
+    action: string;
+    danger?: boolean;
+    divider?: boolean;
+    html?: boolean;
+  }> = [];
 
   const dispatch = createEventDispatcher();
   let el: HTMLDivElement;
@@ -61,7 +66,11 @@
       <div class="divider"></div>
     {:else}
       <button class="item" class:danger={item.danger} on:click={() => select(item.action)}>
-        {item.label}
+        {#if item.html}
+          {@html item.label}
+        {:else}
+          {item.label}
+        {/if}
       </button>
     {/if}
   {/each}
@@ -104,5 +113,10 @@
     height: 1px;
     background: var(--bd);
     margin: 3px 4px;
+  }
+  .item :global(.ctx-icon-label) {
+    display: flex;
+    align-items: center;
+    gap: 7px;
   }
 </style>

@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { SubagentInfo, JournalEntry } from '../lib/types';
   import { getSubagentJournal } from '../lib/tauri';
-  import JournalEntryComponent from './JournalEntry.svelte';
-  import ThinkingBlock from './ThinkingBlock.svelte';
+  import Feed from './Feed.svelte';
 
   export let sessionId: string;
   export let subagents: SubagentInfo[];
@@ -40,6 +39,10 @@
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') closeModal();
   }
+
+  function statusColor(status: string): string {
+    return status === 'done' ? 'var(--s-working)' : 'var(--s-input)';
+  }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -55,7 +58,10 @@
         </div>
         {#each running as agent}
           <button class="agent-row running-row" onclick={() => openLog(agent)}>
-            <div class="agent-type">{agent.agentType} <span class="status-dot">●</span></div>
+            <div class="agent-top">
+              <span class="agent-type">{agent.agentType}</span>
+              <span class="badge badge-running">running</span>
+            </div>
             {#if agent.description}
               <div class="agent-desc">{agent.description}</div>
             {/if}
@@ -71,8 +77,11 @@
           <span class="dot done"></span> Completed ({done.length})
         </div>
         {#each done as agent}
-          <button class="agent-row" onclick={() => openLog(agent)}>
-            <div class="agent-type">{agent.agentType} <span class="check">✓</span></div>
+          <button class="agent-row done-row" onclick={() => openLog(agent)}>
+            <div class="agent-top">
+              <span class="agent-type">{agent.agentType}</span>
+              <span class="badge badge-done">done</span>
+            </div>
             {#if agent.description}
               <div class="agent-desc">{agent.description}</div>
             {/if}
@@ -88,36 +97,40 @@
   <div
     class="modal-backdrop"
     onclick={handleBackdropClick}
-    onkeydown={(e) => e.key === 'Escape' && (modalAgent = null)}
+    onkeydown={(e) => e.key === 'Escape' && closeModal()}
     role="dialog"
     tabindex="-1"
   >
     <div class="modal">
       <div class="modal-header">
-        <div class="modal-title">
+        <div class="header-left">
+          <span class="dot-status" style="color:{statusColor(modalAgent.status)}">●</span>
           <span class="modal-type">{modalAgent.agentType}</span>
           <span
             class="modal-status"
-            class:done={modalAgent.status === 'done'}
-            class:running-status={modalAgent.status === 'running'}
+            class:status-done={modalAgent.status === 'done'}
+            class:status-running={modalAgent.status === 'running'}
           >
             {modalAgent.status}
           </span>
         </div>
-        {#if modalAgent.description}
-          <div class="modal-desc">{modalAgent.description}</div>
-        {/if}
-        <button class="modal-close" onclick={closeModal}>✕</button>
+        <div class="header-right">
+          <button class="modal-close" onclick={closeModal}>×</button>
+        </div>
       </div>
+      {#if modalAgent.description}
+        <div class="desc-strip">
+          <span class="desc-icon">⊙</span>
+          <span class="desc-text">{modalAgent.description}</span>
+        </div>
+      {/if}
       <div class="modal-body">
         {#if loading}
           <p class="loading">Loading log...</p>
         {:else if modalEntries.length === 0}
           <p class="loading">No log entries found</p>
         {:else}
-          {#each modalEntries as entry}
-            <JournalEntryComponent {entry} />
-          {/each}
+          <Feed entries={modalEntries} status={modalAgent.status} />
         {/if}
       </div>
     </div>
@@ -126,11 +139,11 @@
 
 <style>
   .subagents {
-    padding: 10px;
+    padding: 8px;
   }
   .empty {
-    color: var(--text-dim);
-    font-size: 13px;
+    color: var(--t2);
+    font-size: 12px;
     text-align: center;
     padding: 20px;
   }
@@ -138,67 +151,92 @@
     margin-bottom: 12px;
   }
   .section-header {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
-    color: var(--text-muted);
+    color: var(--t2);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
   }
   .dot {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     display: inline-block;
+    flex-shrink: 0;
   }
   .dot.running {
-    background: var(--amber);
+    background: var(--s-input);
   }
   .dot.done {
-    background: var(--green);
+    background: var(--s-working);
   }
+
   .agent-row {
     display: block;
     width: 100%;
     text-align: left;
-    padding: 8px 10px;
-    border-radius: 6px;
-    margin-bottom: 3px;
-    background: var(--bg-overlay);
+    padding: 7px 9px;
+    border-radius: 5px;
+    margin-bottom: 2px;
+    background: var(--bg2);
     border: 1px solid transparent;
     cursor: pointer;
-    transition: border-color 0.15s;
+    font-family: var(--mono);
+    color: inherit;
+    transition: border-color 0.12s;
   }
   .agent-row:hover {
-    border-color: var(--border);
+    border-color: var(--bd1);
+    background: var(--bg3);
   }
   .agent-row.running-row {
-    border-left: 2px solid var(--amber);
+    border-left: 2px solid var(--s-input);
+  }
+  .agent-row.done-row {
+    border-left: 2px solid var(--s-working);
+  }
+
+  .agent-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
   .agent-type {
     font-size: 12px;
     font-weight: 500;
-    color: var(--text-primary);
+    color: var(--t0);
   }
-  .check {
-    color: var(--green);
-  }
-  .status-dot {
-    color: var(--amber);
+  .badge {
     font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-weight: 500;
   }
+  .badge-running {
+    background: rgba(232, 160, 48, 0.12);
+    color: var(--s-input);
+  }
+  .badge-done {
+    background: rgba(0, 212, 126, 0.1);
+    color: var(--s-working);
+  }
+
   .agent-desc {
     font-size: 11px;
-    color: var(--text-secondary);
+    color: var(--t1);
     margin-top: 2px;
     line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .view-hint {
     font-size: 10px;
-    color: var(--text-dim);
+    color: var(--t3);
     margin-top: 3px;
   }
 
@@ -217,73 +255,119 @@
   .modal {
     width: 70vw;
     max-width: 900px;
-    max-height: 80vh;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    height: 75vh;
+    background: var(--bg);
+    border: 1px solid var(--bd1);
+    border-radius: 8px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
+
   .modal-header {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--border);
-    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--bd);
+    flex-shrink: 0;
+    background: var(--bg1);
   }
-  .modal-title {
+  .header-left {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+  .dot-status {
+    font-size: 8px;
+    line-height: 1;
+    flex-shrink: 0;
   }
   .modal-type {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--t0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .modal-status {
-    font-size: 11px;
-    padding: 1px 8px;
-    border-radius: 8px;
-    font-weight: 500;
+    font-size: 10px;
+    color: var(--t2);
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
   }
-  .modal-status.done {
-    background: var(--green-dim);
-    color: var(--green);
+  .modal-status.status-done {
+    color: var(--s-working);
   }
-  .modal-status.running-status {
-    background: var(--amber-dim);
-    color: var(--amber);
+  .modal-status.status-running {
+    color: var(--s-input);
   }
-  .modal-desc {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-top: 4px;
+
+  .header-right {
+    flex-shrink: 0;
+    padding-left: 12px;
   }
   .modal-close {
-    position: absolute;
-    top: 12px;
-    right: 14px;
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 16px;
+    background: var(--bg3);
+    border: 1px solid var(--bd1);
+    color: var(--t2);
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    padding: 4px;
+    font-family: var(--mono);
+    line-height: 1;
+    transition:
+      border-color 0.15s,
+      color 0.15s;
   }
   .modal-close:hover {
-    color: var(--text-primary);
+    border-color: var(--s-error);
+    color: var(--s-error);
   }
+
+  .desc-strip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 14px;
+    border-bottom: 1px solid var(--bd);
+    background: var(--bg1);
+    flex-shrink: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .desc-icon {
+    font-size: 10px;
+    color: var(--t3);
+    flex-shrink: 0;
+  }
+  .desc-text {
+    font-size: 10px;
+    color: var(--t3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .modal-body {
     flex: 1;
-    overflow-y: auto;
-    padding: 12px 18px;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    overflow: hidden;
   }
   .loading {
-    color: var(--text-dim);
-    font-size: 13px;
+    color: var(--t2);
+    font-size: 12px;
     text-align: center;
     padding: 30px;
   }

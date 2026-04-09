@@ -58,6 +58,7 @@ pub fn run() {
             ipc::session::delete_session,
             ipc::project::create_project,
             ipc::project::list_projects,
+            commands::agents::get_subagents,
             commands::diff::get_diff,
             commands::diff::get_file_versions,
             commands::files::get_subagent_journal,

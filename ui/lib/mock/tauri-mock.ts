@@ -389,6 +389,9 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
     case 'get_tasks':
       return [];
 
+    case 'get_subagents':
+      return Promise.resolve([]);
+
     case 'get_changelog':
       return '# Changelog\n\n## April 2026\n\n### 04/07 · New — In-app changelog\nYou can now view the history of Orbit updates directly inside the app.';
 
@@ -520,6 +523,8 @@ function makeStateEvent(sessionId: number, status: string, extraTokens?: Partial
     contextPercent: (tokens.input + tokens.output) / 2000,
     pendingApproval: null,
     miniLog: [],
+    gitBranch: null,
+    subagents: [],
   };
 }
 

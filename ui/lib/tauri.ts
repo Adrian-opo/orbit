@@ -2,7 +2,7 @@ import { invoke as _invoke } from '@tauri-apps/api/core';
 import { listen as _listen } from '@tauri-apps/api/event';
 import { getVersion as _getVersion } from '@tauri-apps/api/app';
 import type { Session, TokenUsage, MiniLogEntry } from './stores/sessions';
-import type { JournalEntry, SlashCommand, TaskItem, UpdateInfo } from './types';
+import type { JournalEntry, SlashCommand, TaskItem, UpdateInfo, SubagentInfo } from './types';
 import { mockInvoke, mockListen } from './mock/tauri-mock';
 
 const IS_MOCK =
@@ -73,6 +73,10 @@ export async function getSubagentJournal(
   return await invoke('get_subagent_journal', { sessionId, subagentId });
 }
 
+export async function getSubagents(sessionId: number): Promise<SubagentInfo[]> {
+  return await invoke('get_subagents', { sessionId });
+}
+
 export async function getSlashCommands(): Promise<SlashCommand[]> {
   return await invoke('get_slash_commands');
 }
@@ -109,6 +113,7 @@ export interface SessionStatePayload {
   pendingApproval: string | null;
   miniLog: MiniLogEntry[];
   gitBranch: string | null;
+  subagents: SubagentInfo[];
 }
 
 export function onSessionCreated(cb: (session: Session) => void) {

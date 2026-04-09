@@ -1,5 +1,6 @@
 import { writable, derived } from 'svelte/store';
 import { splitLayout } from './layout';
+import type { SubagentInfo } from '../types';
 
 export interface TokenUsage {
   input: number;
@@ -32,6 +33,7 @@ export interface Session {
   contextPercent: number | null;
   pendingApproval: string | null;
   miniLog: MiniLogEntry[] | null;
+  subagents?: SubagentInfo[];
   createdAt: string;
   updatedAt: string;
 }

@@ -120,6 +120,7 @@
           pendingApproval: p.pendingApproval,
           miniLog: p.miniLog,
           gitBranch: p.gitBranch ?? null,
+          subagents: p.subagents,
         })
       );
     });

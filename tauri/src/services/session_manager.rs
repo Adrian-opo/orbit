@@ -34,6 +34,7 @@ pub struct SessionStateEvent {
     pub pending_approval: Option<String>,
     pub mini_log: Vec<crate::models::MiniLogEntry>,
     pub git_branch: Option<String>,
+    pub subagents: Vec<crate::models::SubagentInfo>,
 }
 
 struct ActiveSession {
@@ -358,6 +359,14 @@ impl SessionManager {
                             .get(&session_id)
                             .and_then(|a| a.session.cwd.clone());
                         let git_branch = cwd.as_deref().and_then(detect_git_branch);
+                        let claude_session_id = m
+                            .active
+                            .get(&session_id)
+                            .and_then(|a| a.claude_session_id.clone());
+                        let subagents = claude_session_id
+                            .as_deref()
+                            .map(crate::agent_tree::read_subagents)
+                            .unwrap_or_default();
 
                         let state = m.journal_states.entry(session_id).or_default();
 
@@ -397,6 +406,7 @@ impl SessionManager {
                             pending_approval: state.pending_approval.clone(),
                             mini_log: state.mini_log.clone(),
                             git_branch,
+                            subagents,
                         };
                         (new_entries, event)
                     };

@@ -14,8 +14,30 @@
   import OrbitLogo from '../lib/assets/orbit.svg?raw';
   import ThemePicker from './ThemePicker.svelte';
 
-  const MUTED_SVG = `<span class="ctx-icon-label"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>Unmute</span>`;
-  const UNMUTED_SVG = `<span class="ctx-icon-label"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>Mute</span>`;
+  function ctxIcon(paths: string, label: string) {
+    return `<span class="ctx-icon-label"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>${label}</span>`;
+  }
+
+  const CTX_RENAME = ctxIcon(
+    `<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>`,
+    'Rename'
+  );
+  const CTX_MUTE = ctxIcon(
+    `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>`,
+    'Mute'
+  );
+  const CTX_UNMUTE = ctxIcon(
+    `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>`,
+    'Unmute'
+  );
+  const CTX_STOP = ctxIcon(
+    `<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>`,
+    'Force Stop'
+  );
+  const CTX_DELETE = ctxIcon(
+    `<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>`,
+    'Delete'
+  );
 
   // Context menu state
   let ctxMenu: { x: number; y: number; sessionId: number; sessionName: string } | null = null;
@@ -123,11 +145,11 @@
     x={ctxMenu.x}
     y={ctxMenu.y}
     items={[
-      { label: 'Rename', action: 'rename', danger: false },
-      { label: isMuted ? MUTED_SVG : UNMUTED_SVG, action: 'mute', danger: false, html: true },
-      { label: 'Force Stop', action: 'stop', danger: false },
+      { label: CTX_RENAME, action: 'rename', danger: false, html: true },
+      { label: isMuted ? CTX_UNMUTE : CTX_MUTE, action: 'mute', danger: false, html: true },
+      { label: CTX_STOP, action: 'stop', danger: false, html: true },
       { label: '—', action: 'divider', divider: true },
-      { label: 'Delete', action: 'delete', danger: true },
+      { label: CTX_DELETE, action: 'delete', danger: true, html: true },
     ]}
     on:select={(e) => handleCtxAction(e.detail)}
     on:close={() => (ctxMenu = null)}

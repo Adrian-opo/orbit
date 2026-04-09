@@ -1,15 +1,19 @@
 <script lang="ts">
   import type { Session } from '../lib/stores/sessions';
   import { formatTokens } from '../lib/cost';
-  import { stopSession } from '../lib/tauri';
+  import { stopSession, getSubagents } from '../lib/tauri';
   import { isActive } from '../lib/status';
   import { metaPanelVisible } from '../lib/stores/preferences';
+  import { sessions, updateSessionState } from '../lib/stores/sessions';
   import TasksList from './TasksList.svelte';
+  import SubagentsPanel from './SubagentsPanel.svelte';
 
   export let session: Session;
 
-  type Tab = 'stats' | 'tasks';
+  type Tab = 'stats' | 'tasks' | 'agents';
   let tab: Tab = 'stats';
+
+  let refreshing = false;
 
   async function stop() {
     try {
@@ -19,11 +23,25 @@
     }
   }
 
+  async function refreshAgents() {
+    if (refreshing) return;
+    refreshing = true;
+    try {
+      const subagents = await getSubagents(session.id);
+      sessions.update((l) => updateSessionState(l, session.id, { subagents }));
+    } catch (_e) {
+      /* no-op */
+    } finally {
+      refreshing = false;
+    }
+  }
+
   $: tokens = session.tokens;
   $: total = (tokens?.input ?? 0) + (tokens?.output ?? 0);
   $: ctx = session.contextPercent ?? 0;
   $: active = isActive(session.status);
   $: stopped = session.status === 'stopped';
+  $: agentCount = session.subagents?.length ?? 0;
 </script>
 
 <aside class="meta">
@@ -34,8 +52,20 @@
     <button class="tab" class:active={tab === 'tasks'} on:click={() => (tab = 'tasks')}
       >tasks</button
     >
+    <button class="tab" class:active={tab === 'agents'} on:click={() => (tab = 'agents')}>
+      agents{#if agentCount > 0}<span class="tab-badge">{agentCount}</span>{/if}
+    </button>
     <span class="tabs-spacer"></span>
-    {#if active}
+    {#if tab === 'agents'}
+      <button
+        class="stop-btn"
+        on:click={refreshAgents}
+        disabled={refreshing}
+        title="Refresh sub-agents"
+      >
+        {refreshing ? '…' : '↺'}
+      </button>
+    {:else if active}
       <button class="stop-btn" on:click={stop} title="Stop session">■</button>
     {:else if stopped}
       <span class="stopped-badge" title="Session stopped — type to resume">stopped</span>
@@ -118,8 +148,10 @@
           </div>
         </div>
       </div>
-    {:else}
+    {:else if tab === 'tasks'}
       <TasksList sessionId={String(session.id)} />
+    {:else}
+      <SubagentsPanel sessionId={String(session.id)} subagents={session.subagents ?? []} />
     {/if}
   </div>
 </aside>
@@ -159,6 +191,18 @@
     color: var(--t0);
     border-bottom-color: var(--ac);
   }
+  .tab-badge {
+    display: inline-block;
+    margin-left: 3px;
+    font-size: 9px;
+    background: var(--ac);
+    color: var(--bg);
+    border-radius: 8px;
+    padding: 0 4px;
+    line-height: 1.4;
+    vertical-align: middle;
+  }
+
   .tabs-spacer {
     flex: 1;
   }

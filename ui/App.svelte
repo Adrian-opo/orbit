@@ -32,7 +32,7 @@
   import type { UpdateInfo } from './lib/types';
   import Sidebar from './components/Sidebar.svelte';
   import PaneGrid from './components/PaneGrid.svelte';
-  import RightPanel from './components/RightPanel.svelte';
+  import MetaPanel from './components/MetaPanel.svelte';
   import { metaPanelVisible } from './lib/stores/preferences';
   import { mutedSessions } from './lib/stores/ui';
 
@@ -220,7 +220,7 @@
     <PaneGrid />
   {/if}
   {#if selected && $metaPanelVisible}
-    <RightPanel />
+    <MetaPanel session={selected} />
   {:else if selected && !$metaPanelVisible}
     <button class="meta-reopen" on:click={() => metaPanelVisible.set(true)} title="Show panel"
       >‹</button

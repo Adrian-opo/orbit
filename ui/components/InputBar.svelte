@@ -34,6 +34,7 @@
 
   const MODEL_ALIASES: Record<string, string> = {
     opus: 'claude-opus-4-6',
+    'opus-1m': 'claude-opus-4-6[1m]',
     sonnet: 'claude-sonnet-4-6',
     haiku: 'claude-haiku-4-5-20251001',
   };
@@ -42,7 +43,7 @@
 
   // Orbit-native commands added to suggestions
   const ORBIT_COMMANDS: SlashCommand[] = [
-    { cmd: '/model', desc: 'Switch model (opus, sonnet, haiku)', category: 'orbit' },
+    { cmd: '/model', desc: 'Switch model (opus, opus-1m, sonnet, haiku)', category: 'orbit' },
 
     { cmd: '/effort', desc: 'Set thinking effort (low, medium, high, max)', category: 'orbit' },
   ];

@@ -619,6 +619,10 @@ impl SessionManager {
         if let Some(a) = self.active.get_mut(&session_id) {
             a.session.model = Some(model.to_string());
         }
+        // Reset context_window so it re-derives from the new model
+        if let Some(state) = self.journal_states.get_mut(&session_id) {
+            state.context_window = None;
+        }
         self.db
             .update_session_model(session_id, model)
             .map_err(|e| e.to_string())

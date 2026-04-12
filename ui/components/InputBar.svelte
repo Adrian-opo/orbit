@@ -202,7 +202,9 @@
       text = '';
       if (textarea) textarea.style.height = 'auto';
       await updateSessionModel(sessionId, resolved);
-      sessions.update((l) => updateSessionState(l, sessionId, { model: resolved }));
+      sessions.update((l) =>
+        updateSessionState(l, sessionId, { model: resolved, contextWindow: null })
+      );
       emitSystemEntry(`Model changed to ${modelDisplayName(resolved)}`);
       return;
     }

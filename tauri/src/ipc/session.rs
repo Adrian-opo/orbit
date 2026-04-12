@@ -88,6 +88,32 @@ pub fn send_session_message(
     state: State<SessionState>,
     app: AppHandle,
 ) -> Result<(), IpcError> {
+    let trimmed = message.trim();
+
+    // Intercept /model — requires interactive input, not supported in non-interactive mode
+    if trimmed.eq_ignore_ascii_case("/model") || trimmed.to_lowercase().starts_with("/model ") {
+        let arg = trimmed.get(7..).unwrap_or("").trim();
+        if arg.is_empty() {
+            return Err(IpcError::Other(
+                "Usage: /model <name> (opus, sonnet, haiku)".to_string(),
+            ));
+        }
+        state.write().update_session_model(session_id, arg)?;
+        return Ok(());
+    }
+
+    // Intercept /effort
+    if trimmed.eq_ignore_ascii_case("/effort") || trimmed.to_lowercase().starts_with("/effort ") {
+        let arg = trimmed.get(8..).unwrap_or("").trim();
+        if arg.is_empty() {
+            return Err(IpcError::Other(
+                "Usage: /effort <level> (low, medium, high, max)".to_string(),
+            ));
+        }
+        state.write().update_session_effort(session_id, arg)?;
+        return Ok(());
+    }
+
     Ok(SessionManager::send_message(
         Arc::clone(&state.0),
         app,

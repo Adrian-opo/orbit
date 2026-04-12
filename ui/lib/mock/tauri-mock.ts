@@ -430,8 +430,10 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
           name: 'Codex',
           cliAvailable: true,
           models: [
-            { id: 'o3', name: 'o3', context: 200000, output: 100000 },
-            { id: 'o4-mini', name: 'o4-mini', context: 200000, output: 100000 },
+            { id: 'gpt-5.4', name: 'gpt-5.4', context: null, output: null },
+            { id: 'gpt-5.4-mini', name: 'gpt-5.4-mini', context: null, output: null },
+            { id: 'gpt-5.3-codex', name: 'gpt-5.3-codex', context: null, output: null },
+            { id: 'gpt-5.2', name: 'gpt-5.2', context: null, output: null },
           ],
           subProviders: [],
         },

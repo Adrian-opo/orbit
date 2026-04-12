@@ -11,31 +11,40 @@ pub struct ModelInfo {
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ProviderInfo {
+pub struct SubProvider {
     pub id: String,
     pub name: String,
     pub env: Vec<String>,
-    pub models: Vec<ModelInfo>,
     pub configured: bool,
-    pub cli_available: bool,
-    /// "claude" | "opencode" | "codex"
-    pub cli_backend: String,
+    pub models: Vec<ModelInfo>,
 }
 
-/// Read providers from ~/.cache/opencode/models.json + detect installed CLIs.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CliBackend {
+    pub id: String,
+    pub name: String,
+    pub cli_available: bool,
+    /// Direct models (for claude-code and codex)
+    pub models: Vec<ModelInfo>,
+    /// Sub-providers (for opencode only)
+    pub sub_providers: Vec<SubProvider>,
+}
+
+/// Return the 3 CLI backends with their models/sub-providers.
 #[tauri::command]
-pub fn get_providers() -> Vec<ProviderInfo> {
+pub fn get_providers() -> Vec<CliBackend> {
     let claude_available = find_claude().is_some();
     let opencode_available = find_opencode().is_some();
     let codex_available = find_codex().is_some();
 
-    let mut providers = vec![];
+    let mut backends = vec![];
 
-    // 1. Claude Code — always first, hardcoded models
-    providers.push(ProviderInfo {
+    // 1. Claude Code
+    backends.push(CliBackend {
         id: "claude-code".to_string(),
         name: "Claude Code".to_string(),
-        env: vec![],
+        cli_available: claude_available,
         models: vec![
             ModelInfo {
                 id: "auto".to_string(),
@@ -62,16 +71,14 @@ pub fn get_providers() -> Vec<ProviderInfo> {
                 output: Some(64_000),
             },
         ],
-        configured: true,
-        cli_available: claude_available,
-        cli_backend: "claude".to_string(),
+        sub_providers: vec![],
     });
 
-    // 2. Codex — hardcoded models
-    providers.push(ProviderInfo {
+    // 2. Codex — auth via CLI (codex login), no API key needed
+    backends.push(CliBackend {
         id: "codex".to_string(),
         name: "Codex".to_string(),
-        env: vec!["OPENAI_API_KEY".to_string()],
+        cli_available: codex_available,
         models: vec![
             ModelInfo {
                 id: "o3".to_string(),
@@ -98,14 +105,38 @@ pub fn get_providers() -> Vec<ProviderInfo> {
                 output: Some(100_000),
             },
         ],
-        configured: std::env::var("OPENAI_API_KEY").is_ok(),
-        cli_available: codex_available,
-        cli_backend: "codex".to_string(),
+        sub_providers: vec![],
     });
 
-    // 3. Read opencode models.json for all other providers
-    if let Some(opencode_providers) = read_opencode_models() {
-        for (id, provider) in opencode_providers {
+    // 3. OpenCode — sub-providers from ~/.cache/opencode/models.json
+    let sub_providers = read_opencode_providers().unwrap_or_default();
+    backends.push(CliBackend {
+        id: "opencode".to_string(),
+        name: "OpenCode".to_string(),
+        cli_available: opencode_available,
+        models: vec![],
+        sub_providers,
+    });
+
+    backends
+}
+
+/// Check if an environment variable exists (without exposing the value).
+#[tauri::command]
+pub fn check_env_var(name: String) -> bool {
+    std::env::var(&name).is_ok()
+}
+
+fn read_opencode_providers() -> Option<Vec<SubProvider>> {
+    let home = dirs::home_dir()?;
+    let path = home.join(".cache").join("opencode").join("models.json");
+    let content = std::fs::read_to_string(&path).ok()?;
+    let data: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let obj = data.as_object()?;
+
+    let mut result: Vec<SubProvider> = obj
+        .iter()
+        .map(|(id, provider)| {
             let env_vars: Vec<String> = provider
                 .get("env")
                 .and_then(|v| v.as_array())
@@ -121,7 +152,7 @@ pub fn get_providers() -> Vec<ProviderInfo> {
             let name = provider
                 .get("name")
                 .and_then(|v| v.as_str())
-                .unwrap_or(&id)
+                .unwrap_or(id)
                 .to_string();
 
             let models: Vec<ModelInfo> = provider
@@ -143,35 +174,16 @@ pub fn get_providers() -> Vec<ProviderInfo> {
                 })
                 .unwrap_or_default();
 
-            providers.push(ProviderInfo {
-                id,
+            SubProvider {
+                id: id.clone(),
                 name,
                 env: env_vars,
-                models,
                 configured,
-                cli_available: opencode_available,
-                cli_backend: "opencode".to_string(),
-            });
-        }
-    }
+                models,
+            }
+        })
+        .collect();
 
-    providers
-}
-
-/// Check if an environment variable exists (without exposing the value).
-#[tauri::command]
-pub fn check_env_var(name: String) -> bool {
-    std::env::var(&name).is_ok()
-}
-
-fn read_opencode_models() -> Option<Vec<(String, serde_json::Value)>> {
-    let home = dirs::home_dir()?;
-    let path = home.join(".cache").join("opencode").join("models.json");
-    let content = std::fs::read_to_string(&path).ok()?;
-    let data: serde_json::Value = serde_json::from_str(&content).ok()?;
-    let obj = data.as_object()?;
-    let mut result: Vec<(String, serde_json::Value)> =
-        obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-    result.sort_by(|a, b| a.0.cmp(&b.0));
+    result.sort_by(|a, b| a.name.cmp(&b.name));
     Some(result)
 }

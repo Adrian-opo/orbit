@@ -417,43 +417,59 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
         {
           id: 'claude-code',
           name: 'Claude Code',
-          env: [],
+          cliAvailable: true,
           models: [
             { id: 'auto', name: 'auto', context: null, output: null },
             { id: 'claude-sonnet-4-6', name: 'sonnet-4.6', context: 1000000, output: 64000 },
             { id: 'claude-opus-4-6', name: 'opus-4.6', context: 1000000, output: 128000 },
           ],
-          configured: true,
-          cliAvailable: true,
-          cliBackend: 'claude',
+          subProviders: [],
         },
         {
           id: 'codex',
           name: 'Codex',
-          env: ['OPENAI_API_KEY'],
+          cliAvailable: true,
           models: [
             { id: 'o3', name: 'o3', context: 200000, output: 100000 },
             { id: 'o4-mini', name: 'o4-mini', context: 200000, output: 100000 },
           ],
-          configured: false,
-          cliAvailable: true,
-          cliBackend: 'codex',
+          subProviders: [],
         },
         {
-          id: 'openrouter',
-          name: 'OpenRouter',
-          env: ['OPENROUTER_API_KEY'],
-          models: [
+          id: 'opencode',
+          name: 'OpenCode',
+          cliAvailable: true,
+          models: [],
+          subProviders: [
             {
-              id: 'anthropic/claude-sonnet-4',
-              name: 'Claude Sonnet 4',
-              context: 200000,
-              output: 64000,
+              id: 'openrouter',
+              name: 'OpenRouter',
+              env: ['OPENROUTER_API_KEY'],
+              configured: false,
+              models: [
+                {
+                  id: 'anthropic/claude-sonnet-4',
+                  name: 'Claude Sonnet 4',
+                  context: 200000,
+                  output: 64000,
+                },
+              ],
+            },
+            {
+              id: 'anthropic',
+              name: 'Anthropic',
+              env: ['ANTHROPIC_API_KEY'],
+              configured: true,
+              models: [
+                {
+                  id: 'claude-sonnet-4-6',
+                  name: 'Claude Sonnet 4.6',
+                  context: 1000000,
+                  output: 64000,
+                },
+              ],
             },
           ],
-          configured: false,
-          cliAvailable: true,
-          cliBackend: 'opencode',
         },
       ];
 

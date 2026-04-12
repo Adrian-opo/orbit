@@ -8,7 +8,7 @@
     getProviders,
     checkEnvVar,
   } from '../lib/tauri';
-  import type { SpawnDiagnostic, ProviderInfo } from '../lib/tauri';
+  import type { SpawnDiagnostic, CliBackend, SubProvider } from '../lib/tauri';
   import { generateAgentName } from '../lib/android-names';
 
   const dispatch = createEventDispatcher();
@@ -16,7 +16,8 @@
   let path = '';
   let prompt = '';
   let model = 'auto';
-  let providerId = 'claude-code';
+  let backendId = 'claude-code';
+  let subProviderId = '';
   let apiKeyOverride = '';
   let loading = false;
   let error = '';
@@ -27,53 +28,39 @@
   let generatedAgent = '';
   let generatedProject = '';
   let useWorktree = false;
+  let subProviderSearch = '';
 
-  // Provider data from backend
-  let allProviders: ProviderInfo[] = [];
-  let providerSearch = '';
+  let backends: CliBackend[] = [];
 
-  // Favorites shown at top of selector
-  const FAVORITE_IDS = [
-    'claude-code',
-    'codex',
-    'openrouter',
-    'anthropic',
-    'openai',
-    'google',
-    'deepseek',
-  ];
+  $: selectedBackend = backends.find((b) => b.id === backendId) ?? null;
+  $: isClaude = backendId === 'claude-code';
+  $: isOpenCode = backendId === 'opencode';
+  $: hasSubProviders = isOpenCode && (selectedBackend?.subProviders?.length ?? 0) > 0;
 
-  $: selectedProvider = allProviders.find((p) => p.id === providerId) ?? null;
-  $: providerModels = selectedProvider?.models ?? [];
-  $: isClaude = providerId === 'claude-code';
-  $: needsApiKey = selectedProvider && selectedProvider.env.length > 0;
-  $: envVarName = selectedProvider?.env?.[0] ?? '';
+  // Sub-provider selection (OpenCode only)
+  $: selectedSubProvider = hasSubProviders
+    ? (selectedBackend?.subProviders.find((p) => p.id === subProviderId) ?? null)
+    : null;
 
-  // Filter providers for the search dropdown
-  $: favoriteProviders = allProviders.filter((p) => FAVORITE_IDS.includes(p.id));
-  $: otherProviders = allProviders.filter(
+  // Filtered sub-providers for search
+  $: filteredSubProviders = (selectedBackend?.subProviders ?? []).filter(
     (p) =>
-      !FAVORITE_IDS.includes(p.id) &&
-      (providerSearch === '' || p.name.toLowerCase().includes(providerSearch.toLowerCase()))
+      subProviderSearch === '' ||
+      p.name.toLowerCase().includes(subProviderSearch.toLowerCase()) ||
+      p.id.toLowerCase().includes(subProviderSearch.toLowerCase())
   );
 
-  onMount(async () => {
-    try {
-      allProviders = await getProviders();
-    } catch (e) {
-      console.warn('[NewSessionModal] getProviders failed:', e);
-    }
-  });
+  // Models depend on backend type
+  $: currentModels = isOpenCode
+    ? (selectedSubProvider?.models ?? [])
+    : (selectedBackend?.models ?? []);
 
-  // Reset model when provider changes
-  $: {
-    if (selectedProvider) {
-      const first = selectedProvider.models[0];
-      model = first?.id ?? '';
-    }
-  }
+  // API key needed?
+  $: envVars = selectedSubProvider?.env ?? [];
+  $: needsApiKey = isOpenCode && envVars.length > 0;
+  $: envVarName = envVars[0] ?? '';
 
-  // Check API key configured status when provider changes
+  // Check if API key is already configured
   let keyConfigured = false;
   $: if (envVarName) {
     checkEnvVar(envVarName)
@@ -81,6 +68,29 @@
       .catch(() => (keyConfigured = false));
   } else {
     keyConfigured = false;
+  }
+
+  onMount(async () => {
+    try {
+      backends = await getProviders();
+      // Pre-select first sub-provider if OpenCode
+      const oc = backends.find((b) => b.id === 'opencode');
+      if (oc?.subProviders?.length) {
+        subProviderId = oc.subProviders[0].id;
+      }
+    } catch (e) {
+      console.warn('[NewSessionModal] getProviders failed:', e);
+    }
+  });
+
+  // Reset model when backend or sub-provider changes
+  let prevBackendId = backendId;
+  let prevSubProviderId = subProviderId;
+  $: if (backendId !== prevBackendId || subProviderId !== prevSubProviderId) {
+    prevBackendId = backendId;
+    prevSubProviderId = subProviderId;
+    const first = currentModels[0];
+    model = first?.id ?? '';
   }
 
   $: if (path) {
@@ -112,13 +122,27 @@
     if (sel && typeof sel === 'string') path = sel;
   }
 
+  function resolveProvider(): string {
+    if (isOpenCode && subProviderId) return subProviderId;
+    return backendId;
+  }
+
+  function resolveModel(): string | undefined {
+    if (!model || model === 'auto') return isClaude ? undefined : model;
+    // For opencode, model needs "subprovider/model" format
+    if (isOpenCode && subProviderId && !model.includes('/')) {
+      return `${subProviderId}/${model}`;
+    }
+    return model;
+  }
+
   async function submit() {
     if (!path.trim()) {
       error = 'project path required';
       return;
     }
-    if (!selectedProvider?.cliAvailable) {
-      error = `${selectedProvider?.name ?? providerId} CLI not found`;
+    if (!selectedBackend?.cliAvailable) {
+      error = `${selectedBackend?.name ?? backendId} CLI not found`;
       return;
     }
     const agent = agentName.trim() || generatedAgent || generateAgentName();
@@ -131,13 +155,12 @@
       const session = await createSession({
         projectPath: path.trim(),
         prompt: prompt.trim() || 'Hello',
-        model: model === 'auto' ? undefined : model,
+        model: resolveModel(),
         permissionMode: 'ignore',
         sessionName: finalName,
         useWorktree: isClaude ? useWorktree : false,
-        provider: providerId,
+        provider: resolveProvider(),
       });
-      // Pass API key override if provided
       if (needsApiKey && apiKeyOverride.trim()) {
         await setSessionApiKey(session.id, apiKeyOverride.trim());
       }
@@ -153,16 +176,9 @@
     if (e.key === 'Escape') dispatch('cancel');
   }
 
-  function statusIcon(p: ProviderInfo): string {
-    if (!p.cliAvailable) return '○';
-    if (p.configured || p.env.length === 0) return '●';
-    return '◐';
-  }
-
-  function statusColor(p: ProviderInfo): string {
-    if (!p.cliAvailable) return 'var(--t3)';
-    if (p.configured || p.env.length === 0) return 'var(--s-working)';
-    return 'var(--s-input)';
+  function selectSubProvider(p: SubProvider) {
+    subProviderId = p.id;
+    subProviderSearch = '';
   }
 </script>
 
@@ -212,83 +228,93 @@
       ></textarea>
     </div>
 
-    <!-- Provider selector -->
+    <!-- CLI Backend selector -->
     <div class="field">
-      <label class="label" for="ns-provider">provider</label>
-      <div class="provider-grid">
-        {#each favoriteProviders as p}
+      <!-- svelte-ignore a11y_label_has_associated_control -->
+      <label class="label">backend</label>
+      <div class="backend-row">
+        {#each backends as b}
           <button
-            class="provider-chip"
-            class:active={providerId === p.id}
-            class:unavailable={!p.cliAvailable}
-            disabled={loading}
-            on:click={() => (providerId = p.id)}
-            title={p.cliAvailable ? p.name : `${p.name} (CLI not installed)`}
+            class="backend-chip"
+            class:active={backendId === b.id}
+            class:unavailable={!b.cliAvailable}
+            disabled={loading || !b.cliAvailable}
+            on:click={() => (backendId = b.id)}
+            title={b.cliAvailable ? b.name : `${b.name} (not installed)`}
           >
-            <span class="chip-dot" style="color:{statusColor(p)}">{statusIcon(p)}</span>
-            <span class="chip-name">{p.name}</span>
+            <span class="chip-dot" style="color:{b.cliAvailable ? 'var(--s-working)' : 'var(--t3)'}"
+              >{b.cliAvailable ? '●' : '○'}</span
+            >
+            <span>{b.name}</span>
           </button>
         {/each}
       </div>
-      {#if allProviders.length > FAVORITE_IDS.length}
+    </div>
+
+    <!-- OpenCode: sub-provider selector -->
+    {#if hasSubProviders}
+      <div class="field">
+        <!-- svelte-ignore a11y_label_has_associated_control -->
+        <label class="label">provider</label>
         <input
-          class="input provider-search"
-          bind:value={providerSearch}
-          placeholder="search providers..."
+          class="input sub-search"
+          bind:value={subProviderSearch}
+          placeholder="search providers... ({selectedBackend?.subProviders.length ?? 0} available)"
           disabled={loading}
         />
-        {#if providerSearch}
-          <div class="provider-results">
-            {#each otherProviders.slice(0, 12) as p}
-              <button
-                class="provider-result"
-                class:active={providerId === p.id}
-                disabled={loading || !p.cliAvailable}
-                on:click={() => {
-                  providerId = p.id;
-                  providerSearch = '';
-                }}
+        <div class="sub-list">
+          {#each subProviderSearch ? filteredSubProviders : (selectedBackend?.subProviders ?? []).slice(0, 20) as p}
+            <button
+              class="sub-item"
+              class:active={subProviderId === p.id}
+              disabled={loading}
+              on:click={() => selectSubProvider(p)}
+            >
+              <span
+                class="chip-dot"
+                style="color:{p.configured ? 'var(--s-working)' : 'var(--s-input)'}"
+                >{p.configured ? '●' : '◐'}</span
               >
-                <span class="chip-dot" style="color:{statusColor(p)}">{statusIcon(p)}</span>
-                <span>{p.name}</span>
-                <span class="result-count">{p.models.length} models</span>
-              </button>
-            {/each}
-            {#if otherProviders.length === 0}
-              <div class="no-results">no providers match "{providerSearch}"</div>
-            {/if}
-          </div>
-        {/if}
-      {/if}
-    </div>
+              <span class="sub-name">{p.name}</span>
+              <span class="sub-count">{p.models.length}</span>
+            </button>
+          {/each}
+          {#if subProviderSearch && filteredSubProviders.length === 0}
+            <div class="no-results">no providers match "{subProviderSearch}"</div>
+          {/if}
+        </div>
+      </div>
+    {/if}
 
     <!-- Model selector -->
-    <div class="field">
-      <label class="label" for="ns-model">model</label>
-      {#if providerModels.length <= 10}
-        <select id="ns-model" class="input select" bind:value={model} disabled={loading}>
-          {#each providerModels as m}
-            <option value={m.id}>{m.name}</option>
-          {/each}
-        </select>
-      {:else}
-        <input
-          id="ns-model"
-          class="input"
-          list="model-list"
-          bind:value={model}
-          placeholder="search models..."
-          disabled={loading}
-        />
-        <datalist id="model-list">
-          {#each providerModels as m}
-            <option value={m.id}>{m.name}</option>
-          {/each}
-        </datalist>
-      {/if}
-    </div>
+    {#if currentModels.length > 0}
+      <div class="field">
+        <label class="label" for="ns-model">model</label>
+        {#if currentModels.length <= 15}
+          <select id="ns-model" class="input select" bind:value={model} disabled={loading}>
+            {#each currentModels as m}
+              <option value={m.id}>{m.name}</option>
+            {/each}
+          </select>
+        {:else}
+          <input
+            id="ns-model"
+            class="input"
+            list="model-list"
+            bind:value={model}
+            placeholder="search models..."
+            disabled={loading}
+          />
+          <datalist id="model-list">
+            {#each currentModels as m}
+              <option value={m.id}>{m.name}</option>
+            {/each}
+          </datalist>
+        {/if}
+      </div>
+    {/if}
 
-    <!-- API Key -->
+    <!-- API Key (OpenCode sub-providers only) -->
     {#if needsApiKey}
       <div class="field">
         <label class="label" for="ns-apikey">
@@ -482,60 +508,58 @@
     color: var(--t0);
   }
 
-  /* Provider chips */
-  .provider-grid {
+  /* Backend chips */
+  .backend-row {
     display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
+    gap: 6px;
   }
-  .provider-chip {
+  .backend-chip {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
+    flex: 1;
+    justify-content: center;
     background: var(--bg2);
     border: 1px solid var(--bd1);
     border-radius: 3px;
-    padding: 4px 8px;
-    font-size: var(--xs);
+    padding: 7px 10px;
+    font-size: var(--sm);
     color: var(--t1);
     cursor: pointer;
     transition: all 0.15s;
   }
-  .provider-chip:hover {
+  .backend-chip:hover {
     border-color: var(--bd2);
     color: var(--t0);
   }
-  .provider-chip.active {
+  .backend-chip.active {
     border-color: var(--ac);
     color: var(--ac);
     background: rgba(0, 212, 126, 0.08);
   }
-  .provider-chip.unavailable {
-    opacity: 0.4;
+  .backend-chip.unavailable {
+    opacity: 0.35;
   }
   .chip-dot {
     font-size: 8px;
     line-height: 1;
   }
-  .chip-name {
-    white-space: nowrap;
-  }
 
-  .provider-search {
-    margin-top: 6px;
+  /* Sub-provider list */
+  .sub-search {
     font-size: var(--xs);
     padding: 4px 8px;
   }
-  .provider-results {
+  .sub-list {
     display: flex;
     flex-direction: column;
-    max-height: 180px;
+    max-height: 160px;
     overflow-y: auto;
     border: 1px solid var(--bd1);
     border-radius: 3px;
     background: var(--bg2);
   }
-  .provider-result {
+  .sub-item {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -548,19 +572,28 @@
     cursor: pointer;
     border-bottom: 1px solid var(--bd);
   }
-  .provider-result:hover,
-  .provider-result.active {
+  .sub-item:hover {
     background: var(--bg3);
     color: var(--t0);
   }
-  .provider-result:disabled {
+  .sub-item.active {
+    background: rgba(0, 212, 126, 0.06);
+    color: var(--ac);
+  }
+  .sub-item:disabled {
     opacity: 0.3;
     cursor: not-allowed;
   }
-  .result-count {
-    margin-left: auto;
+  .sub-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sub-count {
     color: var(--t3);
     font-size: 10px;
+    flex-shrink: 0;
   }
   .no-results {
     padding: 8px;

@@ -75,17 +75,23 @@ export interface ModelInfo {
   output: number | null;
 }
 
-export interface ProviderInfo {
+export interface SubProvider {
   id: string;
   name: string;
   env: string[];
-  models: ModelInfo[];
   configured: boolean;
-  cliAvailable: boolean;
-  cliBackend: string;
+  models: ModelInfo[];
 }
 
-export async function getProviders(): Promise<ProviderInfo[]> {
+export interface CliBackend {
+  id: string;
+  name: string;
+  cliAvailable: boolean;
+  models: ModelInfo[];
+  subProviders: SubProvider[];
+}
+
+export async function getProviders(): Promise<CliBackend[]> {
   return await invoke('get_providers');
 }
 

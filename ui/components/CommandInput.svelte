@@ -199,6 +199,14 @@
     if (textareaEl) textareaEl.style.height = 'auto';
 
     // Intercept /model
+    if (/^\/model$/i.test(text)) {
+      addToast({
+        type: 'info',
+        message: `Usage: /model <name> (opus, sonnet, haiku, opus-4, sonnet-4, sonnet-4.5)`,
+        autoDismiss: true,
+      });
+      return;
+    }
     const modelMatch = text.match(/^\/model\s+(.+)$/i);
     if (modelMatch) {
       const arg = modelMatch[1].trim().toLowerCase();
@@ -210,6 +218,14 @@
     }
 
     // Intercept /effort
+    if (/^\/effort$/i.test(text)) {
+      addToast({
+        type: 'info',
+        message: `Usage: /effort <level> (low, medium, high, max)`,
+        autoDismiss: true,
+      });
+      return;
+    }
     const effortMatch = text.match(/^\/effort\s+(.+)$/i);
     if (effortMatch) {
       const level = effortMatch[1].trim().toLowerCase();

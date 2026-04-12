@@ -19,6 +19,7 @@
   export let cwd: string = '';
   export let sessionStatus: string = '';
   export let provider: string = 'claude-code';
+  export let providerModels: string[] = [];
 
   let text = '';
   let textarea: HTMLTextAreaElement;
@@ -33,8 +34,15 @@
   // Commands that require an interactive TTY — sending them kills the session.
   const INTERACTIVE_CMDS = new Set(['/mcp', '/login', '/logout', '/init', '/doctor']);
 
-  // Aliases passed directly to claude --model (CLI resolves them)
-  const MODEL_OPTIONS = ['opus', 'opus-1m', 'sonnet', 'haiku'];
+  // Model aliases per backend
+  const CLAUDE_MODELS = ['opus', 'opus-1m', 'sonnet', 'haiku'];
+  const CODEX_MODELS = ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.2'];
+  $: MODEL_OPTIONS =
+    provider === 'claude-code'
+      ? CLAUDE_MODELS
+      : provider === 'codex'
+        ? CODEX_MODELS
+        : providerModels;
   const EFFORT_LEVELS = ['low', 'medium', 'high', 'max'];
 
   // Orbit-native commands added to suggestions
@@ -144,9 +152,12 @@
   $: {
     const lower = text.toLowerCase();
     if (lower.startsWith('/model ')) {
-      const arg = lower.slice(7);
-      subOptions = MODEL_OPTIONS.filter((o) => o.startsWith(arg));
-    } else if (lower.startsWith('/effort ')) {
+      const arg = text.slice(7).toLowerCase();
+      const filtered = arg
+        ? MODEL_OPTIONS.filter((o) => o.toLowerCase().includes(arg))
+        : MODEL_OPTIONS;
+      subOptions = filtered.slice(0, 10);
+    } else if (lower.startsWith('/effort ') && provider === 'claude-code') {
       const arg = lower.slice(8);
       subOptions = EFFORT_LEVELS.filter((o) => o.startsWith(arg));
     } else {
@@ -212,9 +223,10 @@
 
     // Intercept /model
     if (cmd === '/model') {
-      const arg = msg.slice(6).trim().toLowerCase();
+      const arg = msg.slice(6).trim();
       if (!arg) {
-        sendError = `Usage: /model <name> (${MODEL_OPTIONS.join(', ')})`;
+        const hint = MODEL_OPTIONS.length > 0 ? ` (${MODEL_OPTIONS.join(', ')})` : '';
+        sendError = `Usage: /model <name>${hint}`;
         setTimeout(() => (sendError = ''), 5000);
         return;
       }

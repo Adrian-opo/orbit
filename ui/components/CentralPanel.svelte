@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { Session } from '../lib/stores/sessions';
   import { journal, pendingMessages } from '../lib/stores/journal';
-  import { getSessionJournal } from '../lib/tauri';
+  import { getSessionJournal, getProviders } from '../lib/tauri';
+  import type { CliBackend } from '../lib/tauri';
   import { statusColor, statusLabel, isPulsing, modelDisplayName } from '../lib/status';
   import { formatTokens } from '../lib/cost';
   import { mutedSessions, toggleMute } from '../lib/stores/ui';
@@ -58,6 +59,26 @@
   function fmtModel(m: string | null) {
     return modelDisplayName(m);
   }
+
+  // Load provider models for /model autocomplete in InputBar
+  let backends: CliBackend[] = [];
+  let providerModelsLoaded = false;
+  $: if (session?.provider && !providerModelsLoaded) {
+    providerModelsLoaded = true;
+    getProviders()
+      .then((b) => (backends = b))
+      .catch(() => {});
+  }
+
+  $: providerModelIds = (() => {
+    const p = session?.provider ?? 'claude-code';
+    // For Claude Code and Codex, InputBar has hardcoded lists
+    if (p === 'claude-code' || p === 'codex') return [];
+    // For OpenCode sub-providers, find the matching sub-provider
+    const oc = backends.find((b) => b.id === 'opencode');
+    const sub = oc?.subProviders?.find((s) => s.id === p);
+    return sub?.models?.map((m) => m.id) ?? [];
+  })();
 </script>
 
 <div class="panel">
@@ -204,6 +225,7 @@
     cwd={session.cwd ?? ''}
     sessionStatus={session.status}
     provider={session.provider}
+    providerModels={providerModelIds}
   />
 </div>
 

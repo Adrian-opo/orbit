@@ -121,8 +121,10 @@
           miniLog: p.miniLog,
           gitBranch: p.gitBranch ?? null,
           subagents: p.subagents,
-          model: p.model ?? undefined,
-          contextWindow: p.contextWindow ?? undefined,
+          // Only overwrite model/contextWindow when the stream provides them
+          // (Codex/OpenCode don't emit model — preserve the one set at creation)
+          ...(p.model != null ? { model: p.model } : {}),
+          ...(p.contextWindow != null ? { contextWindow: p.contextWindow } : {}),
         })
       );
     });

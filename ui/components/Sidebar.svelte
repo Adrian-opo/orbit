@@ -7,6 +7,7 @@
   import RenameSessionModal from './RenameSessionModal.svelte';
   import { deleteSession, stopSession, getAppVersion } from '../lib/tauri';
   import { mutedSessions } from '../lib/stores/ui';
+  import { sidebarVisible } from '../lib/stores/preferences';
   import { onMount } from 'svelte';
 
   let appVersion = '';
@@ -225,6 +226,9 @@
 
   <footer class="footer">
     <span>{$sessions.length} session{$sessions.length !== 1 ? 's' : ''}</span>
+    <button class="collapse-btn" on:click={() => sidebarVisible.set(false)} title="Hide sidebar"
+      >‹</button
+    >
   </footer>
 </aside>
 
@@ -461,7 +465,21 @@
     font-size: var(--xs);
     color: var(--t2);
     display: flex;
-    gap: 4px;
+    align-items: center;
+    justify-content: space-between;
     flex-shrink: 0;
+  }
+  .collapse-btn {
+    background: none;
+    border: none;
+    color: var(--t2);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .collapse-btn:hover {
+    color: var(--t0);
   }
 </style>

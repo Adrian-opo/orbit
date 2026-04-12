@@ -8,6 +8,7 @@
   import { deleteSession, stopSession, getAppVersion } from '../lib/tauri';
   import { mutedSessions } from '../lib/stores/ui';
   import { sidebarVisible } from '../lib/stores/preferences';
+  import { modelDisplayName } from '../lib/status';
   import { onMount } from 'svelte';
 
   let appVersion = '';
@@ -91,10 +92,7 @@
 
   function fmtModel(model: string | null): string {
     if (!model || model === 'auto') return 'auto';
-    if (model.includes('opus')) return 'opus';
-    if (model.includes('sonnet')) return 'sonnet';
-    if (model.includes('haiku')) return 'haiku';
-    return model.split('-')[2] ?? model;
+    return modelDisplayName(model);
   }
 
   function displayName(s: (typeof $sessions)[0]): string {

@@ -56,11 +56,24 @@
   }, 5000);
   onDestroy(() => clearInterval(hintTimer));
 
+  const ORBIT_COMMANDS: SlashCommand[] = [
+    { cmd: '/model', desc: 'Switch model (opus, sonnet, haiku)', category: 'orbit' },
+    { cmd: '/effort', desc: 'Set thinking effort (low, medium, high, max)', category: 'orbit' },
+  ];
+
+  // Commands that require interactive input — not supported in Orbit's non-interactive mode
+  const BLOCKED_COMMANDS = new Set(['/model', '/login', '/logout', '/doctor']);
+
+  // Commands that need an argument — Enter autocompletes with space instead of sending
+  const COMMANDS_WITH_ARGS = new Set(['/model', '/effort']);
+
   onMount(async () => {
     try {
-      commands = await getSlashCommands();
+      const remote = await getSlashCommands();
+      // Filter out commands that Orbit overrides or can't support
+      commands = [...ORBIT_COMMANDS, ...remote.filter((c) => !BLOCKED_COMMANDS.has(c.cmd))];
     } catch (_e) {
-      // Fallback: empty
+      commands = [...ORBIT_COMMANDS];
     }
   });
 
@@ -307,6 +320,12 @@
       if (e.key === 'Enter' && !e.shiftKey) {
         const exactMatch = filtered.find((c) => c.cmd === inputText.trim());
         if (exactMatch) {
+          // Commands that need arguments: autocomplete with space instead of sending
+          if (COMMANDS_WITH_ARGS.has(exactMatch.cmd)) {
+            e.preventDefault();
+            selectCommand(exactMatch.cmd);
+            return;
+          }
           e.preventDefault();
           handleSend();
           return;
@@ -531,5 +550,9 @@
   .cat.agent {
     background: var(--amber-dim);
     color: var(--amber);
+  }
+  .cat.orbit {
+    background: var(--blue-dim);
+    color: var(--blue);
   }
 </style>

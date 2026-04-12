@@ -3,6 +3,7 @@
   import type { Session } from '../lib/stores/sessions';
   import { formatTokens } from '../lib/cost';
   import { getClaudeUsageStats, type ClaudeUsageStats } from '../lib/tauri';
+  import { modelDisplayName } from '../lib/status';
 
   export let session: Session;
 
@@ -57,7 +58,7 @@
   </div>
   <div class="stat-row">
     <span class="label">Model</span>
-    <span class="value">{session.model ?? '—'}</span>
+    <span class="value">{modelDisplayName(session.model)}</span>
   </div>
   {#if usage}
     <div class="usage-section">

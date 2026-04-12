@@ -92,20 +92,27 @@ pub fn send_session_message(
 ) -> Result<(), IpcError> {
     let trimmed = message.trim();
 
-    // Intercept /model — requires interactive input, not supported in non-interactive mode
+    // Intercept /model — changes model for the next message
     if trimmed.eq_ignore_ascii_case("/model") || trimmed.to_lowercase().starts_with("/model ") {
         let arg = trimmed.get(7..).unwrap_or("").trim();
         if arg.is_empty() {
-            return Err(IpcError::Other(
-                "Usage: /model <name> (opus, sonnet, haiku)".to_string(),
-            ));
+            return Err(IpcError::Other("Usage: /model <name>".to_string()));
         }
         state.write().update_session_model(session_id, arg)?;
         return Ok(());
     }
 
-    // Intercept /effort
+    // Intercept /effort (Claude Code only)
     if trimmed.eq_ignore_ascii_case("/effort") || trimmed.to_lowercase().starts_with("/effort ") {
+        let provider = state
+            .read()
+            .get_session_provider(session_id)
+            .unwrap_or_default();
+        if provider != "claude-code" {
+            return Err(IpcError::Other(
+                "/effort is only supported for Claude Code sessions".to_string(),
+            ));
+        }
         let arg = trimmed.get(8..).unwrap_or("").trim();
         if arg.is_empty() {
             return Err(IpcError::Other(

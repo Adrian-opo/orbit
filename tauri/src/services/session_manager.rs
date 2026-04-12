@@ -861,6 +861,12 @@ impl SessionManager {
         self.active.contains_key(&session_id)
     }
 
+    pub fn get_session_provider(&self, session_id: SessionId) -> Option<String> {
+        self.active
+            .get(&session_id)
+            .map(|a| a.session.provider.clone())
+    }
+
     pub fn rename_session(&mut self, session_id: SessionId, name: &str) -> Result<(), String> {
         self.db
             .rename_session(session_id, name)

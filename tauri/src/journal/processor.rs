@@ -461,6 +461,25 @@ pub fn process_line_opencode(state: &mut JournalState, line: &str) {
     }
 }
 
+/// Extract the inner command from a Codex PowerShell wrapper.
+/// Codex on Windows wraps commands as:
+///   `"C:\\WINDOWS\\...\\powershell.exe" -Command 'echo hello'`
+/// This extracts just `echo hello`.
+fn extract_codex_command(raw: &str) -> String {
+    if let Some(pos) = raw.find("-Command") {
+        let after = raw[pos + 8..].trim_start();
+        let cmd = after
+            .trim_start_matches('\'')
+            .trim_start_matches('"')
+            .trim_end_matches('\'')
+            .trim_end_matches('"');
+        if !cmd.is_empty() {
+            return cmd.to_string();
+        }
+    }
+    raw.to_string()
+}
+
 /// Process a JSONL line from Codex's `exec --json` output.
 pub fn process_line_codex(state: &mut JournalState, line: &str) {
     let val: Value = match serde_json::from_str(line) {
@@ -497,10 +516,11 @@ pub fn process_line_codex(state: &mut JournalState, line: &str) {
                 }
 
                 "command_execution" => {
-                    let command = val
+                    let raw_command = val
                         .pointer("/item/command")
                         .and_then(|v| v.as_str())
                         .unwrap_or("");
+                    let command = extract_codex_command(raw_command);
                     let status = val
                         .pointer("/item/status")
                         .and_then(|v| v.as_str())

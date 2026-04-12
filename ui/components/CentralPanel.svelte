@@ -2,7 +2,7 @@
   import type { Session } from '../lib/stores/sessions';
   import { journal, pendingMessages } from '../lib/stores/journal';
   import { getSessionJournal } from '../lib/tauri';
-  import { statusColor, statusLabel, isPulsing } from '../lib/status';
+  import { statusColor, statusLabel, isPulsing, modelDisplayName } from '../lib/status';
   import { formatTokens } from '../lib/cost';
   import { mutedSessions, toggleMute } from '../lib/stores/ui';
   import Feed from './Feed.svelte';
@@ -56,11 +56,7 @@
   $: muted = mutedSessions.isMuted($mutedSessions, String(session?.id));
 
   function fmtModel(m: string | null) {
-    if (!m) return 'auto';
-    if (m.includes('opus')) return 'opus-4.6';
-    if (m.includes('sonnet')) return 'sonnet-4.6';
-    if (m.includes('haiku')) return 'haiku-4.5';
-    return m;
+    return modelDisplayName(m);
   }
 </script>
 

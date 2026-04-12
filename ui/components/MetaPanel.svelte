@@ -157,31 +157,36 @@
 
         {#if rateLimits}
           <div class="stat-group">
-            <div class="stat-label">rate limits</div>
-            <div class="stat-row">
-              <span>5h</span>
-              <span
-                class="mono-val"
-                class:rl-warn={rateLimits.fiveHourPct > 70}
-                class:rl-danger={rateLimits.fiveHourPct > 90}
-                >{Math.round(rateLimits.fiveHourPct)}%</span
-              >
-              <span class="rl-reset">{fmtReset(rateLimits.fiveHourReset)}</span>
+            <div class="stat-label">usage</div>
+            <div
+              class="rl-row"
+              class:rl-ok={rateLimits.fiveHourPct <= 70}
+              class:rl-warn={rateLimits.fiveHourPct > 70 && rateLimits.fiveHourPct <= 90}
+              class:rl-danger={rateLimits.fiveHourPct > 90}
+            >
+              <span class="rl-label">5h</span>
+              <span class="rl-pct">{Math.round(rateLimits.fiveHourPct)}%</span>
+              <div class="rl-bar">
+                <div class="rl-fill" style="width:{Math.min(rateLimits.fiveHourPct, 100)}%"></div>
+              </div>
+              <span class="rl-timer">{fmtReset(rateLimits.fiveHourReset)}</span>
             </div>
-            <div class="stat-row">
-              <span>7d</span>
-              <span
-                class="mono-val"
-                class:rl-warn={rateLimits.sevenDayPct > 70}
-                class:rl-danger={rateLimits.sevenDayPct > 90}
-                >{Math.round(rateLimits.sevenDayPct)}%</span
-              >
-              <span class="rl-reset">{fmtReset(rateLimits.sevenDayReset)}</span>
+            <div
+              class="rl-row"
+              class:rl-ok={rateLimits.sevenDayPct <= 70}
+              class:rl-warn={rateLimits.sevenDayPct > 70 && rateLimits.sevenDayPct <= 90}
+              class:rl-danger={rateLimits.sevenDayPct > 90}
+            >
+              <span class="rl-label">7d</span>
+              <span class="rl-pct">{Math.round(rateLimits.sevenDayPct)}%</span>
+              <div class="rl-bar">
+                <div class="rl-fill" style="width:{Math.min(rateLimits.sevenDayPct, 100)}%"></div>
+              </div>
+              <span class="rl-timer">{fmtReset(rateLimits.sevenDayReset)}</span>
             </div>
             {#if rateLimits.cost > 0}
-              <div class="stat-row">
-                <span>cost</span>
-                <span class="mono-val">${rateLimits.cost.toFixed(2)}</span>
+              <div class="stat-row dim">
+                <span>cost</span><span>${rateLimits.cost.toFixed(2)}</span>
               </div>
             {/if}
           </div>
@@ -375,15 +380,59 @@
   .meta-info .stat-row {
     color: var(--t2);
   }
-  .rl-warn {
-    color: var(--s-input) !important;
-  }
-  .rl-danger {
-    color: var(--s-error) !important;
-  }
-  .rl-reset {
+  .rl-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
     font-size: var(--xs);
+  }
+  .rl-label {
+    color: var(--t2);
+    width: 16px;
+    flex-shrink: 0;
+  }
+  .rl-pct {
+    width: 28px;
+    text-align: right;
+    flex-shrink: 0;
+    font-weight: 600;
+  }
+  .rl-bar {
+    flex: 1;
+    height: 3px;
+    background: var(--bg3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .rl-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+  .rl-timer {
     color: var(--t3);
-    margin-left: auto;
+    font-size: 10px;
+    flex-shrink: 0;
+    min-width: 32px;
+    text-align: right;
+  }
+  .rl-ok .rl-pct {
+    color: var(--ac);
+  }
+  .rl-ok .rl-fill {
+    background: var(--ac);
+  }
+  .rl-warn .rl-pct {
+    color: var(--s-input);
+  }
+  .rl-warn .rl-fill {
+    background: var(--s-input);
+  }
+  .rl-danger .rl-pct {
+    color: var(--s-error);
+  }
+  .rl-danger .rl-fill {
+    background: var(--s-error);
   }
 </style>

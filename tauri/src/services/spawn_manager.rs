@@ -314,6 +314,8 @@ pub struct CodexConfig {
     pub cwd: PathBuf,
     pub model: String,
     pub prompt: String,
+    /// Codex session (thread) ID for follow-ups
+    pub codex_session_id: Option<String>,
 }
 
 /// Spawn opencode in non-interactive JSON mode.
@@ -376,6 +378,12 @@ pub fn spawn_codex(config: CodexConfig) -> Result<SpawnHandle, String> {
         "--dangerously-bypass-approvals-and-sandbox",
     ]);
     cmd.args(["-m", &config.model]);
+
+    if let Some(ref sid) = config.codex_session_id {
+        // Resume a previous Codex session
+        cmd.args(["--session", sid]);
+    }
+
     cmd.arg(&config.prompt);
 
     cmd.current_dir(&config.cwd);

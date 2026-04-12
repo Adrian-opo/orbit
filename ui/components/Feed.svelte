@@ -6,6 +6,13 @@
 
   export let entries: JournalEntry[] = [];
   export let status: string = '';
+  export let provider: string = 'claude-code';
+
+  const BACKEND_LABELS: Record<string, string> = {
+    'claude-code': 'claude',
+    codex: 'codex',
+  };
+  $: agentLabel = BACKEND_LABELS[provider] ?? 'agent';
 
   const dispatch = createEventDispatcher<{ bottomchange: { atBottom: boolean } }>();
 
@@ -211,7 +218,7 @@
     {:else if e.entryType === 'assistant'}
       <div class="row assistant">
         <div class="row-meta">
-          <span class="row-who ai-who">claude</span>
+          <span class="row-who ai-who">{agentLabel}</span>
           <span class="row-ts">{ts(e)}</span>
         </div>
         <div class="row-body">

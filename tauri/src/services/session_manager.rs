@@ -438,7 +438,7 @@ impl SessionManager {
         session_id: SessionId,
         prompt: String,
     ) {
-        let (db, cwd, model) = {
+        let (db, cwd, model, codex_session_id) = {
             let m = manager.read().unwrap_or_else(|e| e.into_inner());
             let a = match m.active.get(&session_id) {
                 Some(a) => a,
@@ -460,7 +460,11 @@ impl SessionManager {
                     .clone()
                     .or_else(|| a.session.cwd.clone())
                     .unwrap_or_default(),
-                a.session.model.clone().unwrap_or_else(|| "o3".to_string()),
+                a.session
+                    .model
+                    .clone()
+                    .unwrap_or_else(|| "gpt-5.4".to_string()),
+                a.claude_session_id.clone(),
             )
         };
 
@@ -470,6 +474,7 @@ impl SessionManager {
             cwd: std::path::PathBuf::from(&cwd),
             model,
             prompt,
+            codex_session_id,
         };
 
         let handle = match spawn_codex(config) {
@@ -583,7 +588,14 @@ impl SessionManager {
 
                     // Extract and persist Claude session ID from system/init message
                     if let Ok(val) = serde_json::from_str::<serde_json::Value>(&trimmed) {
-                        if let Some(claude_id) = val.get("session_id").and_then(|v| v.as_str()) {
+                        // Extract CLI session ID for resume support:
+                        //   Claude: "session_id", OpenCode: "sessionID", Codex: "thread_id"
+                        let cli_sid = val
+                            .get("session_id")
+                            .or_else(|| val.get("sessionID"))
+                            .or_else(|| val.get("thread_id"))
+                            .and_then(|v| v.as_str());
+                        if let Some(claude_id) = cli_sid {
                             let should_persist = {
                                 let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
                                 if let Some(a) = m.active.get_mut(&session_id) {

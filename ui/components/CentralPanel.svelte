@@ -181,6 +181,7 @@
           bind:this={feedComponent}
           {entries}
           status={session.status}
+          provider={session.provider}
           on:bottomchange={onFeedBottomChange}
         />
       {/key}

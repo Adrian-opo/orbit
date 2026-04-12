@@ -76,7 +76,7 @@
   }
 
   const hints = [
-    'Orbit keeps all your Claude agents in sync — one dashboard, infinite sessions',
+    'Orbit keeps all your agents in sync — one dashboard, infinite sessions',
     'Each agent runs in its own orbit — isolated, parallel, always tracked',
     'Real-time log streaming — watch your agents compute at the speed of light',
     'Token usage and cost tracked per session — every bit accounted for',
@@ -84,7 +84,7 @@
     'Use / to trigger slash commands inside any session',
     'Sessions persist — your agents remember where they left off',
     'Switch between agents without losing orbital momentum',
-    'Multiple Claude agents, one control center — mission control for AI',
+    'Multiple agents, one control center — mission control for AI',
     'Your agents orbit the same codebase, each on their own trajectory',
   ];
   let hintIdx = 0;

@@ -90,6 +90,7 @@ impl SessionManager {
                 project_path,
                 permission_mode,
                 model,
+                None,
             )
             .map_err(|e| e.to_string())?;
 
@@ -893,7 +894,7 @@ mod tests {
         t.phase("Seed");
         let db = make_db();
         let sid = db
-            .create_session(None, None, "/tmp", "ignore", None)
+            .create_session(None, None, "/tmp", "ignore", None, None)
             .expect("session");
         seed_outputs(
             &db,
@@ -919,7 +920,7 @@ mod tests {
         t.phase("Seed");
         let db = make_db();
         let sid = db
-            .create_session(None, None, "/tmp", "ignore", None)
+            .create_session(None, None, "/tmp", "ignore", None, None)
             .expect("session");
         seed_outputs(&db, sid, &[&crate::test_utils::assistant_text("Hello")]);
         t.phase("Act");
@@ -937,7 +938,7 @@ mod tests {
         t.phase("Seed");
         let db = make_db();
         let sid = db
-            .create_session(None, None, "/tmp", "ignore", None)
+            .create_session(None, None, "/tmp", "ignore", None, None)
             .expect("session");
         // input=10, output=5, cache_write=2, cache_read=1 → input_tokens = 13
         seed_outputs(&db, sid, &[&assistant_with_tokens("Hi", 10, 5, 2, 1)]);
@@ -1079,7 +1080,7 @@ mod tests {
         t.phase("Seed — DB has session with outputs, manager is fresh (no restore)");
         let db = make_db();
         let sid = db
-            .create_session(None, None, "/tmp", "ignore", None)
+            .create_session(None, None, "/tmp", "ignore", None, None)
             .expect("session");
         seed_outputs(&db, sid, &[&crate::test_utils::assistant_text("hello")]);
         t.phase("Act — create manager without calling restore_from_db");
@@ -1097,7 +1098,7 @@ mod tests {
         t.phase("Seed — session with token output exists");
         let db = make_db();
         let sid = db
-            .create_session(None, None, "/tmp", "ignore", None)
+            .create_session(None, None, "/tmp", "ignore", None, None)
             .expect("session");
         seed_outputs(
             &db,
@@ -1125,7 +1126,7 @@ mod tests {
         t.phase("Seed");
         let db = make_db();
         let sid = db
-            .create_session(None, None, "/tmp", "ignore", None)
+            .create_session(None, None, "/tmp", "ignore", None, None)
             .expect("session");
         seed_outputs(&db, sid, &[&crate::test_utils::assistant_text("hello")]);
         t.phase("Act — get_journal triggers lazy load");
@@ -1143,7 +1144,7 @@ mod tests {
         t.phase("Seed");
         let db = make_db();
         let sid = db
-            .create_session(None, None, "/tmp", "ignore", None)
+            .create_session(None, None, "/tmp", "ignore", None, None)
             .expect("session");
         seed_outputs(
             &db,

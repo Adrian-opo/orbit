@@ -92,6 +92,8 @@ impl DatabaseService {
         // Run schema migrations (errors ignored — column may already exist)
         let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN claude_session_id TEXT");
         let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN cwd TEXT");
+        let _ = conn
+            .execute_batch("ALTER TABLE sessions ADD COLUMN provider TEXT DEFAULT 'claude-code'");
 
         conn.execute_batch(
             "
@@ -162,18 +164,20 @@ impl DatabaseService {
         cwd: &str,
         permission_mode: &str,
         model: Option<&str>,
+        provider: Option<&str>,
     ) -> SqlResult<SessionId> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
-            "INSERT INTO sessions (project_id, name, cwd, status, permission_mode, model)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO sessions (project_id, name, cwd, status, permission_mode, model, provider)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 project_id,
                 name,
                 cwd,
                 crate::models::SessionStatus::Initializing,
                 permission_mode,
-                model
+                model,
+                provider.unwrap_or("claude-code")
             ],
         )?;
         Ok(conn.last_insert_rowid())
@@ -452,7 +456,7 @@ mod tests {
         t.phase("Act");
         let db = make_db();
         let id = db
-            .create_session(None, Some("task 1"), "/tmp/proj", "ignore", None)
+            .create_session(None, Some("task 1"), "/tmp/proj", "ignore", None, None)
             .expect("create_session failed");
         t.phase("Assert");
         t.ok("id is positive", id > 0);
@@ -471,7 +475,7 @@ mod tests {
         t.phase("Act");
         let db = make_db();
         let id = db
-            .create_session(None, None, "/tmp/proj", "ignore", None)
+            .create_session(None, None, "/tmp/proj", "ignore", None, None)
             .expect("create failed");
         t.phase("Assert");
         let session = db
@@ -541,6 +545,7 @@ mod tests {
                 "/myapp",
                 "approve",
                 Some("claude-sonnet-4-6"),
+                None,
             )
             .expect("create failed");
         t.phase("Assert");
@@ -633,10 +638,10 @@ mod tests {
         t.phase("Seed");
         let db = make_db();
         let id1 = db
-            .create_session(None, None, "/a", "ignore", None)
+            .create_session(None, None, "/a", "ignore", None, None)
             .expect("s1");
         let id2 = db
-            .create_session(None, None, "/b", "ignore", None)
+            .create_session(None, None, "/b", "ignore", None, None)
             .expect("s2");
         db.insert_output(id1, &assistant_text("session 1 msg"))
             .expect("o1");
@@ -674,7 +679,7 @@ mod tests {
         t.phase("Seed");
         let db = make_db();
         let sid = db
-            .create_session(None, None, "/tmp", "ignore", None)
+            .create_session(None, None, "/tmp", "ignore", None, None)
             .expect("session");
         db.update_session_status(sid, crate::models::SessionStatus::Stopped)
             .expect("update");

@@ -32,13 +32,8 @@
   // Commands that require an interactive TTY — sending them kills the session.
   const INTERACTIVE_CMDS = new Set(['/mcp', '/login', '/logout', '/init', '/doctor']);
 
-  const MODEL_ALIASES: Record<string, string> = {
-    opus: 'claude-opus-4-6',
-    'opus-1m': 'claude-opus-4-6[1m]',
-    sonnet: 'claude-sonnet-4-6',
-    haiku: 'claude-haiku-4-5-20251001',
-  };
-  const MODEL_OPTIONS = Object.keys(MODEL_ALIASES);
+  // Aliases passed directly to claude --model (CLI resolves them)
+  const MODEL_OPTIONS = ['opus', 'opus-1m', 'sonnet', 'haiku'];
   const EFFORT_LEVELS = ['low', 'medium', 'high', 'max'];
 
   // Orbit-native commands added to suggestions
@@ -199,14 +194,11 @@
         setTimeout(() => (sendError = ''), 5000);
         return;
       }
-      const resolved = MODEL_ALIASES[arg] ?? arg;
       text = '';
       if (textarea) textarea.style.height = 'auto';
-      await updateSessionModel(sessionId, resolved);
-      sessions.update((l) =>
-        updateSessionState(l, sessionId, { model: resolved, contextWindow: null })
-      );
-      emitSystemEntry(`Model changed to ${modelDisplayName(resolved)}`);
+      await updateSessionModel(sessionId, arg);
+      sessions.update((l) => updateSessionState(l, sessionId, { model: arg, contextWindow: null }));
+      emitSystemEntry(`Model changed to ${arg}`);
       return;
     }
 

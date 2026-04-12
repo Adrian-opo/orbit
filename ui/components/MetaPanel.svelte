@@ -2,7 +2,8 @@
   import type { Session } from '../lib/stores/sessions';
   import { formatTokens } from '../lib/cost';
   import { stopSession, getSubagents } from '../lib/tauri';
-  import { isActive } from '../lib/status';
+  import { isActive, modelDisplayName } from '../lib/status';
+  import { sessionEffort } from '../lib/stores/ui';
   import { metaPanelVisible } from '../lib/stores/preferences';
   import { sessions, updateSessionState } from '../lib/stores/sessions';
   import TasksList from './TasksList.svelte';
@@ -121,8 +122,11 @@
 
         <div class="stat-group meta-info">
           <div class="stat-row">
-            <span>model</span><span class="mono-val"
-              >{session.model?.split('-').slice(-2).join('-') ?? '—'}</span
+            <span>model</span><span class="mono-val">{modelDisplayName(session.model)}</span>
+          </div>
+          <div class="stat-row">
+            <span>effort</span><span class="mono-val"
+              >{sessionEffort.get($sessionEffort, String(session.id))}</span
             >
           </div>
           <div class="stat-row">

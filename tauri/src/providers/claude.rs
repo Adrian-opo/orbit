@@ -24,7 +24,7 @@ impl Provider for ClaudeProvider {
             } else {
                 Some(config.model)
             },
-            effort: None,
+            effort: config.effort,
             prompt: config.prompt,
             claude_session_id: config.resume_id,
         })

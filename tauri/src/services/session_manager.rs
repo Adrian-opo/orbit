@@ -6,10 +6,8 @@ use tauri::{AppHandle, Emitter};
 
 use crate::journal::{process_line, process_line_codex, process_line_opencode, JournalState};
 use crate::models::{AgentStatus, Session, SessionId, TokenUsage};
+use crate::providers::{ProviderRegistry, ProviderSpawnConfig};
 use crate::services::database::DatabaseService;
-use crate::services::spawn_manager::{
-    spawn_claude, spawn_codex, spawn_opencode, CodexConfig, OpenCodeConfig, SpawnConfig,
-};
 
 /// Reads `.git/HEAD` to detect the current branch without spawning a subprocess.
 fn detect_git_branch(cwd: &str) -> Option<String> {
@@ -167,42 +165,19 @@ impl SessionManager {
 
     /// Phase 2 (async): spawn provider with `-p "prompt"`.
     /// Each message spawns a new process. Uses `--resume` for follow-ups.
+    ///
+    /// Resolves the provider from the registry and delegates spawning + output
+    /// parsing to the `Provider` trait, eliminating per-provider match dispatch.
     pub fn do_spawn(
         manager: Arc<RwLock<SessionManager>>,
         app: AppHandle,
         session_id: SessionId,
         prompt: String,
+        registry: &ProviderRegistry,
     ) {
-        let provider = {
+        // 1. Read session data from the active map
+        let (db, cwd, model, provider_id, effort, resume_id, extra_env) = {
             let m = manager.read().unwrap_or_else(|e| e.into_inner());
-            m.active
-                .get(&session_id)
-                .map(|a| a.session.provider.clone())
-                .unwrap_or_else(|| "claude-code".to_string())
-        };
-
-        match provider.as_str() {
-            "claude-code" => {
-                Self::do_spawn_claude(manager, app, session_id, prompt);
-            }
-            "codex" => {
-                Self::do_spawn_codex(manager, app, session_id, prompt);
-            }
-            _ => {
-                // Any other provider goes through opencode CLI
-                Self::do_spawn_opencode(manager, app, session_id, prompt);
-            }
-        }
-    }
-
-    fn do_spawn_claude(
-        manager: Arc<RwLock<SessionManager>>,
-        app: AppHandle,
-        session_id: SessionId,
-        prompt: String,
-    ) {
-        let (db, cwd, permission_mode, model, effort, claude_session_id) = {
-            let m = manager.write().unwrap_or_else(|e| e.into_inner());
             let a = match m.active.get(&session_id) {
                 Some(a) => a,
                 None => {
@@ -216,6 +191,30 @@ impl SessionManager {
                     return;
                 }
             };
+
+            let raw_model = a.session.model.clone().unwrap_or_default();
+            let pid_str = a.session.provider.clone();
+
+            // Build model string — for opencode providers, prefix with provider
+            let model = if pid_str != "claude-code" && pid_str != "codex" {
+                if raw_model.starts_with(&format!("{pid_str}/")) {
+                    raw_model
+                } else {
+                    format!("{pid_str}/{raw_model}")
+                }
+            } else if pid_str == "claude-code" && (raw_model.is_empty() || raw_model == "auto") {
+                "auto".to_string()
+            } else {
+                raw_model
+            };
+
+            // API key env vars for opencode providers
+            let mut env = vec![];
+            if let Some(ref key) = a.api_key {
+                let var_name = format!("{}_API_KEY", pid_str.to_uppercase().replace('-', "_"));
+                env.push((var_name, key.clone()));
+            }
+
             (
                 m.db.clone(),
                 a.session
@@ -223,25 +222,50 @@ impl SessionManager {
                     .clone()
                     .or_else(|| a.session.cwd.clone())
                     .unwrap_or_default(),
-                a.session.permission_mode.clone(),
-                a.session.model.clone(),
+                model,
+                pid_str,
                 a.effort.clone(),
                 a.claude_session_id.clone(),
+                env,
             )
         };
 
-        let prompt_text = prompt.clone();
-        let config = SpawnConfig {
-            session_id,
-            cwd: std::path::PathBuf::from(&cwd),
-            permission_mode,
-            model,
-            effort,
-            prompt,
-            claude_session_id,
+        // 2. Resolve provider from registry
+        let provider = match registry.resolve(&provider_id) {
+            Some(p) => p,
+            None => {
+                let _ = app.emit(
+                    "session:error",
+                    serde_json::json!({
+                        "sessionId": session_id,
+                        "error": format!("Unknown provider: {provider_id}")
+                    }),
+                );
+                return;
+            }
         };
 
-        let handle = match spawn_claude(config) {
+        // 3. Set context window from provider
+        if let Some(ctx) = provider.context_window(&model) {
+            let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
+            if let Some(state) = m.journal_states.get_mut(&session_id) {
+                state.context_window = Some(ctx);
+            }
+        }
+
+        // 4. Spawn CLI via provider trait
+        let prompt_text = prompt.clone();
+        let spawn_config = ProviderSpawnConfig {
+            session_id,
+            cwd: std::path::PathBuf::from(&cwd),
+            model,
+            prompt,
+            resume_id,
+            extra_env,
+            effort,
+        };
+
+        let handle = match provider.spawn(spawn_config) {
             Ok(h) => h,
             Err(e) => {
                 let _ = db.update_session_status(session_id, crate::models::SessionStatus::Error);
@@ -255,9 +279,7 @@ impl SessionManager {
             }
         };
 
-        let pid = handle.pid as i32;
-        let _ = db.update_session_pid(session_id, pid);
-
+        // 5. Stderr monitoring for rate limit detection
         let app_err = app.clone();
         let stderr_reader = handle.stderr;
         std::thread::spawn(move || {
@@ -283,145 +305,7 @@ impl SessionManager {
             }
         });
 
-        {
-            let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
-            if let Some(a) = m.active.get_mut(&session_id) {
-                a.session.status = crate::models::SessionStatus::Running;
-                a.session.pid = Some(pid);
-            }
-        }
-
-        let _ = app.emit(
-            "session:running",
-            serde_json::json!({
-                "sessionId": session_id, "pid": pid
-            }),
-        );
-
-        let user_entry = crate::models::JournalEntry {
-            session_id: session_id.to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-            entry_type: crate::models::JournalEntryType::User,
-            text: Some(prompt_text.clone()),
-            ..crate::models::JournalEntry::default()
-        };
-        let user_line = serde_json::json!({
-            "type": "user",
-            "message": { "content": &prompt_text },
-            "timestamp": &user_entry.timestamp
-        })
-        .to_string();
-        let _ = db.insert_output(session_id, &user_line);
-
-        {
-            let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
-            let state = m.journal_states.entry(session_id).or_default();
-            state.entries.push(user_entry.clone());
-        }
-
-        let _ = app.emit(
-            "session:output",
-            SessionOutputEvent {
-                session_id,
-                entry: user_entry,
-            },
-        );
-
-        Self::reader_loop(
-            Arc::clone(&manager),
-            app,
-            session_id,
-            handle.reader,
-            db,
-            handle.child,
-            process_line,
-        );
-    }
-
-    fn do_spawn_opencode(
-        manager: Arc<RwLock<SessionManager>>,
-        app: AppHandle,
-        session_id: SessionId,
-        prompt: String,
-    ) {
-        let (db, cwd, model, raw_model, sub_provider, extra_env, opencode_session_id) = {
-            let m = manager.read().unwrap_or_else(|e| e.into_inner());
-            let a = match m.active.get(&session_id) {
-                Some(a) => a,
-                None => {
-                    let _ = app.emit(
-                        "session:error",
-                        serde_json::json!({
-                            "sessionId": session_id,
-                            "error": "Session not found in active map"
-                        }),
-                    );
-                    return;
-                }
-            };
-            let raw = a
-                .session
-                .model
-                .clone()
-                .unwrap_or_else(|| "opencode/big-pickle".to_string());
-            let provider = a.session.provider.clone();
-            let full_model = if raw.starts_with(&format!("{provider}/")) {
-                raw.clone()
-            } else {
-                format!("{provider}/{raw}")
-            };
-            let mut env = vec![];
-            if let Some(ref key) = a.api_key {
-                let var_name = format!("{}_API_KEY", provider.to_uppercase().replace('-', "_"));
-                env.push((var_name, key.clone()));
-            }
-            (
-                m.db.clone(),
-                a.session
-                    .worktree_path
-                    .clone()
-                    .or_else(|| a.session.cwd.clone())
-                    .unwrap_or_default(),
-                full_model,
-                raw,
-                provider,
-                env,
-                a.claude_session_id.clone(),
-            )
-        };
-
-        // Set context window from models.json
-        if let Some(ctx) =
-            crate::commands::providers::lookup_context_window(&sub_provider, &raw_model)
-        {
-            let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
-            if let Some(state) = m.journal_states.get_mut(&session_id) {
-                state.context_window = Some(ctx);
-            }
-        }
-
-        let prompt_text = prompt.clone();
-        let config = OpenCodeConfig {
-            session_id,
-            cwd: std::path::PathBuf::from(&cwd),
-            model,
-            prompt,
-            opencode_session_id: opencode_session_id.clone(),
-            extra_env,
-        };
-
-        let handle = match spawn_opencode(config) {
-            Ok(h) => h,
-            Err(e) => {
-                let _ = db.update_session_status(session_id, crate::models::SessionStatus::Error);
-                let _ = app.emit(
-                    "session:error",
-                    serde_json::json!({ "sessionId": session_id, "error": e }),
-                );
-                return;
-            }
-        };
-
+        // 6. Emit spawn-started events
         Self::emit_spawn_started(
             &manager,
             &app,
@@ -431,6 +315,16 @@ impl SessionManager {
             &prompt_text,
         );
 
+        // 7. Resolve the right line processor fn pointer from provider ID.
+        // We resolve here rather than passing the trait object into the thread,
+        // because Provider is not Send-safe across thread boundaries.
+        let line_processor: fn(&mut JournalState, &str) = match provider.id() {
+            "claude-code" => process_line,
+            "codex" => process_line_codex,
+            _ => process_line_opencode,
+        };
+
+        // 8. Reader loop
         Self::reader_loop(
             Arc::clone(&manager),
             app,
@@ -438,93 +332,7 @@ impl SessionManager {
             handle.reader,
             db,
             handle.child,
-            process_line_opencode,
-        );
-    }
-
-    fn do_spawn_codex(
-        manager: Arc<RwLock<SessionManager>>,
-        app: AppHandle,
-        session_id: SessionId,
-        prompt: String,
-    ) {
-        let (db, cwd, model, codex_session_id) = {
-            let m = manager.read().unwrap_or_else(|e| e.into_inner());
-            let a = match m.active.get(&session_id) {
-                Some(a) => a,
-                None => {
-                    let _ = app.emit(
-                        "session:error",
-                        serde_json::json!({
-                            "sessionId": session_id,
-                            "error": "Session not found in active map"
-                        }),
-                    );
-                    return;
-                }
-            };
-            (
-                m.db.clone(),
-                a.session
-                    .worktree_path
-                    .clone()
-                    .or_else(|| a.session.cwd.clone())
-                    .unwrap_or_default(),
-                a.session
-                    .model
-                    .clone()
-                    .unwrap_or_else(|| "gpt-5.4".to_string()),
-                a.claude_session_id.clone(),
-            )
-        };
-
-        // Set context window for Codex models
-        {
-            let ctx = crate::commands::providers::codex_context_window(&model);
-            let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
-            if let Some(state) = m.journal_states.get_mut(&session_id) {
-                state.context_window = Some(ctx);
-            }
-        }
-
-        let prompt_text = prompt.clone();
-        let config = CodexConfig {
-            session_id,
-            cwd: std::path::PathBuf::from(&cwd),
-            model,
-            prompt,
-            codex_session_id,
-        };
-
-        let handle = match spawn_codex(config) {
-            Ok(h) => h,
-            Err(e) => {
-                let _ = db.update_session_status(session_id, crate::models::SessionStatus::Error);
-                let _ = app.emit(
-                    "session:error",
-                    serde_json::json!({ "sessionId": session_id, "error": e }),
-                );
-                return;
-            }
-        };
-
-        Self::emit_spawn_started(
-            &manager,
-            &app,
-            &db,
-            session_id,
-            handle.pid as i32,
-            &prompt_text,
-        );
-
-        Self::reader_loop(
-            Arc::clone(&manager),
-            app,
-            session_id,
-            handle.reader,
-            db,
-            handle.child,
-            process_line_codex,
+            line_processor,
         );
     }
 
@@ -764,13 +572,14 @@ impl SessionManager {
         let _ = child.wait();
     }
 
-    /// Send a follow-up message by spawning a new Claude process with --resume.
+    /// Send a follow-up message by spawning a new CLI process with --resume.
     /// Reads session data from DB so it works even after app restart.
     pub fn send_message(
         manager: Arc<RwLock<SessionManager>>,
         app: AppHandle,
         session_id: SessionId,
         text: String,
+        registry: Arc<ProviderRegistry>,
     ) -> Result<(), String> {
         // Re-add to active map if missing (e.g. after app restart)
         {
@@ -799,7 +608,7 @@ impl SessionManager {
 
         let manager_clone = Arc::clone(&manager);
         std::thread::spawn(move || {
-            Self::do_spawn(manager_clone, app, session_id, text);
+            Self::do_spawn(manager_clone, app, session_id, text, &registry);
         });
 
         Ok(())

@@ -23,7 +23,7 @@ impl SessionState {
 }
 
 /// Create a session: returns immediately after creating the DB record (status = "initializing").
-/// The actual Claude process spawns in a background thread — non-blocking.
+/// The actual CLI process spawns in a background thread — non-blocking.
 /// Frontend should listen to "session:running" (ready) or "session:error" (spawn failed).
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
@@ -36,6 +36,7 @@ pub fn create_session(
     use_worktree: Option<bool>,
     provider: Option<String>,
     state: State<SessionState>,
+    registry: State<ProviderRegistryState>,
     app: AppHandle,
 ) -> Result<Session, IpcError> {
     let mode = permission_mode.unwrap_or_else(|| "ignore".to_string());
@@ -57,9 +58,10 @@ pub fn create_session(
     let _ = app.emit("session:created", &session);
 
     let manager = Arc::clone(&state.0);
+    let reg = Arc::clone(&registry.0);
     let session_id = session.id;
     std::thread::spawn(move || {
-        SessionManager::do_spawn(manager, app, session_id, prompt);
+        SessionManager::do_spawn(manager, app, session_id, prompt, &reg);
     });
 
     Ok(session)
@@ -90,6 +92,7 @@ pub fn send_session_message(
     session_id: SessionId,
     message: String,
     state: State<SessionState>,
+    registry: State<ProviderRegistryState>,
     app: AppHandle,
 ) -> Result<(), IpcError> {
     let trimmed = message.trim();
@@ -104,15 +107,19 @@ pub fn send_session_message(
         return Ok(());
     }
 
-    // Intercept /effort (Claude Code only)
+    // Intercept /effort — only for providers that support it
     if trimmed.eq_ignore_ascii_case("/effort") || trimmed.to_lowercase().starts_with("/effort ") {
-        let provider = state
+        let provider_id = state
             .read()
             .get_session_provider(session_id)
             .unwrap_or_default();
-        if provider != "claude-code" {
+        let supports = registry
+            .0
+            .resolve(&provider_id)
+            .is_some_and(|p| p.supports_effort());
+        if !supports {
             return Err(IpcError::Other(
-                "/effort is only supported for Claude Code sessions".to_string(),
+                "/effort is not supported for this provider".to_string(),
             ));
         }
         let arg = trimmed.get(8..).unwrap_or("").trim();
@@ -130,6 +137,7 @@ pub fn send_session_message(
         app,
         session_id,
         message,
+        Arc::clone(&registry.0),
     )?)
 }
 

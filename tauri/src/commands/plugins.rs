@@ -110,13 +110,16 @@ fn scan_plugin(install_path: &Path, plugin_name: &str, out: &mut Vec<SlashComman
 }
 
 #[tauri::command]
-pub fn get_slash_commands(provider: Option<String>) -> Vec<SlashCommand> {
-    let backend = provider.as_deref().unwrap_or("claude-code");
-    match backend {
-        "codex" => get_codex_commands(),
-        "claude-code" => get_claude_commands(),
-        _ => get_opencode_commands(),
-    }
+pub fn get_slash_commands(
+    provider: Option<String>,
+    registry: tauri::State<crate::ipc::session::ProviderRegistryState>,
+) -> Vec<SlashCommand> {
+    let id = provider.as_deref().unwrap_or("claude-code");
+    registry
+        .0
+        .resolve(id)
+        .map(|p| p.slash_commands())
+        .unwrap_or_default()
 }
 
 pub fn get_claude_commands() -> Vec<SlashCommand> {

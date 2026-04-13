@@ -12,6 +12,8 @@ pub struct ProviderSpawnConfig {
     pub prompt: String,
     pub resume_id: Option<String>,
     pub extra_env: Vec<(String, String)>,
+    /// Effort level for thinking (low, medium, high, max). Only used by Claude Code.
+    pub effort: Option<String>,
 }
 
 /// Trait that every CLI backend (Claude Code, Codex, OpenCode, etc.) must implement.

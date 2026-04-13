@@ -4,6 +4,7 @@ pub mod diff_builder;
 pub mod ipc;
 pub mod journal;
 pub mod models;
+pub mod providers;
 pub mod services;
 
 #[cfg(test)]

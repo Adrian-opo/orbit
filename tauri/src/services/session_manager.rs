@@ -495,7 +495,7 @@ impl SessionManager {
                                 .map(crate::models::context_window)
                                 .unwrap_or(0)
                         });
-                        let total = state.input_tokens + state.output_tokens;
+                        let total = state.input_tokens;
 
                         let status_str = match state.status {
                             AgentStatus::Working => "working",
@@ -639,7 +639,7 @@ impl SessionManager {
                         .map(crate::models::context_window)
                         .unwrap_or(0)
                 });
-                let total = state.input_tokens + state.output_tokens;
+                let total = state.input_tokens;
                 s.tokens = Some(TokenUsage {
                     input: state.input_tokens,
                     output: state.output_tokens,

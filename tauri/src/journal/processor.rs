@@ -426,13 +426,14 @@ pub fn process_line_opencode(state: &mut JournalState, line: &str) {
                 .unwrap_or("");
 
             if let Some(tokens) = val.pointer("/part/tokens") {
-                state.input_tokens = tokens.get("input").and_then(|v| v.as_u64()).unwrap_or(0);
-                state.output_tokens = tokens.get("output").and_then(|v| v.as_u64()).unwrap_or(0);
-                state.cache_write = tokens
+                // Accumulate — each step_finish reports per-turn tokens
+                state.input_tokens += tokens.get("input").and_then(|v| v.as_u64()).unwrap_or(0);
+                state.output_tokens += tokens.get("output").and_then(|v| v.as_u64()).unwrap_or(0);
+                state.cache_write += tokens
                     .pointer("/cache/write")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0);
-                state.cache_read = tokens
+                state.cache_read += tokens
                     .pointer("/cache/read")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0);
@@ -588,15 +589,16 @@ pub fn process_line_codex(state: &mut JournalState, line: &str) {
 
         "turn.completed" => {
             if let Some(usage) = val.get("usage") {
-                state.input_tokens = usage
+                // Accumulate — each turn.completed reports per-turn tokens
+                state.input_tokens += usage
                     .get("input_tokens")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0);
-                state.output_tokens = usage
+                state.output_tokens += usage
                     .get("output_tokens")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0);
-                state.cache_read = usage
+                state.cache_read += usage
                     .get("cached_input_tokens")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0);

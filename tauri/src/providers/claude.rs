@@ -50,6 +50,15 @@ impl Provider for ClaudeProvider {
     fn supports_effort(&self) -> bool {
         true
     }
+    fn cli_name(&self) -> &str {
+        "claude"
+    }
+    fn find_cli(&self) -> Option<String> {
+        crate::services::spawn_manager::find_claude()
+    }
+    fn install_hint(&self) -> &str {
+        "npm install -g @anthropic-ai/claude-code"
+    }
 }
 
 #[cfg(test)]

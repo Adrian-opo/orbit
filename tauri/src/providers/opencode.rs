@@ -44,6 +44,15 @@ impl Provider for OpenCodeProvider {
     fn supports_effort(&self) -> bool {
         false
     }
+    fn cli_name(&self) -> &str {
+        "opencode"
+    }
+    fn find_cli(&self) -> Option<String> {
+        crate::services::spawn_manager::find_opencode()
+    }
+    fn install_hint(&self) -> &str {
+        "npm install -g opencode"
+    }
 }
 
 #[cfg(test)]

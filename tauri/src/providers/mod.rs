@@ -44,6 +44,15 @@ pub trait Provider: Send + Sync {
 
     /// Whether this provider supports the `effort` parameter.
     fn supports_effort(&self) -> bool;
+
+    /// CLI binary name for diagnostics (e.g. "claude", "codex", "opencode").
+    fn cli_name(&self) -> &str;
+
+    /// Find the CLI binary path, or None if not installed.
+    fn find_cli(&self) -> Option<String>;
+
+    /// Install hint shown when CLI is not found.
+    fn install_hint(&self) -> &str;
 }
 
 /// Registry that maps provider IDs to their implementations.
@@ -139,6 +148,15 @@ mod tests {
 
         fn supports_effort(&self) -> bool {
             self.mock_effort
+        }
+        fn cli_name(&self) -> &str {
+            "mock"
+        }
+        fn find_cli(&self) -> Option<String> {
+            None
+        }
+        fn install_hint(&self) -> &str {
+            "install mock"
         }
     }
 

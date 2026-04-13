@@ -39,6 +39,15 @@ impl Provider for CodexProvider {
     fn supports_effort(&self) -> bool {
         false
     }
+    fn cli_name(&self) -> &str {
+        "codex"
+    }
+    fn find_cli(&self) -> Option<String> {
+        crate::services::spawn_manager::find_codex()
+    }
+    fn install_hint(&self) -> &str {
+        "npm install -g @openai/codex"
+    }
 }
 
 #[cfg(test)]

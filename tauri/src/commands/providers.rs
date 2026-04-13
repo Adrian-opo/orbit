@@ -1,5 +1,3 @@
-use crate::services::spawn_manager::{find_claude, find_codex, find_opencode};
-
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelInfo {
@@ -33,10 +31,21 @@ pub struct CliBackend {
 
 /// Return the 3 CLI backends with their models/sub-providers.
 #[tauri::command]
-pub fn get_providers() -> Vec<CliBackend> {
-    let claude_available = find_claude().is_some();
-    let opencode_available = find_opencode().is_some();
-    let codex_available = find_codex().is_some();
+pub fn get_providers(
+    registry: tauri::State<crate::ipc::session::ProviderRegistryState>,
+) -> Vec<CliBackend> {
+    let claude_available = registry
+        .0
+        .get("claude-code")
+        .is_some_and(|p| p.find_cli().is_some());
+    let codex_available = registry
+        .0
+        .get("codex")
+        .is_some_and(|p| p.find_cli().is_some());
+    let opencode_available = registry
+        .0
+        .get("opencode")
+        .is_some_and(|p| p.find_cli().is_some());
 
     let mut backends = vec![];
 
@@ -129,39 +138,44 @@ pub fn check_env_var(name: String) -> bool {
 
 /// Diagnose a provider: check if CLI is found, get version, report path.
 #[tauri::command]
-pub fn diagnose_provider(backend: String) -> serde_json::Value {
-    let (cli_name, find_fn): (&str, fn() -> Option<String>) = match backend.as_str() {
-        "claude-code" => ("claude", find_claude as fn() -> Option<String>),
-        "codex" => ("codex", find_codex as fn() -> Option<String>),
-        _ => ("opencode", find_opencode as fn() -> Option<String>),
+pub fn diagnose_provider(
+    backend: String,
+    registry: tauri::State<crate::ipc::session::ProviderRegistryState>,
+) -> serde_json::Value {
+    let provider = match registry.0.resolve(&backend) {
+        Some(p) => p,
+        None => {
+            return serde_json::json!({
+                "backend": backend,
+                "cliName": backend,
+                "found": false,
+                "path": null,
+                "version": null,
+                "installHint": "unknown provider",
+            });
+        }
     };
 
-    let path = find_fn();
+    let path = provider.find_cli();
     let found = path.is_some();
 
-    let version = if found {
-        run_version(path.as_deref().unwrap_or(cli_name))
+    let version = if let Some(ref p) = path {
+        run_cli_version(p)
     } else {
         None
     };
 
-    let install_hint = match backend.as_str() {
-        "claude-code" => "npm install -g @anthropic-ai/claude-code",
-        "codex" => "npm install -g @openai/codex",
-        _ => "npm install -g opencode",
-    };
-
     serde_json::json!({
         "backend": backend,
-        "cliName": cli_name,
+        "cliName": provider.cli_name(),
         "found": found,
         "path": path,
         "version": version,
-        "installHint": install_hint,
+        "installHint": provider.install_hint(),
     })
 }
 
-fn run_version(path: &str) -> Option<String> {
+fn run_cli_version(path: &str) -> Option<String> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

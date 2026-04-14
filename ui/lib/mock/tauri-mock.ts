@@ -426,6 +426,10 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
           id: 'claude-code',
           name: 'Claude Code',
           cliAvailable: true,
+          supportsEffort: true,
+          supportsSsh: true,
+          supportsSubagents: true,
+          hasSubProviders: false,
           models: [
             { id: 'auto', name: 'auto', context: null, output: null },
             { id: 'claude-sonnet-4-6', name: 'sonnet-4.6', context: 1000000, output: 64000 },
@@ -437,6 +441,10 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
           id: 'codex',
           name: 'Codex',
           cliAvailable: true,
+          supportsEffort: false,
+          supportsSsh: true,
+          supportsSubagents: false,
+          hasSubProviders: false,
           models: [
             { id: 'gpt-5.4', name: 'gpt-5.4', context: null, output: null },
             { id: 'gpt-5.4-mini', name: 'gpt-5.4-mini', context: null, output: null },
@@ -449,6 +457,10 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
           id: 'opencode',
           name: 'OpenCode',
           cliAvailable: true,
+          supportsEffort: false,
+          supportsSsh: false,
+          supportsSubagents: false,
+          hasSubProviders: true,
           models: [],
           subProviders: [
             {

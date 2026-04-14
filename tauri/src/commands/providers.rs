@@ -23,111 +23,75 @@ pub struct CliBackend {
     pub id: String,
     pub name: String,
     pub cli_available: bool,
+    pub supports_effort: bool,
+    pub supports_ssh: bool,
+    pub supports_subagents: bool,
+    pub has_sub_providers: bool,
     /// Direct models (for claude-code and codex)
     pub models: Vec<ModelInfo>,
     /// Sub-providers (for opencode only)
     pub sub_providers: Vec<SubProvider>,
 }
 
-/// Return the 3 CLI backends with their models/sub-providers.
+/// Return all CLI backends with their capabilities and models.
+/// Built dynamically from the provider registry — no hardcoded list.
 #[tauri::command]
 pub fn get_providers(
     registry: tauri::State<crate::ipc::session::ProviderRegistryState>,
 ) -> Vec<CliBackend> {
-    let claude_available = registry
-        .0
-        .get("claude-code")
-        .is_some_and(|p| p.find_cli().is_some());
-    let codex_available = registry
-        .0
-        .get("codex")
-        .is_some_and(|p| p.find_cli().is_some());
-    let opencode_available = registry
-        .0
-        .get("opencode")
-        .is_some_and(|p| p.find_cli().is_some());
+    // Stable ordering: claude-code first, then codex, then opencode
+    let order = ["claude-code", "codex", "opencode"];
+    let mut providers = registry.0.all();
+    providers.sort_by_key(|p| {
+        order
+            .iter()
+            .position(|&id| id == p.id())
+            .unwrap_or(usize::MAX)
+    });
 
-    let mut backends = vec![];
+    let opencode_sub_providers = read_opencode_providers().unwrap_or_default();
 
-    // 1. Claude Code
-    backends.push(CliBackend {
-        id: "claude-code".to_string(),
-        name: "Claude Code".to_string(),
-        cli_available: claude_available,
-        models: vec![
-            ModelInfo {
-                id: "auto".to_string(),
-                name: "auto".to_string(),
-                context: None,
-                output: None,
-            },
-            ModelInfo {
-                id: "claude-sonnet-4-6".to_string(),
-                name: "sonnet-4.6".to_string(),
-                context: Some(1_000_000),
-                output: Some(64_000),
-            },
-            ModelInfo {
-                id: "claude-opus-4-6".to_string(),
-                name: "opus-4.6".to_string(),
-                context: Some(1_000_000),
-                output: Some(128_000),
-            },
-            ModelInfo {
-                id: "claude-haiku-4-5-20251001".to_string(),
-                name: "haiku-4.5".to_string(),
-                context: Some(200_000),
-                output: Some(64_000),
-            },
+    providers
+        .iter()
+        .map(|p| {
+            let has_subs = p.id() == "opencode" && !opencode_sub_providers.is_empty();
+            CliBackend {
+                id: p.id().to_string(),
+                name: p.display_name().to_string(),
+                cli_available: p.find_cli().is_some(),
+                supports_effort: p.supports_effort(),
+                supports_ssh: p.supports_ssh(),
+                supports_subagents: p.id() == "claude-code", // only Claude has subagents
+                has_sub_providers: has_subs,
+                models: get_provider_models(p.id()),
+                sub_providers: if has_subs {
+                    opencode_sub_providers.clone()
+                } else {
+                    vec![]
+                },
+            }
+        })
+        .collect()
+}
+
+/// Return the hardcoded model list for a provider.
+/// Models are intrinsic to each CLI — not worth abstracting into the trait.
+fn get_provider_models(provider_id: &str) -> Vec<ModelInfo> {
+    match provider_id {
+        "claude-code" => vec![
+            ModelInfo { id: "auto".into(), name: "auto".into(), context: None, output: None },
+            ModelInfo { id: "claude-sonnet-4-6".into(), name: "sonnet-4.6".into(), context: Some(1_000_000), output: Some(64_000) },
+            ModelInfo { id: "claude-opus-4-6".into(), name: "opus-4.6".into(), context: Some(1_000_000), output: Some(128_000) },
+            ModelInfo { id: "claude-haiku-4-5-20251001".into(), name: "haiku-4.5".into(), context: Some(200_000), output: Some(64_000) },
         ],
-        sub_providers: vec![],
-    });
-
-    // 2. Codex — auth via CLI (codex login), no API key needed
-    backends.push(CliBackend {
-        id: "codex".to_string(),
-        name: "Codex".to_string(),
-        cli_available: codex_available,
-        models: vec![
-            ModelInfo {
-                id: "gpt-5.4".to_string(),
-                name: "gpt-5.4".to_string(),
-                context: None,
-                output: None,
-            },
-            ModelInfo {
-                id: "gpt-5.4-mini".to_string(),
-                name: "gpt-5.4-mini".to_string(),
-                context: None,
-                output: None,
-            },
-            ModelInfo {
-                id: "gpt-5.3-codex".to_string(),
-                name: "gpt-5.3-codex".to_string(),
-                context: None,
-                output: None,
-            },
-            ModelInfo {
-                id: "gpt-5.2".to_string(),
-                name: "gpt-5.2".to_string(),
-                context: None,
-                output: None,
-            },
+        "codex" => vec![
+            ModelInfo { id: "gpt-5.4".into(), name: "gpt-5.4".into(), context: None, output: None },
+            ModelInfo { id: "gpt-5.4-mini".into(), name: "gpt-5.4-mini".into(), context: None, output: None },
+            ModelInfo { id: "gpt-5.3-codex".into(), name: "gpt-5.3-codex".into(), context: None, output: None },
+            ModelInfo { id: "gpt-5.2".into(), name: "gpt-5.2".into(), context: None, output: None },
         ],
-        sub_providers: vec![],
-    });
-
-    // 3. OpenCode — sub-providers from ~/.cache/opencode/models.json
-    let sub_providers = read_opencode_providers().unwrap_or_default();
-    backends.push(CliBackend {
-        id: "opencode".to_string(),
-        name: "OpenCode".to_string(),
-        cli_available: opencode_available,
-        models: vec![],
-        sub_providers,
-    });
-
-    backends
+        _ => vec![], // OpenCode models come from sub-providers
+    }
 }
 
 /// Check if an environment variable exists (without exposing the value).

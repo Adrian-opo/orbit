@@ -115,6 +115,10 @@ export interface CliBackend {
   id: string;
   name: string;
   cliAvailable: boolean;
+  supportsEffort: boolean;
+  supportsSsh: boolean;
+  supportsSubagents: boolean;
+  hasSubProviders: boolean;
   models: ModelInfo[];
   subProviders: SubProvider[];
 }

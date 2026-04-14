@@ -8,8 +8,10 @@
   import { sessions, updateSessionState } from '../lib/stores/sessions';
   import TasksList from './TasksList.svelte';
   import SubagentsPanel from './SubagentsPanel.svelte';
+  import { providerCaps, getCaps } from '../lib/stores/providers';
 
   export let session: Session;
+  $: caps = getCaps($providerCaps, session.provider);
 
   type Tab = 'stats' | 'tasks' | 'agents';
   let tab: Tab = 'stats';
@@ -52,7 +54,7 @@
     <button class="tab" class:active={tab === 'tasks'} on:click={() => (tab = 'tasks')}
       >tasks</button
     >
-    {#if session.provider === 'claude-code'}
+    {#if caps.supportsSubagents}
       <button class="tab" class:active={tab === 'agents'} on:click={() => (tab = 'agents')}
         >agents</button
       >
@@ -136,7 +138,7 @@
               >{modelShortName(session.model)}</span
             >
           </div>
-          {#if session.provider === 'claude-code'}
+          {#if caps.supportsEffort}
             <div class="stat-row">
               <span>effort</span><span class="mono-val"
                 >{sessionEffort.get($sessionEffort, String(session.id))}</span

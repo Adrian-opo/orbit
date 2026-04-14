@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { Session } from '../lib/stores/sessions';
   import { journal, pendingMessages } from '../lib/stores/journal';
-  import { getSessionJournal, getProviders } from '../lib/tauri';
-  import type { CliBackend } from '../lib/tauri';
+  import { getSessionJournal } from '../lib/tauri';
+  import { backends as backendsStore } from '../lib/stores/providers';
   import { statusColor, statusLabel, isPulsing, modelShortName } from '../lib/status';
   import { formatTokens } from '../lib/cost';
   import { mutedSessions, toggleMute } from '../lib/stores/ui';
@@ -60,24 +60,16 @@
     return modelShortName(m);
   }
 
-  // Load provider models for /model autocomplete in InputBar
-  let backends: CliBackend[] = [];
-  let providerModelsLoaded = false;
-  $: if (session?.provider && !providerModelsLoaded) {
-    providerModelsLoaded = true;
-    getProviders()
-      .then((b) => (backends = b))
-      .catch(() => {});
-  }
-
+  // Provider models for /model autocomplete — read from store
   $: providerModelIds = (() => {
     const p = session?.provider ?? 'claude-code';
-    // For Claude Code and Codex, InputBar has hardcoded lists
-    if (p === 'claude-code' || p === 'codex') return [];
-    // For OpenCode sub-providers, find the matching sub-provider
-    const oc = backends.find((b) => b.id === 'opencode');
-    const sub = oc?.subProviders?.find((s) => s.id === p);
-    return sub?.models?.map((m) => m.id) ?? [];
+    // Find models from matching backend or sub-provider
+    for (const b of $backendsStore) {
+      if (b.id === p) return b.models.map((m) => m.id);
+      const sub = b.subProviders?.find((s) => s.id === p);
+      if (sub) return sub.models.map((m) => m.id);
+    }
+    return [];
   })();
 </script>
 

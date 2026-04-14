@@ -3,16 +3,14 @@
   import type { JournalEntry } from '../lib/types';
   import Markdown from './Markdown.svelte';
   import ToolCallEntry from './ToolCallEntry.svelte';
+  import { backends } from '../lib/stores/providers';
 
   export let entries: JournalEntry[] = [];
   export let status: string = '';
   export let provider: string = 'claude-code';
 
-  const BACKEND_LABELS: Record<string, string> = {
-    'claude-code': 'claude',
-    codex: 'codex',
-  };
-  $: agentLabel = BACKEND_LABELS[provider] ?? 'agent';
+  $: agentLabel =
+    $backends.find((b) => b.id === provider)?.name.toLowerCase() ?? 'agent';
 
   const dispatch = createEventDispatcher<{ bottomchange: { atBottom: boolean } }>();
 

@@ -14,12 +14,15 @@
   import { sessionEffort } from '../lib/stores/ui';
   import type { SlashCommand } from '../lib/types';
   import type { JournalEntry } from '../lib/types';
+  import { providerCaps, getCaps } from '../lib/stores/providers';
 
   export let sessionId: number;
   export let cwd: string = '';
   export let sessionStatus: string = '';
   export let provider: string = 'claude-code';
   export let providerModels: string[] = [];
+
+  $: caps = getCaps($providerCaps, provider);
 
   let text = '';
   let textarea: HTMLTextAreaElement;
@@ -55,7 +58,7 @@
 
   $: effectiveCommands = (() => {
     const cmds: SlashCommand[] = [{ cmd: '/model', desc: modelHint, category: 'orbit' }];
-    if (provider === 'claude-code') {
+    if (caps.supportsEffort) {
       cmds.push({
         cmd: '/effort',
         desc: 'Set thinking effort (low, medium, high, max)',
@@ -147,7 +150,7 @@
         ? MODEL_OPTIONS.filter((o) => o.toLowerCase().includes(arg))
         : MODEL_OPTIONS;
       subOptions = filtered.slice(0, 10);
-    } else if (lower.startsWith('/effort ') && provider === 'claude-code') {
+    } else if (lower.startsWith('/effort ') && caps.supportsEffort) {
       const arg = lower.slice(8);
       subOptions = EFFORT_LEVELS.filter((o) => o.startsWith(arg));
     } else {
@@ -229,7 +232,7 @@
     }
 
     // Intercept /effort (Claude Code only)
-    if (cmd === '/effort' && provider === 'claude-code') {
+    if (cmd === '/effort' && caps.supportsEffort) {
       const arg = msg.slice(7).trim().toLowerCase();
       if (!arg || !EFFORT_LEVELS.includes(arg)) {
         sendError = `Usage: /effort <level> (${EFFORT_LEVELS.join(', ')})`;

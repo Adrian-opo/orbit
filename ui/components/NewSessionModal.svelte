@@ -2,7 +2,8 @@
   import { onMount, createEventDispatcher } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import { createSession, getProviders, diagnoseProvider } from '../lib/tauri';
-  import type { ProviderDiagnostic, CliBackend, SubProvider } from '../lib/tauri';
+  import { backends as backendsStore, providerCaps, getCaps } from '../lib/stores/providers';
+  import type { ProviderDiagnostic, SubProvider } from '../lib/tauri';
   import { generateAgentName } from '../lib/android-names';
 
   const dispatch = createEventDispatcher();
@@ -28,17 +29,16 @@
   let sshUser = 'ubuntu';
   let sshPassword = '';
 
-  let backends: CliBackend[] = [];
-
+  $: backends = $backendsStore;
   $: selectedBackend = backends.find((b) => b.id === backendId) ?? null;
-  $: isClaude = backendId === 'claude-code';
-  $: isOpenCode = backendId === 'opencode';
-  $: hasSubProviders = isOpenCode && (selectedBackend?.subProviders?.length ?? 0) > 0;
+  $: caps = getCaps($providerCaps, backendId);
+  $: hasSubProviders = selectedBackend?.hasSubProviders ?? false;
 
-  // SSH mode: only claude-code and codex (opencode SSH not yet supported)
-  $: if (sshMode && backendId === 'opencode') backendId = 'claude-code';
+  // SSH mode: reset to claude-code if current backend doesn't support SSH
+  $: if (sshMode && !(backends.find((b) => b.id === backendId)?.supportsSsh ?? false))
+    backendId = 'claude-code';
   $: sshBackends = sshMode
-    ? backends.filter((b) => b.id === 'claude-code' || b.id === 'codex')
+    ? backends.filter((b) => b.supportsSsh)
     : backends;
 
   // Sub-provider selection (OpenCode only)
@@ -55,25 +55,28 @@
   );
 
   // Models depend on backend type
-  $: currentModels = isOpenCode
+  $: currentModels = hasSubProviders
     ? (selectedSubProvider?.models ?? [])
     : (selectedBackend?.models ?? []);
 
-  // API key needed?
+  // API key needed? (only for sub-provider backends like OpenCode)
   $: envVars = selectedSubProvider?.env ?? [];
-  $: needsApiKey = isOpenCode && envVars.length > 0;
+  $: needsApiKey = hasSubProviders && envVars.length > 0;
   $: envVarName = envVars[0] ?? '';
 
   onMount(async () => {
-    try {
-      backends = await getProviders();
-      // Pre-select first sub-provider if OpenCode
-      const oc = backends.find((b) => b.id === 'opencode');
-      if (oc?.subProviders?.length) {
-        subProviderId = oc.subProviders[0].id;
+    // Refresh providers if not already loaded
+    if (backends.length === 0) {
+      try {
+        backendsStore.set(await getProviders());
+      } catch (e) {
+        console.warn('[NewSessionModal] getProviders failed:', e);
       }
-    } catch (e) {
-      console.warn('[NewSessionModal] getProviders failed:', e);
+    }
+    // Pre-select first sub-provider if OpenCode
+    const oc = backends.find((b) => b.hasSubProviders);
+    if (oc?.subProviders?.length) {
+      subProviderId = oc.subProviders[0].id;
     }
   });
 
@@ -125,14 +128,13 @@
   }
 
   function resolveProvider(): string {
-    if (isOpenCode && subProviderId) return subProviderId;
+    if (hasSubProviders && subProviderId) return subProviderId;
     return backendId;
   }
 
   function resolveModel(): string | undefined {
-    if (!model || model === 'auto') return isClaude ? undefined : model;
-    // For opencode, model needs "subprovider/model" format
-    if (isOpenCode && subProviderId && !model.includes('/')) {
+    if (!model || model === 'auto') return caps.supportsEffort ? undefined : model;
+    if (hasSubProviders && subProviderId && !model.includes('/')) {
       return `${subProviderId}/${model}`;
     }
     return model;
@@ -168,7 +170,7 @@
         model: resolveModel(),
         permissionMode: 'ignore',
         sessionName: finalName,
-        useWorktree: isClaude && !sshMode ? useWorktree : false,
+        useWorktree: caps.supportsEffort && !sshMode ? useWorktree : false,
         provider: resolveProvider(),
         apiKey: needsApiKey && apiKeyOverride.trim() ? apiKeyOverride.trim() : undefined,
         sshHost: sshMode ? sshHost.trim() : undefined,
@@ -438,7 +440,7 @@
       {/if}
     </div>
 
-    {#if isClaude && !sshMode}
+    {#if caps.supportsEffort && !sshMode}
       <label class="toggle-row">
         <input type="checkbox" bind:checked={useWorktree} disabled={loading} />
         <span class="toggle-label">criar git worktree</span>

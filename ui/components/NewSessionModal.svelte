@@ -504,15 +504,15 @@
   .modal {
     background: var(--bg1);
     border: 1px solid var(--bd1);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     width: 500px;
     max-width: 94vw;
     max-height: 90vh;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 20px;
+    gap: var(--sp-7);
+    padding: var(--sp-9);
   }
   .modal-header {
     display: flex;
@@ -529,7 +529,7 @@
     border: none;
     color: var(--t2);
     font-size: 12px;
-    padding: 2px 4px;
+    padding: var(--sp-1) var(--sp-2);
   }
   .close:hover {
     color: var(--t0);
@@ -538,7 +538,7 @@
   .field {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: var(--sp-3);
   }
   .label {
     font-size: var(--xs);
@@ -546,15 +546,15 @@
     letter-spacing: 0.06em;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-3);
   }
   .input {
     background: var(--bg2);
     border: 1px solid var(--bd1);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     color: var(--t0);
     font-size: var(--md);
-    padding: 6px 8px;
+    padding: var(--sp-3) var(--sp-4);
     outline: none;
     width: 100%;
     transition: border-color 0.15s;
@@ -576,7 +576,7 @@
 
   .path-row {
     display: flex;
-    gap: 6px;
+    gap: var(--sp-3);
   }
   .path-row .input {
     flex: 1;
@@ -585,8 +585,8 @@
     background: var(--bg2);
     border: 1px solid var(--bd1);
     color: var(--t1);
-    border-radius: 3px;
-    padding: 0 10px;
+    border-radius: var(--radius-sm);
+    padding: 0 var(--sp-5);
     font-size: var(--base);
     flex-shrink: 0;
   }
@@ -598,18 +598,18 @@
   /* Backend chips */
   .backend-row {
     display: flex;
-    gap: 6px;
+    gap: var(--sp-3);
   }
   .backend-chip {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--sp-3);
     flex: 1;
     justify-content: center;
     background: var(--bg2);
     border: 1px solid var(--bd1);
-    border-radius: 3px;
-    padding: 7px 10px;
+    border-radius: var(--radius-sm);
+    padding: var(--sp-3) var(--sp-5);
     font-size: var(--sm);
     color: var(--t1);
     cursor: pointer;
@@ -637,7 +637,7 @@
   /* Sub-provider list */
   .sub-search {
     font-size: var(--xs);
-    padding: 4px 8px;
+    padding: var(--sp-2) var(--sp-4);
   }
   .sub-list {
     display: flex;
@@ -645,14 +645,14 @@
     max-height: 160px;
     overflow-y: auto;
     border: 1px solid var(--bd1);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     background: var(--bg2);
   }
   .sub-item {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 8px;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
     border: none;
     background: none;
     color: var(--t1);
@@ -685,7 +685,7 @@
     flex-shrink: 0;
   }
   .no-results {
-    padding: 8px;
+    padding: var(--sp-4);
     font-size: var(--xs);
     color: var(--t3);
     text-align: center;
@@ -704,11 +704,11 @@
   .diag {
     background: var(--bg3);
     border: 1px solid var(--bd1);
-    border-radius: 3px;
-    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    padding: var(--sp-4) var(--sp-5);
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: var(--sp-2);
   }
   .diag-row {
     font-size: var(--xs);
@@ -724,15 +724,15 @@
   .actions {
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
+    gap: var(--sp-4);
   }
   .btn {
     background: none;
     border: 1px solid var(--bd1);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     color: var(--t1);
     font-size: var(--sm);
-    padding: 5px 14px;
+    padding: var(--sp-3) var(--sp-7);
     transition: all 0.15s;
   }
   .btn:hover {
@@ -755,7 +755,7 @@
   .nickname-row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-3);
   }
   .nickname-row .input {
     flex: 1;
@@ -774,7 +774,7 @@
   .toggle-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-4);
     cursor: pointer;
     user-select: none;
   }

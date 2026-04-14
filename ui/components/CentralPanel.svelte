@@ -237,7 +237,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 14px;
+    padding: var(--sp-4) var(--sp-7);
     border-bottom: 1px solid var(--bd);
     flex-shrink: 0;
     background: var(--bg1);
@@ -245,7 +245,7 @@
   .header-left {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-4);
     min-width: 0;
     flex: 1;
     overflow: hidden;
@@ -278,8 +278,8 @@
   .branch-strip {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 2px 14px;
+    gap: var(--sp-3);
+    padding: var(--sp-1) var(--sp-7);
     border-bottom: 1px solid var(--bd);
     background: var(--bg1);
     flex-shrink: 0;
@@ -308,9 +308,9 @@
   .header-right {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--sp-5);
     flex-shrink: 0;
-    padding-left: 12px;
+    padding-left: var(--sp-6);
   }
   .meta {
     font-size: var(--xs);
@@ -319,18 +319,18 @@
   .ctx {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--sp-3);
   }
   .ctx-bar {
     width: 40px;
     height: 3px;
     background: var(--bg3);
-    border-radius: 2px;
+    border-radius: var(--radius-sm);
     overflow: hidden;
   }
   .ctx-fill {
     height: 100%;
-    border-radius: 2px;
+    border-radius: var(--radius-sm);
     transition: width 0.3s;
   }
   .ctx-pct {
@@ -345,8 +345,8 @@
   .approval {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 14px;
+    gap: var(--sp-4);
+    padding: var(--sp-3) var(--sp-7);
     background: rgba(232, 160, 48, 0.07);
     border-bottom: 1px solid rgba(232, 160, 48, 0.2);
     flex-shrink: 0;
@@ -371,8 +371,8 @@
   .header-actions {
     display: flex;
     align-items: center;
-    gap: 3px;
-    margin-left: 4px;
+    gap: var(--sp-2);
+    margin-left: var(--sp-2);
   }
 
   .action-btn {
@@ -381,7 +381,7 @@
     color: var(--t2);
     width: 18px;
     height: 18px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     font-size: 11px;
     display: flex;
     align-items: center;
@@ -429,14 +429,14 @@
 
   .pending-msg {
     display: flex;
-    gap: 8px;
+    gap: var(--sp-4);
     align-items: flex-start;
-    padding: 8px 14px 8px 10px;
+    padding: var(--sp-4) var(--sp-7) var(--sp-4) var(--sp-5);
     font-size: var(--base);
     color: var(--t1);
     opacity: 0.6;
     border-left: 2px solid var(--user-fg);
-    margin: 2px 0;
+    margin: var(--sp-1) 0;
   }
   .pending-arrow {
     color: var(--user-fg);
@@ -450,10 +450,10 @@
     z-index: 10;
     background: var(--bg2);
     border: 1px solid var(--bd1);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     color: var(--t1);
     font-size: var(--xs);
-    padding: 4px 10px;
+    padding: var(--sp-2) var(--sp-5);
   }
   .scroll-btn:hover {
     border-color: var(--ac);

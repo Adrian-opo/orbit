@@ -180,7 +180,7 @@
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--bd);
-    padding: 0 2px;
+    padding: 0 var(--sp-1);
     flex-shrink: 0;
   }
   .tab {
@@ -188,7 +188,7 @@
     border: none;
     color: var(--t2);
     font-size: var(--xs);
-    padding: 9px 10px 8px;
+    padding: var(--sp-5) var(--sp-5) var(--sp-4);
     letter-spacing: 0.06em;
     border-bottom: 1px solid transparent;
     margin-bottom: -1px;
@@ -210,7 +210,7 @@
     border: none;
     color: var(--t2);
     font-size: 14px;
-    padding: 4px 6px;
+    padding: var(--sp-2) var(--sp-3);
     line-height: 1;
     cursor: pointer;
     transition: color 0.15s;
@@ -225,13 +225,13 @@
   }
 
   .stats {
-    padding: 10px 0;
+    padding: var(--sp-5) 0;
     display: flex;
     flex-direction: column;
     gap: 0;
   }
   .stat-group {
-    padding: 8px 12px;
+    padding: var(--sp-4) var(--sp-6);
     border-bottom: 1px solid var(--bd);
   }
   .stat-group:last-child {
@@ -241,7 +241,7 @@
     font-size: var(--xs);
     color: var(--t2);
     letter-spacing: 0.08em;
-    margin-bottom: 4px;
+    margin-bottom: var(--sp-2);
   }
   .stat-value {
     font-size: var(--md);

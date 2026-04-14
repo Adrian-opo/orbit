@@ -40,7 +40,7 @@
     max-height: 520px;
     background: var(--bg2);
     border: 1px solid var(--bd2);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -50,14 +50,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
+    padding: var(--sp-6) var(--sp-8);
     border-bottom: 1px solid var(--bd);
     flex-shrink: 0;
   }
   .modal-title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--sp-4);
   }
   .title-text {
     font-size: var(--md);
@@ -69,8 +69,8 @@
     color: var(--ac);
     background: var(--ac-d);
     border: 1px solid rgba(0, 212, 126, 0.2);
-    border-radius: 3px;
-    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+    padding: var(--sp-1) 7px;
   }
   .close-btn {
     background: none;
@@ -78,7 +78,7 @@
     color: var(--t2);
     font-size: 13px;
     cursor: pointer;
-    padding: 2px 4px;
+    padding: var(--sp-1) var(--sp-2);
     line-height: 1;
     transition: color 0.15s;
   }
@@ -88,7 +88,7 @@
   .modal-body {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 20px;
+    padding: var(--sp-8) var(--sp-9);
   }
   .modal-body::-webkit-scrollbar {
     width: 4px;
@@ -98,12 +98,12 @@
   }
   .modal-body::-webkit-scrollbar-thumb {
     background: var(--bd2);
-    border-radius: 2px;
+    border-radius: var(--radius-sm);
   }
   .current-badge {
     font-size: 10px;
     color: var(--ac);
-    margin-bottom: 14px;
+    margin-bottom: var(--sp-7);
   }
   /* Sobrescreve estilos do Markdown.svelte dentro do modal */
   .modal-body :global(h1) {
@@ -114,24 +114,24 @@
     color: var(--t2);
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    margin: 16px 0 10px;
+    margin: var(--sp-8) 0 var(--sp-5);
     font-weight: 500;
   }
   .modal-body :global(h3) {
     font-size: var(--sm);
     color: var(--t0);
     font-weight: 500;
-    margin: 10px 0 4px;
+    margin: var(--sp-5) 0 var(--sp-2);
   }
   .modal-body :global(p) {
     font-size: var(--sm);
     color: var(--t1);
     line-height: 1.6;
-    margin-bottom: 8px;
+    margin-bottom: var(--sp-4);
   }
   .modal-body :global(hr) {
     border: none;
     border-top: 1px solid var(--bd);
-    margin: 12px 0;
+    margin: var(--sp-6) 0;
   }
 </style>

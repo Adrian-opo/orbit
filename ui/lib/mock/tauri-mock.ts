@@ -489,6 +489,7 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
     case 'diagnose_provider': {
       const backend = (args?.backend as string) ?? 'claude-code';
       const sshHost = args?.sshHost as string | null;
+      const projectPath = args?.projectPath as string | null;
       return {
         backend,
         cliName: backend === 'claude-code' ? 'claude' : backend === 'codex' ? 'codex' : 'opencode',
@@ -497,6 +498,7 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
         version: '1.0.0-mock',
         installHint: 'npm install -g mock',
         ssh: sshHost ? { ok: true, latencyMs: 42, error: '' } : null,
+        projectDirOk: projectPath ? true : null,
       };
     }
 

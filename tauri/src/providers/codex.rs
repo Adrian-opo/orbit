@@ -33,9 +33,9 @@ impl Provider for CodexProvider {
                         "--json".to_string(),
                         "--dangerously-bypass-approvals-and-sandbox".to_string(),
                         "-m".to_string(),
-                        ssh::posix_escape(&config.model),
-                        ssh::posix_escape(sid),
-                        ssh::posix_escape(&config.prompt),
+                        config.model.clone(),
+                        sid.clone(),
+                        config.prompt.clone(),
                     ]);
                 } else {
                     parts.extend([
@@ -43,15 +43,15 @@ impl Provider for CodexProvider {
                         "--json".to_string(),
                         "--dangerously-bypass-approvals-and-sandbox".to_string(),
                         "-m".to_string(),
-                        ssh::posix_escape(&config.model),
-                        ssh::posix_escape(&config.prompt),
+                        config.model.clone(),
+                        config.prompt.clone(),
                     ]);
                 }
 
                 let cwd_str = config.cwd.to_string_lossy();
                 let remote_script = format!(
                     "cd {} && {}",
-                    ssh::posix_escape(&cwd_str),
+                    cwd_str,
                     parts.join(" ")
                 );
 

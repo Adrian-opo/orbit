@@ -36,27 +36,29 @@ impl Provider for OpenCodeProvider {
                 let cwd_str = config.cwd.to_string_lossy();
                 parts.extend([
                     "--dir".to_string(),
-                    ssh::posix_escape(&cwd_str),
+                    cwd_str.to_string(),
                     "-m".to_string(),
-                    ssh::posix_escape(&config.model),
+                    config.model.clone(),
                 ]);
 
                 if let Some(ref sid) = config.resume_id {
                     parts.extend([
                         "--continue".to_string(),
                         "-s".to_string(),
-                        ssh::posix_escape(sid),
+                        sid.clone(),
                     ]);
                 }
 
-                parts.push(ssh::posix_escape(&config.prompt));
+                parts.push(config.prompt.clone());
 
+                // Inline env vars: KEY=val KEY2=val2 cmd args
                 let mut env_prefix = String::new();
                 for (k, v) in &config.extra_env {
-                    env_prefix.push_str(&format!("export {}={} && ", k, ssh::posix_escape(v)));
+                    env_prefix.push_str(&format!("{k}={v} "));
                 }
 
-                let remote_script = format!("{}{}", env_prefix, parts.join(" "));
+                let remote_script =
+                    format!("cd {cwd_str} && {env_prefix}{}", parts.join(" "));
 
                 let (mut child, askpass) = ssh::spawn_via_ssh(
                     host,

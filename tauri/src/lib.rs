@@ -31,6 +31,9 @@ pub fn run() {
                 .expect("Could not resolve app data dir");
             std::fs::create_dir_all(&data_dir).expect("Could not create app data dir");
 
+            // Initialize encryption key for storing secrets (stored at {app_data}/orbit.key)
+            services::crypto::init(&data_dir);
+
             let db_path = data_dir.join("agent-dashboard.db");
             let db = Arc::new(DatabaseService::open(&db_path).expect("Could not open database"));
 

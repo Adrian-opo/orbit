@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
-  import { createSession, setSessionApiKey, getProviders, diagnoseProvider } from '../lib/tauri';
+  import { createSession, getProviders, diagnoseProvider } from '../lib/tauri';
   import type { ProviderDiagnostic, CliBackend, SubProvider } from '../lib/tauri';
   import { generateAgentName } from '../lib/android-names';
 
@@ -34,6 +34,12 @@
   $: isClaude = backendId === 'claude-code';
   $: isOpenCode = backendId === 'opencode';
   $: hasSubProviders = isOpenCode && (selectedBackend?.subProviders?.length ?? 0) > 0;
+
+  // SSH mode: only claude-code and codex (opencode SSH not yet supported)
+  $: if (sshMode && backendId === 'opencode') backendId = 'claude-code';
+  $: sshBackends = sshMode
+    ? backends.filter((b) => b.id === 'claude-code' || b.id === 'codex')
+    : backends;
 
   // Sub-provider selection (OpenCode only)
   $: selectedSubProvider = hasSubProviders
@@ -100,16 +106,12 @@
     diag = null;
     error = '';
     try {
-      diag = await diagnoseProvider(
-        backendId,
-        sshMode
-          ? {
-              sshHost: sshHost.trim() || undefined,
-              sshUser: sshUser.trim() || undefined,
-              sshPassword: sshPassword.trim() || undefined,
-            }
-          : undefined
-      );
+      diag = await diagnoseProvider(backendId, {
+        projectPath: path.trim() || undefined,
+        sshHost: sshMode ? sshHost.trim() || undefined : undefined,
+        sshUser: sshMode ? sshUser.trim() || undefined : undefined,
+        sshPassword: sshMode ? sshPassword.trim() || undefined : undefined,
+      });
     } catch (e: any) {
       error = e?.message ?? String(e);
     } finally {
@@ -160,7 +162,7 @@
     loading = true;
     error = '';
     try {
-      const session = await createSession({
+      await createSession({
         projectPath: path.trim(),
         prompt: prompt.trim() || 'Hello',
         model: resolveModel(),
@@ -168,13 +170,11 @@
         sessionName: finalName,
         useWorktree: isClaude && !sshMode ? useWorktree : false,
         provider: resolveProvider(),
+        apiKey: needsApiKey && apiKeyOverride.trim() ? apiKeyOverride.trim() : undefined,
         sshHost: sshMode ? sshHost.trim() : undefined,
         sshUser: sshMode ? sshUser.trim() : undefined,
         sshPassword: sshMode && sshPassword.trim() ? sshPassword.trim() : undefined,
       });
-      if (needsApiKey && apiKeyOverride.trim()) {
-        await setSessionApiKey(session.id, apiKeyOverride.trim());
-      }
       dispatch('done');
     } catch (e: any) {
       error = e?.message ?? String(e);
@@ -313,7 +313,7 @@
       <!-- svelte-ignore a11y_label_has_associated_control -->
       <label class="label">backend</label>
       <div class="backend-row">
-        {#each backends as b}
+        {#each sshBackends as b}
           <button
             class="backend-chip"
             class:active={backendId === b.id}
@@ -465,6 +465,11 @@
           {/if}
           {#if !diag.found}
             <div class="diag-row fail">install: {diag.installHint}</div>
+          {/if}
+          {#if diag.projectDirOk === true}
+            <div class="diag-row ok">path: ✓ exists</div>
+          {:else if diag.projectDirOk === false}
+            <div class="diag-row fail">path: ✗ directory not found</div>
           {/if}
         {/if}
       </div>

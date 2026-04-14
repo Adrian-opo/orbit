@@ -160,6 +160,13 @@ impl SessionManager {
             ssh_user: ssh_user.map(|s| s.to_string()),
         };
 
+        // Persist SSH password encrypted to DB (api_key saved separately via set_api_key)
+        if ssh_password.is_some() {
+            let _ = self
+                .db
+                .save_session_secrets(session_id, None, ssh_password.as_deref());
+        }
+
         self.active.insert(
             session_id,
             ActiveSession {
@@ -283,6 +290,33 @@ impl SessionManager {
 
         // 4. Spawn CLI via provider trait
         let prompt_text = prompt.clone();
+        if cfg!(debug_assertions) {
+            eprintln!("[orbit:debug] ── spawn session {session_id} ──");
+            eprintln!("[orbit:debug]   provider: {provider_id}");
+            eprintln!("[orbit:debug]   model: {model}");
+            eprintln!("[orbit:debug]   cwd: {cwd}");
+            eprintln!(
+                "[orbit:debug]   spawn_mode: {}",
+                match &spawn_mode {
+                    crate::services::ssh::SpawnMode::Local => "local".to_string(),
+                    crate::services::ssh::SpawnMode::Ssh { host, user } =>
+                        format!("ssh {user}@{host}"),
+                }
+            );
+            eprintln!(
+                "[orbit:debug]   ssh_password: {}",
+                if ssh_password.is_some() { "<set>" } else { "<none>" }
+            );
+            if !extra_env.is_empty() {
+                for (k, _) in &extra_env {
+                    eprintln!("[orbit:debug]   env: {k}=<set>");
+                }
+            }
+            if let Some(ref rid) = resume_id {
+                eprintln!("[orbit:debug]   resume: {rid}");
+            }
+            eprintln!("[orbit:debug]   prompt: {}…", &prompt.chars().take(80).collect::<String>());
+        }
         let spawn_config = ProviderSpawnConfig {
             session_id,
             cwd: std::path::PathBuf::from(&cwd),
@@ -322,6 +356,9 @@ impl SessionManager {
                     Ok(0) | Err(_) => break,
                     Ok(_) => {
                         let trimmed = line.trim();
+                        if cfg!(debug_assertions) && !trimmed.is_empty() {
+                            eprintln!("[orbit:debug] stderr {session_id}: {trimmed}");
+                        }
                         if trimmed.contains("rate_limit_error")
                             || trimmed.contains("overloaded_error")
                         {
@@ -441,6 +478,11 @@ impl SessionManager {
                     let trimmed = line.trim().to_string();
                     if trimmed.is_empty() || !trimmed.starts_with('{') {
                         continue;
+                    }
+
+                    if cfg!(debug_assertions) {
+                        let preview: String = trimmed.chars().take(200).collect();
+                        eprintln!("[orbit:debug] stdout {session_id}: {preview}");
                     }
 
                     // Extract and persist Claude session ID from system/init message
@@ -622,6 +664,10 @@ impl SessionManager {
                         .ok_or_else(|| format!("Session {session_id} not found"))?;
 
                 let claude_session_id = m.db.get_claude_session_id(session_id).ok().flatten();
+                let (api_key, ssh_password) = m
+                    .db
+                    .load_session_secrets(session_id)
+                    .unwrap_or((None, None));
 
                 m.active.insert(
                     session_id,
@@ -629,8 +675,8 @@ impl SessionManager {
                         session,
                         claude_session_id,
                         effort: None,
-                        api_key: None,
-                        ssh_password: None,
+                        api_key,
+                        ssh_password,
                     },
                 );
                 m.journal_states.entry(session_id).or_default();
@@ -796,6 +842,11 @@ impl SessionManager {
 
     pub fn set_api_key(&mut self, session_id: SessionId, api_key: String) {
         if let Some(a) = self.active.get_mut(&session_id) {
+            // Persist encrypted to DB so it survives app restart
+            let ssh_pw = a.ssh_password.as_deref();
+            let _ = self
+                .db
+                .save_session_secrets(session_id, Some(&api_key), ssh_pw);
             a.api_key = Some(api_key);
         }
     }

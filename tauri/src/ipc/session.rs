@@ -35,6 +35,7 @@ pub fn create_session(
     session_name: Option<String>,
     use_worktree: Option<bool>,
     provider: Option<String>,
+    api_key: Option<String>,
     ssh_host: Option<String>,
     ssh_user: Option<String>,
     ssh_password: Option<String>,
@@ -46,7 +47,7 @@ pub fn create_session(
 
     let session = {
         let mut m = state.write();
-        m.init_session(
+        let s = m.init_session(
             &project_path,
             session_name.as_deref(),
             &mode,
@@ -56,7 +57,12 @@ pub fn create_session(
             ssh_host.as_deref(),
             ssh_user.as_deref(),
             ssh_password,
-        )?
+        )?;
+        // Set API key before spawn thread starts — avoids race condition
+        if let Some(key) = api_key {
+            m.set_api_key(s.id, key);
+        }
+        s
     };
 
     // Emit session:created immediately so frontend shows the session

@@ -96,6 +96,8 @@ impl DatabaseService {
             .execute_batch("ALTER TABLE sessions ADD COLUMN provider TEXT DEFAULT 'claude-code'");
         let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN ssh_host TEXT");
         let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN ssh_user TEXT");
+        let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN api_key_enc TEXT");
+        let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN ssh_password_enc TEXT");
 
         conn.execute_batch(
             "
@@ -222,6 +224,53 @@ impl DatabaseService {
             params![model, id],
         )?;
         Ok(())
+    }
+
+    /// Store encrypted API key and/or SSH password for a session.
+    pub fn save_session_secrets(
+        &self,
+        id: SessionId,
+        api_key: Option<&str>,
+        ssh_password: Option<&str>,
+    ) -> SqlResult<()> {
+        let api_enc = api_key.and_then(|k| crate::services::crypto::encrypt(k).ok());
+        let pw_enc = ssh_password.and_then(|p| crate::services::crypto::encrypt(p).ok());
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        conn.execute(
+            "UPDATE sessions SET api_key_enc = ?1, ssh_password_enc = ?2, \
+             updated_at = datetime('now') WHERE id = ?3",
+            params![api_enc, pw_enc, id],
+        )?;
+        Ok(())
+    }
+
+    /// Load and decrypt API key and SSH password for a session.
+    pub fn load_session_secrets(
+        &self,
+        id: SessionId,
+    ) -> SqlResult<(Option<String>, Option<String>)> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare(
+            "SELECT api_key_enc, ssh_password_enc FROM sessions WHERE id = ?1",
+        )?;
+        let result = stmt
+            .query_row(params![id], |row| {
+                let api_enc: Option<String> = row.get(0)?;
+                let pw_enc: Option<String> = row.get(1)?;
+                Ok((api_enc, pw_enc))
+            })
+            .optional()?;
+
+        match result {
+            Some((api_enc, pw_enc)) => {
+                let api_key =
+                    api_enc.and_then(|e| crate::services::crypto::decrypt(&e).ok());
+                let ssh_pw =
+                    pw_enc.and_then(|e| crate::services::crypto::decrypt(&e).ok());
+                Ok((api_key, ssh_pw))
+            }
+            None => Ok((None, None)),
+        }
     }
 
     pub fn update_session_worktree(

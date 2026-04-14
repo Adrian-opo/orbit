@@ -40,23 +40,23 @@ impl Provider for ClaudeProvider {
                 ];
                 if config.model != "auto" && !config.model.is_empty() {
                     parts.push("--model".to_string());
-                    parts.push(ssh::posix_escape(&config.model));
+                    parts.push(config.model.clone());
                 }
                 if let Some(ref effort) = config.effort {
                     parts.push("--effort".to_string());
-                    parts.push(ssh::posix_escape(effort));
+                    parts.push(effort.clone());
                 }
                 if let Some(ref resume_id) = config.resume_id {
                     parts.push("--resume".to_string());
-                    parts.push(ssh::posix_escape(resume_id));
+                    parts.push(resume_id.clone());
                 }
                 parts.push("-p".to_string());
-                parts.push(ssh::posix_escape(&config.prompt));
+                parts.push(config.prompt.clone());
 
                 let cwd_str = config.cwd.to_string_lossy();
                 let remote_script = format!(
                     "cd {} && {}",
-                    ssh::posix_escape(&cwd_str),
+                    cwd_str,
                     parts.join(" ")
                 );
 

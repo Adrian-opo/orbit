@@ -136,13 +136,15 @@ pub fn check_env_var(name: String) -> bool {
     std::env::var(&name).is_ok()
 }
 
-/// Diagnose a provider: check if CLI is found, get version, report path.
+/// Diagnose a provider: check if CLI is found, get version, report path,
+/// and verify the project directory exists.
 /// When SSH params are provided, first tests the SSH connection, then checks
-/// for the CLI on the remote machine via `which` and `--version` over SSH.
+/// for the CLI and directory on the remote machine.
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub fn diagnose_provider(
     backend: String,
+    project_path: Option<String>,
     ssh_host: Option<String>,
     ssh_user: Option<String>,
     ssh_password: Option<String>,
@@ -159,6 +161,7 @@ pub fn diagnose_provider(
                 "version": null,
                 "installHint": "unknown provider",
                 "ssh": null,
+                "projectDirOk": null,
             });
         }
     };
@@ -166,7 +169,7 @@ pub fn diagnose_provider(
     let cli_name = provider.cli_name().to_string();
     let install_hint = provider.install_hint().to_string();
 
-    // SSH mode: test connection, then check CLI on remote
+    // SSH mode: test connection → check CLI → check dir on remote
     if let (Some(ref host), Some(ref user)) = (&ssh_host, &ssh_user) {
         let ssh_result =
             crate::services::ssh::test_ssh_connection(host, user, ssh_password.as_deref());
@@ -184,12 +187,20 @@ pub fn diagnose_provider(
                     "latencyMs": ssh_result.latency_ms,
                     "error": ssh_result.error,
                 },
+                "projectDirOk": null,
             });
         }
 
-        // SSH connected — check for CLI on the remote machine
-        let remote_script = format!("which {} && {} --version", cli_name, cli_name);
-        let (path, version) = match crate::services::ssh::spawn_via_ssh(
+        // SSH connected — check CLI + dir in one remote call
+        let dir_check = if let Some(ref pp) = project_path {
+            format!(" && test -d {pp} && echo __dir_ok__")
+        } else {
+            String::new()
+        };
+        let remote_script =
+            format!("which {cli_name} && {cli_name} --version{dir_check}");
+
+        let (path, version, dir_ok) = match crate::services::ssh::spawn_via_ssh(
             host,
             user,
             ssh_password.as_deref(),
@@ -198,20 +209,32 @@ pub fn diagnose_provider(
             Ok((child, _guard)) => {
                 let output = child.wait_with_output().ok();
                 match output {
-                    Some(o) if o.status.success() => {
+                    Some(o) => {
                         let stdout = String::from_utf8_lossy(&o.stdout);
                         let mut lines = stdout.lines();
                         let p = lines.next().map(|l| l.trim().to_string());
                         let v = lines
                             .next()
                             .map(|l| l.trim().to_string())
-                            .filter(|s| !s.is_empty());
-                        (p, v)
+                            .filter(|s| !s.is_empty() && !s.contains("__dir_ok__"));
+                        let has_dir = stdout.contains("__dir_ok__");
+                        if o.status.success() {
+                            (p, v, Some(has_dir))
+                        } else {
+                            // `which` succeeded but `test -d` failed → CLI found, dir missing
+                            let cli_found = p.is_some()
+                                && p.as_ref().is_some_and(|s| !s.is_empty());
+                            if cli_found {
+                                (p, v, Some(false))
+                            } else {
+                                (None, None, None)
+                            }
+                        }
                     }
-                    _ => (None, None),
+                    _ => (None, None, None),
                 }
             }
-            Err(_) => (None, None),
+            Err(_) => (None, None, None),
         };
 
         let found = path.is_some();
@@ -227,10 +250,11 @@ pub fn diagnose_provider(
                 "latencyMs": ssh_result.latency_ms,
                 "error": "",
             },
+            "projectDirOk": if project_path.is_some() { serde_json::json!(dir_ok) } else { serde_json::json!(null) },
         });
     }
 
-    // Local mode: existing behavior
+    // Local mode: check CLI + directory
     let path = provider.find_cli();
     let found = path.is_some();
 
@@ -240,6 +264,17 @@ pub fn diagnose_provider(
         None
     };
 
+    let project_dir_ok = project_path.as_deref().filter(|p| !p.is_empty()).map(|p| {
+        let result = std::path::Path::new(p).is_dir();
+        if cfg!(debug_assertions) {
+            eprintln!(
+                "[orbit:debug] diagnose project_path={p:?} is_dir={result} exists={}",
+                std::path::Path::new(p).exists()
+            );
+        }
+        result
+    });
+
     serde_json::json!({
         "backend": backend,
         "cliName": cli_name,
@@ -248,6 +283,7 @@ pub fn diagnose_provider(
         "version": version,
         "installHint": install_hint,
         "ssh": null,
+        "projectDirOk": project_dir_ok,
     })
 }
 

@@ -30,6 +30,8 @@ export interface CreateSessionOptions {
   sessionName?: string;
   useWorktree?: boolean;
   provider?: string;
+  /** Provider API key. Set before spawn to avoid race condition. */
+  apiKey?: string;
   sshHost?: string;
   sshUser?: string;
   /** SSH password. Never persisted — held in backend memory for session lifetime. */
@@ -51,6 +53,7 @@ export async function createSession(opts: CreateSessionOptions): Promise<Session
     sessionName: opts.sessionName ?? null,
     useWorktree: opts.useWorktree ?? false,
     provider: opts.provider ?? 'claude-code',
+    apiKey: opts.apiKey ?? null,
     sshHost: opts.sshHost ?? null,
     sshUser: opts.sshUser ?? null,
     sshPassword: opts.sshPassword ?? null,
@@ -138,14 +141,21 @@ export interface ProviderDiagnostic {
   version: string | null;
   installHint: string;
   ssh: SshDiagnostic | null;
+  projectDirOk: boolean | null;
 }
 
 export async function diagnoseProvider(
   backend: string,
-  opts?: { sshHost?: string; sshUser?: string; sshPassword?: string }
+  opts?: {
+    projectPath?: string;
+    sshHost?: string;
+    sshUser?: string;
+    sshPassword?: string;
+  }
 ): Promise<ProviderDiagnostic> {
   return await invoke('diagnose_provider', {
     backend,
+    projectPath: opts?.projectPath ?? null,
     sshHost: opts?.sshHost ?? null,
     sshUser: opts?.sshUser ?? null,
     sshPassword: opts?.sshPassword ?? null,

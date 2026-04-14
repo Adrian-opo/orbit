@@ -304,8 +304,10 @@ pub fn test_ssh_connection(host: &str, user: &str, password: Option<&str>) -> Ss
 /// the [`Child`] process handle together with the optional [`AskpassGuard`]
 /// (which must be kept alive until the child exits).
 ///
-/// The remote script is wrapped as `bash -lc '<remote_script>'` so that the
-/// remote shell's login profile (PATH, rbenv, nvm, etc.) is loaded.
+/// `remote_script` should be a **plain** shell command with values already
+/// individually escaped via [`posix_escape`]. This function wraps it in a
+/// single `posix_escape` layer for `bash -lc '<script>'` so the remote login
+/// profile is loaded.
 pub fn spawn_via_ssh(
     host: &str,
     user: &str,
@@ -328,9 +330,28 @@ pub fn spawn_via_ssh(
 
     args.push(format!("{}@{}", user, host));
 
-    // Wrap the remote script in `bash -lc '...'` to load the login environment.
-    let escaped = posix_escape(remote_script);
-    args.push(format!("bash -lc {}", escaped));
+    // Wrap in bash -lc so the remote login profile is loaded (PATH includes
+    // ~/.local/bin, nvm, npm globals, etc.). Without -l, user-installed CLIs
+    // like claude/codex won't be found.
+    // Use double quotes for the outer layer — the script has no pre-escaped
+    // single quotes (providers pass raw values, no posix_escape).
+    // Escape only $ ` \ " inside the script to prevent remote shell expansion.
+    let safe = remote_script
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('$', "\\$")
+        .replace('`', "\\`");
+    args.push(format!("bash -lc \"{safe}\""));
+
+    if cfg!(debug_assertions) {
+        eprintln!(
+            "[orbit:debug] spawn_via_ssh: ssh {}",
+            args.iter()
+                .map(|a| if a.contains(' ') { format!("'{a}'") } else { a.clone() })
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
+    }
 
     let mut cmd = Command::new("ssh");
     cmd.args(&args);

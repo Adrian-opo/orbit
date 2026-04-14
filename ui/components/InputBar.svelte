@@ -10,11 +10,11 @@
   import { sessions, updateSessionState } from '../lib/stores/sessions';
   import { journal } from '../lib/stores/journal';
   import { pendingMessages } from '../lib/stores/journal';
-  import { modelDisplayName } from '../lib/status';
   import { sessionEffort } from '../lib/stores/ui';
   import type { SlashCommand } from '../lib/types';
   import type { JournalEntry } from '../lib/types';
   import { providerCaps, getCaps } from '../lib/stores/providers';
+  import SlashCommandPicker from './shared/SlashCommandPicker.svelte';
 
   export let sessionId: number;
   export let cwd: string = '';
@@ -28,11 +28,8 @@
   let textarea: HTMLTextAreaElement;
   let commands: SlashCommand[] = [];
   let files: string[] = [];
-  let suggestions: SlashCommand[] = [];
-  let fileSuggestions: string[] = [];
-  let selIdx = 0;
-  let fileSelIdx = 0;
   let sendError = '';
+  let picker: SlashCommandPicker;
 
   // Commands that require an interactive TTY — sending them kills the session.
   const INTERACTIVE_CMDS = new Set(['/mcp', '/login', '/logout', '/init', '/doctor']);
@@ -140,40 +137,8 @@
       .catch((e) => console.warn('[InputBar] listProjectFiles failed:', e));
   }
 
-  // Sub-options for /model and /effort
-  let subOptions: string[] = [];
-  $: {
-    const lower = text.toLowerCase();
-    if (lower.startsWith('/model ')) {
-      const arg = text.slice(7).toLowerCase();
-      const filtered = arg
-        ? MODEL_OPTIONS.filter((o) => o.toLowerCase().includes(arg))
-        : MODEL_OPTIONS;
-      subOptions = filtered.slice(0, 10);
-    } else if (lower.startsWith('/effort ') && caps.supportsEffort) {
-      const arg = lower.slice(8);
-      subOptions = EFFORT_LEVELS.filter((o) => o.startsWith(arg));
-    } else {
-      subOptions = [];
-    }
-  }
-  $: showSubOptions = subOptions.length > 0;
-
-  $: suggestions =
-    subOptions.length > 0
-      ? []
-      : text.startsWith('/')
-        ? text.length === 1
-          ? commands.slice(0, 8)
-          : commands.filter((c) => c.cmd.toLowerCase().includes(text.toLowerCase())).slice(0, 8)
-        : [];
-  $: showSuggestions = suggestions.length > 0;
-  $: if (selIdx >= suggestions.length) selIdx = 0;
-
-  let subSelIdx = 0;
-  $: if (subSelIdx >= subOptions.length) subSelIdx = 0;
-
-  function atQuery(): string | null {
+  // atQuery: compute the @ file query from current cursor position
+  function computeAtQuery(): string | null {
     if (!textarea) return null;
     const before = text.slice(0, textarea.selectionStart);
     const atPos = before.lastIndexOf('@');
@@ -186,21 +151,11 @@
   let aq: string | null = null;
   $: aq = (() => {
     void text;
-    return atQuery();
+    return computeAtQuery();
   })();
-  $: fileSuggestions =
-    aq === null
-      ? []
-      : aq === ''
-        ? files.slice(0, 10)
-        : (() => {
-            const q = (aq as string).toLowerCase();
-            const name = files.filter((f) => f.split('/').pop()!.toLowerCase().includes(q));
-            const path = files.filter((f) => !name.includes(f) && f.toLowerCase().includes(q));
-            return [...name, ...path].slice(0, 10);
-          })();
-  $: showFiles = fileSuggestions.length > 0;
-  $: if (fileSelIdx >= fileSuggestions.length) fileSelIdx = 0;
+
+  // Whether any picker dropdown is active (for keyboard handling)
+  $: pickerVisible = text.startsWith('/') || aq !== null;
 
   async function send() {
     const msg = text.trim();
@@ -259,98 +214,34 @@
     }
   }
 
-  function selectCmd(cmd: string) {
-    text = cmd + ' ';
-    suggestions = [];
-    textarea?.focus();
-  }
-
-  function selectSubOption(opt: string) {
-    const cmd = text.toLowerCase().startsWith('/model') ? '/model' : '/effort';
-    text = cmd + ' ' + opt;
-    subOptions = [];
-    send();
-  }
-
-  function selectFile(f: string) {
-    if (!textarea) return;
-    const pos = textarea.selectionStart;
-    const before = text.slice(0, pos);
-    const atPos = before.lastIndexOf('@');
-    if (atPos === -1) return;
-    text = text.slice(0, atPos) + '@' + f + ' ' + text.slice(pos);
-    fileSuggestions = [];
-    tick().then(() => {
-      const np = atPos + 1 + f.length + 1;
-      textarea.selectionStart = textarea.selectionEnd = np;
-      textarea.focus();
-    });
+  function handlePickerSelect(
+    e: CustomEvent<{ type: 'cmd' | 'subOption' | 'file'; value: string }>,
+  ) {
+    const { type, value } = e.detail;
+    if (type === 'cmd') {
+      text = value + ' ';
+      textarea?.focus();
+    } else if (type === 'subOption') {
+      const cmd = text.toLowerCase().startsWith('/model') ? '/model' : '/effort';
+      text = cmd + ' ' + value;
+      send();
+    } else if (type === 'file') {
+      if (!textarea) return;
+      const pos = textarea.selectionStart;
+      const before = text.slice(0, pos);
+      const atPos = before.lastIndexOf('@');
+      if (atPos === -1) return;
+      text = text.slice(0, atPos) + '@' + value + ' ' + text.slice(pos);
+      tick().then(() => {
+        const np = atPos + 1 + value.length + 1;
+        textarea.selectionStart = textarea.selectionEnd = np;
+        textarea.focus();
+      });
+    }
   }
 
   function onKey(e: KeyboardEvent) {
-    if (showSubOptions) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        subSelIdx = (subSelIdx + 1) % subOptions.length;
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        subSelIdx = (subSelIdx - 1 + subOptions.length) % subOptions.length;
-        return;
-      }
-      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
-        e.preventDefault();
-        selectSubOption(subOptions[subSelIdx]);
-        return;
-      }
-      if (e.key === 'Escape') {
-        subOptions = [];
-        return;
-      }
-    }
-    if (showFiles) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        fileSelIdx = (fileSelIdx + 1) % fileSuggestions.length;
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        fileSelIdx = (fileSelIdx - 1 + fileSuggestions.length) % fileSuggestions.length;
-        return;
-      }
-      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
-        e.preventDefault();
-        selectFile(fileSuggestions[fileSelIdx]);
-        return;
-      }
-      if (e.key === 'Escape') {
-        fileSuggestions = [];
-        return;
-      }
-    }
-    if (showSuggestions) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        selIdx = (selIdx + 1) % suggestions.length;
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        selIdx = (selIdx - 1 + suggestions.length) % suggestions.length;
-        return;
-      }
-      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
-        e.preventDefault();
-        selectCmd(suggestions[selIdx].cmd);
-        return;
-      }
-      if (e.key === 'Escape') {
-        suggestions = [];
-        return;
-      }
-    }
+    if (picker?.handleKey(e)) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       send();
@@ -379,34 +270,21 @@
     <div class="send-error">! {sendError}</div>
   {/if}
   <!-- Autocomplete dropdowns -->
-  {#if showSubOptions}
-    <div class="dropdown">
-      {#each subOptions as opt, i}
-        <button class="drop-item" class:sel={i === subSelIdx} on:click={() => selectSubOption(opt)}>
-          <span class="drop-main">{opt}</span>
-        </button>
-      {/each}
-    </div>
-  {:else if showFiles || showSuggestions}
-    <div class="dropdown">
-      {#if showFiles}
-        {#each fileSuggestions as f, i}
-          <button class="drop-item" class:sel={i === fileSelIdx} on:click={() => selectFile(f)}>
-            <span class="drop-icon">@</span>
-            <span class="drop-main">{f.split('/').pop()}</span>
-            <span class="drop-sub">{f}</span>
-          </button>
-        {/each}
-      {:else}
-        {#each suggestions as s, i}
-          <button class="drop-item" class:sel={i === selIdx} on:click={() => selectCmd(s.cmd)}>
-            <span class="drop-main">{s.cmd}</span>
-            <span class="drop-sub">{s.desc}</span>
-          </button>
-        {/each}
-      {/if}
-    </div>
-  {/if}
+  <SlashCommandPicker
+    bind:this={picker}
+    {commands}
+    {text}
+    visible={pickerVisible}
+    {providerModels}
+    modelOptions={MODEL_OPTIONS}
+    supportsEffort={caps.supportsEffort}
+    {files}
+    atQuery={aq}
+    on:select={handlePickerSelect}
+    on:close={() => {
+      text = text;
+    }}
+  />
 
   <div class="input-row">
     <span class="prompt-char" class:dim={sessionStatus === 'initializing'}>›</span>
@@ -450,55 +328,6 @@
     color: var(--s-error);
     border-bottom: 1px solid rgba(224, 72, 72, 0.2);
     background: rgba(224, 72, 72, 0.05);
-  }
-
-  .dropdown {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    right: 0;
-    background: var(--bg2);
-    border: 1px solid var(--bd1);
-    border-bottom: none;
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
-    max-height: 200px;
-    overflow-y: auto;
-  }
-  .drop-item {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-4);
-    width: 100%;
-    text-align: left;
-    background: none;
-    border: none;
-    padding: var(--sp-3) var(--sp-6);
-    cursor: pointer;
-    border-bottom: 1px solid var(--bd);
-  }
-  .drop-item:hover,
-  .drop-item.sel {
-    background: var(--bg3);
-  }
-  .drop-icon {
-    color: var(--ac);
-    font-size: var(--xs);
-    width: 14px;
-    flex-shrink: 0;
-  }
-  .drop-main {
-    font-size: var(--md);
-    color: var(--t0);
-    font-weight: 500;
-    flex-shrink: 0;
-  }
-  .drop-sub {
-    font-size: var(--xs);
-    color: var(--t2);
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .input-row {

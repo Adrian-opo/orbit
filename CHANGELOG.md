@@ -4,6 +4,9 @@
 
 ## April 2026
 
+### 04/15 · New — macOS support
+Orbit is now available for macOS (Intel and Apple Silicon). Download the .dmg from the releases page, open it, and drag Orbit to your Applications folder.
+
 ### 04/14 · New — SSH remote sessions for all providers
 
 You can now run sessions on remote servers via SSH. When creating a session,

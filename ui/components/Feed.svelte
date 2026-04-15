@@ -74,6 +74,7 @@
   let isAtBottom = true;
   let lastScrollTop = 0;
   let scrollerEl: HTMLDivElement;
+  let programmaticScroll = false; // flag to ignore onScroll after programmatic changes
 
   // When display grows, reset visibleFrom to show the tail if at bottom.
   // When display shrinks (session switch via {#key}), always reset.
@@ -99,19 +100,22 @@
     if (!scrollerEl) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollerEl;
 
+    // Skip follow-mode logic for programmatic scrolls (ResizeObserver, scrollToBottom).
+    if (programmaticScroll) {
+      programmaticScroll = false;
+      lastScrollTop = scrollTop;
+      return;
+    }
+
     const atBottom = scrollHeight - scrollTop - clientHeight < 80;
 
     if (atBottom) {
-      // Reached bottom — always resume following
       if (!isAtBottom) {
         isAtBottom = true;
         dispatch('bottomchange', { atBottom: true });
       }
     } else if (scrollTop < lastScrollTop) {
       // User scrolled UP intentionally — stop following.
-      // Ignore scroll events caused by content insertion (scrollHeight grows,
-      // scrollTop stays the same or increases) so we don't lose follow-mode
-      // just because new entries arrived.
       if (isAtBottom) {
         isAtBottom = false;
         dispatch('bottomchange', { atBottom: false });
@@ -132,15 +136,21 @@
     const anchor = scrollerEl.firstElementChild as HTMLElement | null;
     const anchorTop = anchor ? anchor.getBoundingClientRect().top : 0;
 
+    const prevFrom = visibleFrom;
     visibleFrom = Math.max(0, visibleFrom - PAGE_SIZE);
+    const added = prevFrom - visibleFrom; // how many items were actually prepended
 
     await tick();
 
-    // Restore scroll so the old first item stays in the same visual position
-    const newAnchor = scrollerEl.children[visibleFrom === 0 ? 0 : PAGE_SIZE] as HTMLElement | null;
+    // Restore scroll so the old first item stays in the same visual position.
+    // The "load more" button may occupy children[0], so account for it.
+    const offset = visibleFrom > 0 ? 1 : 0; // 1 if "load more" button still present
+    const anchorIdx = added + offset;
+    const newAnchor = scrollerEl.children[anchorIdx] as HTMLElement | null;
     if (newAnchor) {
-      const newAnchorTop = newAnchor.getBoundingClientRect().top;
-      scrollerEl.scrollTop += newAnchorTop - anchorTop;
+      programmaticScroll = true;
+      scrollerEl.scrollTop += newAnchor.getBoundingClientRect().top - anchorTop;
+      lastScrollTop = scrollerEl.scrollTop;
     }
   }
 
@@ -148,29 +158,54 @@
   export function scrollToBottom() {
     if (!scrollerEl) return;
     visibleFrom = Math.max(0, display.length - PAGE_SIZE);
+    isAtBottom = true;
     tick().then(() => {
       if (scrollerEl) {
+        programmaticScroll = true;
         scrollerEl.scrollTop = scrollerEl.scrollHeight;
         lastScrollTop = scrollerEl.scrollTop;
       }
     });
-    isAtBottom = true;
   }
 
-  // Auto-scroll when new entries arrive and user is at bottom
-  let prevVisibleLen = 0;
-  $: if (visibleItems.length !== prevVisibleLen) {
-    prevVisibleLen = visibleItems.length;
-    if (isAtBottom) {
-      tick().then(() => {
-        if (scrollerEl) scrollerEl.scrollTop = scrollerEl.scrollHeight;
-      });
-    }
-  }
+  // Auto-scroll when content grows (new entries OR existing entries expanding).
+  // A ResizeObserver on the scroller catches every scrollHeight change — covers
+  // streaming progress, markdown rendering, code blocks expanding, etc.
+  let resizeObs: ResizeObserver | undefined;
 
   onMount(() => {
     if (scrollerEl) scrollerEl.scrollTop = scrollerEl.scrollHeight;
+
+    resizeObs = new ResizeObserver(() => {
+      if (isAtBottom && scrollerEl) {
+        programmaticScroll = true;
+        scrollerEl.scrollTop = scrollerEl.scrollHeight;
+        lastScrollTop = scrollerEl.scrollTop;
+      }
+    });
+
+    // Observe the scroller's *content* — when any child changes size the
+    // observer fires, letting us pin to the bottom without tracking item count.
+    for (const child of scrollerEl.children) {
+      resizeObs.observe(child);
+    }
+
+    // Also observe the scroller itself so we catch container resizes (e.g. window resize).
+    resizeObs.observe(scrollerEl);
+
+    return () => resizeObs?.disconnect();
   });
+
+  // When visible items change, observe any newly added children.
+  let prevVisibleLen = 0;
+  $: if (visibleItems.length !== prevVisibleLen) {
+    prevVisibleLen = visibleItems.length;
+    if (scrollerEl && resizeObs) {
+      for (const child of scrollerEl.children) {
+        resizeObs.observe(child); // no-op if already observed
+      }
+    }
+  }
 </script>
 
 <div class="feed-scroller" bind:this={scrollerEl} on:scroll={onScroll}>

@@ -4,6 +4,11 @@
 
 ## April 2026
 
+### 04/15 · Fix — Feed auto-scroll losing position on large content
+The session feed now reliably follows new output even when a large block of content
+(code blocks, tool call results, long markdown) appears at once. Previously the
+feed would stop scrolling and require manually clicking "scroll to bottom".
+
 ### 04/15 · New — macOS support
 Orbit is now available for macOS (Intel and Apple Silicon). Download the .dmg from the releases page, open it, and drag Orbit to your Applications folder.
 

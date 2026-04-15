@@ -36,7 +36,7 @@ impl Provider for OpenCodeProvider {
                 let cwd_str = config.cwd.to_string_lossy();
                 parts.extend([
                     "--dir".to_string(),
-                    ssh::posix_escape(&cwd_str.to_string()),
+                    ssh::posix_escape(&cwd_str),
                     "-m".to_string(),
                     ssh::posix_escape(&config.model),
                 ]);

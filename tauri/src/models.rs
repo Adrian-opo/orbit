@@ -291,6 +291,7 @@ pub struct Session {
     pub branch_name: Option<String>,
     pub permission_mode: String,
     pub model: Option<String>,
+    pub provider: String,
     pub pid: Option<i32>,
     pub created_at: String,
     pub updated_at: String,
@@ -309,6 +310,10 @@ pub struct Session {
     pub pending_approval: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mini_log: Option<Vec<MiniLogEntry>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ssh_host: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ssh_user: Option<String>,
 }
 
 #[derive(Debug, Clone)]

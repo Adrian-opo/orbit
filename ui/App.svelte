@@ -14,6 +14,7 @@
   import {
     listSessions,
     checkClaude,
+    getProviders,
     onSessionCreated,
     onSessionOutput,
     onSessionState,
@@ -35,6 +36,7 @@
   import MetaPanel from './components/MetaPanel.svelte';
   import { metaPanelVisible, sidebarVisible } from './lib/stores/preferences';
   import { mutedSessions } from './lib/stores/ui';
+  import { backends } from './lib/stores/providers';
 
   let prevStatuses: Record<number, string> = {};
   let audioCtx: AudioContext | null = null;
@@ -77,12 +79,14 @@
   }
 
   onMount(async () => {
-    const [existing, check, version, changelog] = await Promise.all([
+    const [existing, check, version, changelog, providerList] = await Promise.all([
       listSessions(),
       checkClaude(),
       getAppVersion(),
       getChangelog(),
+      getProviders().catch(() => []),
     ]);
+    backends.set(providerList);
     appVersion = version;
     changelogContent = changelog;
     const lastSeen = localStorage.getItem(CHANGELOG_VERSION_KEY);
@@ -121,8 +125,10 @@
           miniLog: p.miniLog,
           gitBranch: p.gitBranch ?? null,
           subagents: p.subagents,
-          model: p.model ?? undefined,
-          contextWindow: p.contextWindow ?? undefined,
+          // Only overwrite model/contextWindow when the stream provides them
+          // (Codex/OpenCode don't emit model — preserve the one set at creation)
+          ...(p.model != null ? { model: p.model } : {}),
+          ...(p.contextWindow != null ? { contextWindow: p.contextWindow } : {}),
         })
       );
     });

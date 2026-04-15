@@ -10,38 +10,60 @@
   import { sessions, updateSessionState } from '../lib/stores/sessions';
   import { journal } from '../lib/stores/journal';
   import { pendingMessages } from '../lib/stores/journal';
-  import { modelDisplayName } from '../lib/status';
   import { sessionEffort } from '../lib/stores/ui';
   import type { SlashCommand } from '../lib/types';
   import type { JournalEntry } from '../lib/types';
+  import { providerCaps, getCaps } from '../lib/stores/providers';
+  import SlashCommandPicker from './shared/SlashCommandPicker.svelte';
 
   export let sessionId: number;
   export let cwd: string = '';
   export let sessionStatus: string = '';
+  export let provider: string = 'claude-code';
+  export let providerModels: string[] = [];
+
+  $: caps = getCaps($providerCaps, provider);
 
   let text = '';
   let textarea: HTMLTextAreaElement;
   let commands: SlashCommand[] = [];
   let files: string[] = [];
-  let suggestions: SlashCommand[] = [];
-  let fileSuggestions: string[] = [];
-  let selIdx = 0;
-  let fileSelIdx = 0;
   let sendError = '';
+  let picker: SlashCommandPicker;
 
   // Commands that require an interactive TTY — sending them kills the session.
   const INTERACTIVE_CMDS = new Set(['/mcp', '/login', '/logout', '/init', '/doctor']);
 
-  // Aliases passed directly to claude --model (CLI resolves them)
-  const MODEL_OPTIONS = ['opus', 'opus-1m', 'sonnet', 'haiku'];
+  // Model aliases per backend
+  const CLAUDE_MODELS = ['opus', 'opus-1m', 'sonnet', 'haiku'];
+  const CODEX_MODELS = ['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.2'];
+  $: MODEL_OPTIONS =
+    provider === 'claude-code'
+      ? CLAUDE_MODELS
+      : provider === 'codex'
+        ? CODEX_MODELS
+        : providerModels;
   const EFFORT_LEVELS = ['low', 'medium', 'high', 'max'];
 
-  // Orbit-native commands added to suggestions
-  const ORBIT_COMMANDS: SlashCommand[] = [
-    { cmd: '/model', desc: 'Switch model (opus, opus-1m, sonnet, haiku)', category: 'orbit' },
+  // Orbit-native commands — provider-aware
+  $: modelHint =
+    provider === 'claude-code'
+      ? 'Switch model (opus, sonnet, haiku)'
+      : provider === 'codex'
+        ? 'Switch model (gpt-5.4, gpt-5.4-mini, ...)'
+        : 'Switch model (type model ID)';
 
-    { cmd: '/effort', desc: 'Set thinking effort (low, medium, high, max)', category: 'orbit' },
-  ];
+  $: effectiveCommands = (() => {
+    const cmds: SlashCommand[] = [{ cmd: '/model', desc: modelHint, category: 'orbit' }];
+    if (caps.supportsEffort) {
+      cmds.push({
+        cmd: '/effort',
+        desc: 'Set thinking effort (low, medium, high, max)',
+        category: 'orbit',
+      });
+    }
+    return cmds;
+  })();
 
   function emitSystemEntry(msg: string) {
     const entry: JournalEntry = {
@@ -65,7 +87,7 @@
   }
 
   const hints = [
-    'Orbit keeps all your Claude agents in sync — one dashboard, infinite sessions',
+    'Orbit keeps all your agents in sync — one dashboard, infinite sessions',
     'Each agent runs in its own orbit — isolated, parallel, always tracked',
     'Real-time log streaming — watch your agents compute at the speed of light',
     'Token usage and cost tracked per session — every bit accounted for',
@@ -73,7 +95,7 @@
     'Use / to trigger slash commands inside any session',
     'Sessions persist — your agents remember where they left off',
     'Switch between agents without losing orbital momentum',
-    'Multiple Claude agents, one control center — mission control for AI',
+    'Multiple agents, one control center — mission control for AI',
     'Your agents orbit the same codebase, each on their own trajectory',
   ];
   let hintIdx = 0;
@@ -92,11 +114,11 @@
 
   onMount(async () => {
     try {
-      const remote = await getSlashCommands();
-      const blocked = new Set([...INTERACTIVE_CMDS, '/model']);
-      commands = [...ORBIT_COMMANDS, ...remote.filter((c) => !blocked.has(c.cmd))];
+      const remote = await getSlashCommands(provider);
+      const blocked = new Set([...INTERACTIVE_CMDS, '/model', '/effort']);
+      commands = [...effectiveCommands, ...remote.filter((c) => !blocked.has(c.cmd))];
     } catch (_e) {
-      commands = [...ORBIT_COMMANDS];
+      commands = [...effectiveCommands];
     }
   });
 
@@ -115,37 +137,8 @@
       .catch((e) => console.warn('[InputBar] listProjectFiles failed:', e));
   }
 
-  // Sub-options for /model and /effort
-  let subOptions: string[] = [];
-  $: {
-    const lower = text.toLowerCase();
-    if (lower.startsWith('/model ')) {
-      const arg = lower.slice(7);
-      subOptions = MODEL_OPTIONS.filter((o) => o.startsWith(arg));
-    } else if (lower.startsWith('/effort ')) {
-      const arg = lower.slice(8);
-      subOptions = EFFORT_LEVELS.filter((o) => o.startsWith(arg));
-    } else {
-      subOptions = [];
-    }
-  }
-  $: showSubOptions = subOptions.length > 0;
-
-  $: suggestions =
-    subOptions.length > 0
-      ? []
-      : text.startsWith('/')
-        ? text.length === 1
-          ? commands.slice(0, 8)
-          : commands.filter((c) => c.cmd.toLowerCase().includes(text.toLowerCase())).slice(0, 8)
-        : [];
-  $: showSuggestions = suggestions.length > 0;
-  $: if (selIdx >= suggestions.length) selIdx = 0;
-
-  let subSelIdx = 0;
-  $: if (subSelIdx >= subOptions.length) subSelIdx = 0;
-
-  function atQuery(): string | null {
+  // atQuery: compute the @ file query from current cursor position
+  function computeAtQuery(): string | null {
     if (!textarea) return null;
     const before = text.slice(0, textarea.selectionStart);
     const atPos = before.lastIndexOf('@');
@@ -158,21 +151,11 @@
   let aq: string | null = null;
   $: aq = (() => {
     void text;
-    return atQuery();
+    return computeAtQuery();
   })();
-  $: fileSuggestions =
-    aq === null
-      ? []
-      : aq === ''
-        ? files.slice(0, 10)
-        : (() => {
-            const q = (aq as string).toLowerCase();
-            const name = files.filter((f) => f.split('/').pop()!.toLowerCase().includes(q));
-            const path = files.filter((f) => !name.includes(f) && f.toLowerCase().includes(q));
-            return [...name, ...path].slice(0, 10);
-          })();
-  $: showFiles = fileSuggestions.length > 0;
-  $: if (fileSelIdx >= fileSuggestions.length) fileSelIdx = 0;
+
+  // Whether any picker dropdown is active (for keyboard handling)
+  $: pickerVisible = text.startsWith('/') || aq !== null;
 
   async function send() {
     const msg = text.trim();
@@ -188,9 +171,10 @@
 
     // Intercept /model
     if (cmd === '/model') {
-      const arg = msg.slice(6).trim().toLowerCase();
+      const arg = msg.slice(6).trim();
       if (!arg) {
-        sendError = `Usage: /model <name> (${MODEL_OPTIONS.join(', ')})`;
+        const hint = MODEL_OPTIONS.length > 0 ? ` (${MODEL_OPTIONS.join(', ')})` : '';
+        sendError = `Usage: /model <name>${hint}`;
         setTimeout(() => (sendError = ''), 5000);
         return;
       }
@@ -202,8 +186,8 @@
       return;
     }
 
-    // Intercept /effort
-    if (cmd === '/effort') {
+    // Intercept /effort (Claude Code only)
+    if (cmd === '/effort' && caps.supportsEffort) {
       const arg = msg.slice(7).trim().toLowerCase();
       if (!arg || !EFFORT_LEVELS.includes(arg)) {
         sendError = `Usage: /effort <level> (${EFFORT_LEVELS.join(', ')})`;
@@ -230,98 +214,34 @@
     }
   }
 
-  function selectCmd(cmd: string) {
-    text = cmd + ' ';
-    suggestions = [];
-    textarea?.focus();
-  }
-
-  function selectSubOption(opt: string) {
-    const cmd = text.toLowerCase().startsWith('/model') ? '/model' : '/effort';
-    text = cmd + ' ' + opt;
-    subOptions = [];
-    send();
-  }
-
-  function selectFile(f: string) {
-    if (!textarea) return;
-    const pos = textarea.selectionStart;
-    const before = text.slice(0, pos);
-    const atPos = before.lastIndexOf('@');
-    if (atPos === -1) return;
-    text = text.slice(0, atPos) + '@' + f + ' ' + text.slice(pos);
-    fileSuggestions = [];
-    tick().then(() => {
-      const np = atPos + 1 + f.length + 1;
-      textarea.selectionStart = textarea.selectionEnd = np;
-      textarea.focus();
-    });
+  function handlePickerSelect(
+    e: CustomEvent<{ type: 'cmd' | 'subOption' | 'file'; value: string }>,
+  ) {
+    const { type, value } = e.detail;
+    if (type === 'cmd') {
+      text = value + ' ';
+      textarea?.focus();
+    } else if (type === 'subOption') {
+      const cmd = text.toLowerCase().startsWith('/model') ? '/model' : '/effort';
+      text = cmd + ' ' + value;
+      send();
+    } else if (type === 'file') {
+      if (!textarea) return;
+      const pos = textarea.selectionStart;
+      const before = text.slice(0, pos);
+      const atPos = before.lastIndexOf('@');
+      if (atPos === -1) return;
+      text = text.slice(0, atPos) + '@' + value + ' ' + text.slice(pos);
+      tick().then(() => {
+        const np = atPos + 1 + value.length + 1;
+        textarea.selectionStart = textarea.selectionEnd = np;
+        textarea.focus();
+      });
+    }
   }
 
   function onKey(e: KeyboardEvent) {
-    if (showSubOptions) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        subSelIdx = (subSelIdx + 1) % subOptions.length;
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        subSelIdx = (subSelIdx - 1 + subOptions.length) % subOptions.length;
-        return;
-      }
-      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
-        e.preventDefault();
-        selectSubOption(subOptions[subSelIdx]);
-        return;
-      }
-      if (e.key === 'Escape') {
-        subOptions = [];
-        return;
-      }
-    }
-    if (showFiles) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        fileSelIdx = (fileSelIdx + 1) % fileSuggestions.length;
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        fileSelIdx = (fileSelIdx - 1 + fileSuggestions.length) % fileSuggestions.length;
-        return;
-      }
-      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
-        e.preventDefault();
-        selectFile(fileSuggestions[fileSelIdx]);
-        return;
-      }
-      if (e.key === 'Escape') {
-        fileSuggestions = [];
-        return;
-      }
-    }
-    if (showSuggestions) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        selIdx = (selIdx + 1) % suggestions.length;
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        selIdx = (selIdx - 1 + suggestions.length) % suggestions.length;
-        return;
-      }
-      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
-        e.preventDefault();
-        selectCmd(suggestions[selIdx].cmd);
-        return;
-      }
-      if (e.key === 'Escape') {
-        suggestions = [];
-        return;
-      }
-    }
+    if (picker?.handleKey(e)) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       send();
@@ -350,34 +270,21 @@
     <div class="send-error">! {sendError}</div>
   {/if}
   <!-- Autocomplete dropdowns -->
-  {#if showSubOptions}
-    <div class="dropdown">
-      {#each subOptions as opt, i}
-        <button class="drop-item" class:sel={i === subSelIdx} on:click={() => selectSubOption(opt)}>
-          <span class="drop-main">{opt}</span>
-        </button>
-      {/each}
-    </div>
-  {:else if showFiles || showSuggestions}
-    <div class="dropdown">
-      {#if showFiles}
-        {#each fileSuggestions as f, i}
-          <button class="drop-item" class:sel={i === fileSelIdx} on:click={() => selectFile(f)}>
-            <span class="drop-icon">@</span>
-            <span class="drop-main">{f.split('/').pop()}</span>
-            <span class="drop-sub">{f}</span>
-          </button>
-        {/each}
-      {:else}
-        {#each suggestions as s, i}
-          <button class="drop-item" class:sel={i === selIdx} on:click={() => selectCmd(s.cmd)}>
-            <span class="drop-main">{s.cmd}</span>
-            <span class="drop-sub">{s.desc}</span>
-          </button>
-        {/each}
-      {/if}
-    </div>
-  {/if}
+  <SlashCommandPicker
+    bind:this={picker}
+    {commands}
+    {text}
+    visible={pickerVisible}
+    {providerModels}
+    modelOptions={MODEL_OPTIONS}
+    supportsEffort={caps.supportsEffort}
+    {files}
+    atQuery={aq}
+    on:select={handlePickerSelect}
+    on:close={() => {
+      text = text;
+    }}
+  />
 
   <div class="input-row">
     <span class="prompt-char" class:dim={sessionStatus === 'initializing'}>›</span>
@@ -416,74 +323,25 @@
     flex-shrink: 0;
   }
   .send-error {
-    padding: 5px 12px;
+    padding: var(--sp-3) var(--sp-6);
     font-size: var(--xs);
     color: var(--s-error);
     border-bottom: 1px solid rgba(224, 72, 72, 0.2);
     background: rgba(224, 72, 72, 0.05);
   }
 
-  .dropdown {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    right: 0;
-    background: var(--bg2);
-    border: 1px solid var(--bd1);
-    border-bottom: none;
-    border-radius: 4px 4px 0 0;
-    max-height: 200px;
-    overflow-y: auto;
-  }
-  .drop-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    text-align: left;
-    background: none;
-    border: none;
-    padding: 6px 12px;
-    cursor: pointer;
-    border-bottom: 1px solid var(--bd);
-  }
-  .drop-item:hover,
-  .drop-item.sel {
-    background: var(--bg3);
-  }
-  .drop-icon {
-    color: var(--ac);
-    font-size: var(--xs);
-    width: 14px;
-    flex-shrink: 0;
-  }
-  .drop-main {
-    font-size: var(--md);
-    color: var(--t0);
-    font-weight: 500;
-    flex-shrink: 0;
-  }
-  .drop-sub {
-    font-size: var(--xs);
-    color: var(--t2);
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   .input-row {
     display: flex;
     align-items: flex-end;
     gap: 0;
-    padding: 8px 10px 6px;
+    padding: var(--sp-4) var(--sp-5) var(--sp-3);
   }
   .prompt-char {
     color: var(--t2);
     font-size: var(--lg);
     line-height: 1;
-    margin-bottom: 6px;
-    margin-right: 8px;
+    margin-bottom: var(--sp-3);
+    margin-right: var(--sp-4);
     flex-shrink: 0;
     transition: color 0.2s;
   }
@@ -497,7 +355,7 @@
     color: var(--t0);
     font-size: var(--base);
     font-family: var(--mono);
-    padding: 4px 0;
+    padding: var(--sp-2) 0;
     resize: none;
     outline: none;
     line-height: 1.5;
@@ -512,8 +370,8 @@
     border: none;
     color: var(--t2);
     font-size: var(--lg);
-    padding: 2px 4px;
-    margin-bottom: 4px;
+    padding: var(--sp-1) var(--sp-2);
+    margin-bottom: var(--sp-2);
     flex-shrink: 0;
   }
   .send-btn:hover:not(:disabled) {
@@ -524,14 +382,14 @@
   }
 
   .hint-bar {
-    padding: 0 10px 7px;
+    padding: 0 var(--sp-5) var(--sp-3);
     font-size: var(--xs);
     color: var(--t3);
     opacity: 1;
     transition: opacity 0.3s ease;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--sp-3);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

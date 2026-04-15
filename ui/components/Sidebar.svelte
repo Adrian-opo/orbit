@@ -8,7 +8,7 @@
   import { deleteSession, stopSession, getAppVersion } from '../lib/tauri';
   import { mutedSessions, sessionEffort } from '../lib/stores/ui';
   import { sidebarVisible } from '../lib/stores/preferences';
-  import { modelDisplayName } from '../lib/status';
+  import { modelShortName } from '../lib/status';
   import { onMount } from 'svelte';
 
   let appVersion = '';
@@ -92,7 +92,7 @@
 
   function fmtModel(model: string | null): string {
     if (!model || model === 'auto') return 'auto';
-    return modelDisplayName(model);
+    return modelShortName(model);
   }
 
   function displayName(s: (typeof $sessions)[0]): string {
@@ -210,9 +210,11 @@
             <span class="status" style="color:{color}">{statusLabel(s.status)}</span>
           </div>
           <div class="item-meta">
-            <span>{fmtModel(s.model)}</span>
-            <span class="sep">·</span>
-            <span>{sessionEffort.get($sessionEffort, String(s.id))}</span>
+            <span title={s.model ?? ''}>{fmtModel(s.model)}</span>
+            {#if s.provider === 'claude-code'}
+              <span class="sep">·</span>
+              <span>{sessionEffort.get($sessionEffort, String(s.id))}</span>
+            {/if}
             <span class="sep">·</span>
             <span>{fmtTokens(s)}</span>
             {#if s.pendingApproval}
@@ -246,14 +248,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 12px 9px;
+    padding: var(--sp-5) var(--sp-6) 9px;
     border-bottom: 1px solid var(--bd);
     flex-shrink: 0;
   }
   .brand {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: var(--sp-3);
   }
   .brand-logo {
     display: flex;
@@ -296,7 +298,7 @@
   .header-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-3);
   }
   .new-btn {
     background: none;
@@ -304,7 +306,7 @@
     color: var(--t1);
     width: 20px;
     height: 20px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     font-size: 14px;
     line-height: 1;
     display: flex;
@@ -325,7 +327,7 @@
   }
 
   .empty {
-    padding: 16px 12px;
+    padding: var(--sp-8) var(--sp-6);
     font-size: var(--sm);
     color: var(--t3);
   }
@@ -336,7 +338,7 @@
     background: none;
     border: none;
     border-bottom: 1px solid var(--bd);
-    padding: 8px 12px;
+    padding: var(--sp-4) var(--sp-6);
     cursor: pointer;
     transition: background 0.1s;
   }
@@ -346,14 +348,14 @@
   .item.active {
     background: var(--ac-d2);
     border-left: 2px solid var(--ac);
-    padding-left: 10px;
+    padding-left: var(--sp-5);
   }
 
   .item-top {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 3px;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-2);
   }
   .dot {
     font-size: 8px;
@@ -392,10 +394,10 @@
   .item-meta {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-2);
     font-size: var(--xs);
     color: var(--t2);
-    padding-left: 14px;
+    padding-left: var(--sp-7);
   }
   .confirm-overlay {
     position: fixed;
@@ -409,30 +411,30 @@
   .confirm-box {
     background: var(--bg2);
     border: 1px solid var(--bd1);
-    border-radius: 4px;
-    padding: 16px 20px;
+    border-radius: var(--radius-md);
+    padding: var(--sp-8) var(--sp-9);
     min-width: 200px;
   }
   .confirm-box p {
     font-size: var(--sm);
     color: var(--t0);
-    margin-bottom: 12px;
+    margin-bottom: var(--sp-6);
   }
   .confirm-box strong {
     color: var(--t0);
   }
   .confirm-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--sp-4);
     justify-content: flex-end;
   }
   .confirm-btn {
     background: none;
     border: 1px solid var(--bd1);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     color: var(--t1);
     font-size: var(--xs);
-    padding: 4px 12px;
+    padding: var(--sp-2) var(--sp-6);
     cursor: pointer;
     font-family: var(--mono);
   }
@@ -449,7 +451,7 @@
 
   .approval-dot {
     color: var(--s-input);
-    margin-left: 4px;
+    margin-left: var(--sp-2);
   }
 
   .muted-icon {
@@ -460,7 +462,7 @@
   }
 
   .footer {
-    padding: 7px 12px;
+    padding: var(--sp-3) var(--sp-6);
     border-top: 1px solid var(--bd);
     font-size: var(--xs);
     color: var(--t2);
@@ -475,7 +477,7 @@
     color: var(--t2);
     font-size: 14px;
     cursor: pointer;
-    padding: 0 2px;
+    padding: 0 var(--sp-1);
     line-height: 1;
     transition: color 0.15s;
   }

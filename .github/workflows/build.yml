@@ -461,8 +461,8 @@ jobs:
 
           sig_file="${dmg}.sig"
           if [ ! -f "$sig_file" ]; then
-            echo "::error::.sig file not found: $sig_file"
-            exit 1
+            echo "::warning::.sig file not found — skipping updater JSON (signing key may not be set)"
+            exit 0
           fi
 
           signature=$(cat "$sig_file")

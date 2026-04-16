@@ -38,7 +38,7 @@ pub fn create_session(
     api_key: Option<String>,
     ssh_host: Option<String>,
     ssh_user: Option<String>,
-    ssh_password: Option<String>,
+    ssh_key_path: Option<String>,
     state: State<SessionState>,
     registry: State<ProviderRegistryState>,
     app: AppHandle,
@@ -56,7 +56,7 @@ pub fn create_session(
             provider.as_deref(),
             ssh_host.as_deref(),
             ssh_user.as_deref(),
-            ssh_password,
+            ssh_key_path,
         )?;
         // Set API key before spawn thread starts — avoids race condition
         if let Some(key) = api_key {
@@ -364,8 +364,53 @@ pub fn set_session_api_key(
 
 use crate::services::ssh;
 
+/// Save an API key for a provider (persisted encrypted).
+#[tauri::command]
+pub fn save_provider_key(
+    provider_id: String,
+    env_var: String,
+    api_key: String,
+    state: State<SessionState>,
+) -> Result<(), IpcError> {
+    state
+        .read()
+        .db
+        .save_provider_key(&provider_id, &env_var, &api_key)
+        .map_err(IpcError::from)
+}
+
+/// Load the decrypted API key for a provider. Returns null if not found.
+#[tauri::command]
+pub fn load_provider_key(
+    provider_id: String,
+    state: State<SessionState>,
+) -> Result<Option<serde_json::Value>, IpcError> {
+    let result = state
+        .read()
+        .db
+        .load_provider_key(&provider_id)
+        .map_err(IpcError::from)?;
+    Ok(
+        result
+            .map(|(env_var, api_key)| serde_json::json!({ "envVar": env_var, "apiKey": api_key })),
+    )
+}
+
+/// Delete a saved provider key.
+#[tauri::command]
+pub fn delete_provider_key(
+    provider_id: String,
+    state: State<SessionState>,
+) -> Result<(), IpcError> {
+    state
+        .read()
+        .db
+        .delete_provider_key(&provider_id)
+        .map_err(IpcError::from)
+}
+
 /// Test SSH connectivity to a remote host without creating a session.
 #[tauri::command]
-pub fn test_ssh(host: String, user: String, password: Option<String>) -> ssh::SshTestResult {
-    ssh::test_ssh_connection(&host, &user, password.as_deref())
+pub fn test_ssh(host: String, user: String, key_path: Option<String>) -> ssh::SshTestResult {
+    ssh::test_ssh_connection(&host, &user, key_path.as_deref())
 }

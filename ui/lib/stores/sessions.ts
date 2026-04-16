@@ -39,6 +39,8 @@ export interface Session {
   sshUser: string | null;
   subagents?: SubagentInfo[];
   attention?: { requiresAttention: boolean; reason: string | null; since: string | null } | null;
+  rateLimit?: import('../types').RateLimitInfo[];
+  costUsd?: number;
   skipPermissions?: boolean;
   parentSessionId?: number | null;
   depth?: number;

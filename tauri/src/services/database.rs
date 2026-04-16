@@ -103,6 +103,15 @@ impl DatabaseService {
         let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN parent_session_id INTEGER");
         let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN depth INTEGER DEFAULT 0");
 
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS provider_keys (
+                provider_id TEXT NOT NULL PRIMARY KEY,
+                env_var     TEXT NOT NULL,
+                key_enc     TEXT NOT NULL,
+                updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+        );
+
         conn.execute_batch(
             "
             CREATE TABLE IF NOT EXISTS projects (
@@ -275,6 +284,76 @@ impl DatabaseService {
             }
             None => Ok((None, None)),
         }
+    }
+
+    /// Save an API key for a provider (upsert). The key is encrypted before storage.
+    pub fn save_provider_key(
+        &self,
+        provider_id: &str,
+        env_var: &str,
+        api_key: &str,
+    ) -> SqlResult<()> {
+        let key_enc = crate::services::crypto::encrypt(api_key).map_err(|e| {
+            rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::other(e)))
+        })?;
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        conn.execute(
+            "INSERT INTO provider_keys (provider_id, env_var, key_enc, updated_at) \
+             VALUES (?1, ?2, ?3, datetime('now')) \
+             ON CONFLICT(provider_id) DO UPDATE SET env_var=?2, key_enc=?3, updated_at=datetime('now')",
+            params![provider_id, env_var, key_enc],
+        )?;
+        Ok(())
+    }
+
+    /// Load the decrypted API key for a provider. Returns (env_var, api_key) or None.
+    pub fn load_provider_key(&self, provider_id: &str) -> SqlResult<Option<(String, String)>> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt =
+            conn.prepare("SELECT env_var, key_enc FROM provider_keys WHERE provider_id = ?1")?;
+        let result = stmt
+            .query_row(params![provider_id], |row| {
+                let env_var: String = row.get(0)?;
+                let key_enc: String = row.get(1)?;
+                Ok((env_var, key_enc))
+            })
+            .optional()?;
+
+        match result {
+            Some((env_var, key_enc)) => {
+                let api_key = crate::services::crypto::decrypt(&key_enc).map_err(|e| {
+                    rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::other(e)))
+                })?;
+                Ok(Some((env_var, api_key)))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// List all provider IDs that have saved keys. Returns whether each is configured.
+    pub fn list_provider_keys(&self) -> SqlResult<Vec<(String, String)>> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare("SELECT provider_id, env_var FROM provider_keys")?;
+        let rows = stmt.query_map(params![], |row| {
+            let provider_id: String = row.get(0)?;
+            let env_var: String = row.get(1)?;
+            Ok((provider_id, env_var))
+        })?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row?);
+        }
+        Ok(result)
+    }
+
+    /// Delete a saved provider key.
+    pub fn delete_provider_key(&self, provider_id: &str) -> SqlResult<()> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        conn.execute(
+            "DELETE FROM provider_keys WHERE provider_id = ?1",
+            params![provider_id],
+        )?;
+        Ok(())
     }
 
     pub fn update_session_worktree(

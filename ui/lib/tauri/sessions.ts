@@ -14,8 +14,8 @@ export interface CreateSessionOptions {
   apiKey?: string;
   sshHost?: string;
   sshUser?: string;
-  /** SSH password. Never persisted — held in backend memory for session lifetime. */
-  sshPassword?: string;
+  /** SSH private key file path. */
+  sshKeyPath?: string;
 }
 
 export async function createSession(opts: CreateSessionOptions): Promise<Session> {
@@ -30,7 +30,7 @@ export async function createSession(opts: CreateSessionOptions): Promise<Session
     apiKey: opts.apiKey ?? null,
     sshHost: opts.sshHost ?? null,
     sshUser: opts.sshUser ?? null,
-    sshPassword: opts.sshPassword ?? null,
+    sshKeyPath: opts.sshKeyPath ?? null,
   });
 }
 

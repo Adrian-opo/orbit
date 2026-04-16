@@ -58,7 +58,7 @@ impl Provider for CodexProvider {
                 let remote_script = format!("cd {} && {}", cwd_str, parts.join(" "));
 
                 let (mut child, askpass) =
-                    ssh::spawn_via_ssh(host, user, config.ssh_password.as_deref(), &remote_script)
+                    ssh::spawn_via_ssh(host, user, config.ssh_key_path.as_deref(), &remote_script)
                         .map_err(|e| format!("ssh spawn failed: {e}"))?;
 
                 let pid = child.id();

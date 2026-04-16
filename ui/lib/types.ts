@@ -87,6 +87,15 @@ export interface AttentionState {
   since: string | null;
 }
 
+export interface RateLimitInfo {
+  status: string;
+  rateLimitType: string;
+  utilization: number;
+  resetsAt: number | null;
+  isUsingOverage: boolean;
+  surpassedThreshold: number;
+}
+
 export interface UpdateInfo {
   version: string;
   body: string;

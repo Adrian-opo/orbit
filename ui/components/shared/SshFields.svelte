@@ -1,8 +1,20 @@
 <script lang="ts">
+  import { open } from '@tauri-apps/plugin-dialog';
+
   export let sshHost: string;
   export let sshUser: string;
-  export let sshPassword: string;
+  export let sshKeyPath: string;
   export let loading: boolean;
+
+  async function browseKey() {
+    const sel = await open({
+      multiple: false,
+      filters: [
+        { name: 'SSH Keys', extensions: ['pem', 'key', 'rsa', 'pub', 'id_rsa', 'id_ed25519'] },
+      ],
+    });
+    if (sel && typeof sel === 'string') sshKeyPath = sel;
+  }
 </script>
 
 <div class="field">
@@ -30,17 +42,20 @@
 </div>
 
 <div class="field">
-  <label class="label" for="ns-ssh-pw"
-    >password <span class="key-hint">(optional — uses SSH key if empty)</span></label
+  <label class="label" for="ns-ssh-key"
+    >SSH key <span class="key-hint">(private key file)</span></label
   >
-  <input
-    id="ns-ssh-pw"
-    class="input"
-    type="password"
-    bind:value={sshPassword}
-    placeholder="leave empty for key auth"
-    disabled={loading}
-  />
+  <div class="key-row">
+    <input
+      id="ns-ssh-key"
+      class="input"
+      type="text"
+      bind:value={sshKeyPath}
+      placeholder="~/.ssh/id_rsa"
+      disabled={loading}
+    />
+    <button class="browse" on:click={browseKey} disabled={loading} title="browse">⌘</button>
+  </div>
 </div>
 
 <style>
@@ -78,5 +93,25 @@
     font-weight: normal;
     color: var(--t3);
     font-size: 10px;
+  }
+  .key-row {
+    display: flex;
+    gap: var(--sp-3);
+  }
+  .key-row .input {
+    flex: 1;
+  }
+  .browse {
+    background: var(--bg2);
+    border: 1px solid var(--bd1);
+    color: var(--t1);
+    border-radius: var(--radius-sm);
+    padding: 0 var(--sp-5);
+    font-size: var(--base);
+    flex-shrink: 0;
+  }
+  .browse:hover {
+    border-color: var(--bd2);
+    color: var(--t0);
   }
 </style>

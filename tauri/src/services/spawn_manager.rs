@@ -328,6 +328,11 @@ pub fn spawn_opencode(config: OpenCodeConfig) -> Result<SpawnHandle, String> {
     let opencode = find_opencode()
         .ok_or_else(|| "opencode not found — install with: npm i -g opencode".to_string())?;
 
+    // On Windows, .cmd wrappers reject arguments containing newlines ("batch file
+    // arguments are invalid").  Always pipe the prompt via stdin to avoid this.
+    let prompt = config.prompt.clone();
+    let use_stdin = cfg!(windows) || prompt.contains('\n');
+
     let mut cmd = std::process::Command::new(&opencode);
     cmd.args(["run", "--format", "json"]);
     cmd.args(["--dir", &config.cwd.to_string_lossy()]);
@@ -337,7 +342,19 @@ pub fn spawn_opencode(config: OpenCodeConfig) -> Result<SpawnHandle, String> {
         cmd.args(["--continue", "-s", sid]);
     }
 
-    cmd.arg(&config.prompt);
+    if use_stdin {
+        cmd.arg("-");
+    } else {
+        cmd.arg(&prompt);
+    }
+
+    cmd.env("PATH", extended_path());
+    if use_stdin {
+        cmd.stdin(std::process::Stdio::piped());
+    } else {
+        cmd.stdin(std::process::Stdio::null());
+    }
+
     cmd.env("PATH", extended_path());
 
     for (k, v) in &config.extra_env {
@@ -357,6 +374,16 @@ pub fn spawn_opencode(config: OpenCodeConfig) -> Result<SpawnHandle, String> {
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("spawn opencode failed: {e}"))?;
+
+    // Write prompt to stdin when needed
+    if use_stdin {
+        use std::io::Write;
+        let mut stdin_pipe = child.stdin.take().ok_or("no stdin")?;
+        stdin_pipe
+            .write_all(prompt.as_bytes())
+            .map_err(|e| format!("write prompt to stdin: {e}"))?;
+        drop(stdin_pipe);
+    }
 
     let pid = child.id();
     let stdout = child.stdout.take().ok_or("no stdout")?;

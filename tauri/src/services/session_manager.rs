@@ -82,6 +82,8 @@ pub struct SessionStateEvent {
     pub model: Option<String>,
     pub context_window: Option<u64>,
     pub attention: crate::models::AttentionState,
+    pub rate_limit: Vec<crate::models::RateLimitInfo>,
+    pub cost_usd: Option<f64>,
 }
 
 struct ActiveSession {
@@ -93,8 +95,8 @@ struct ActiveSession {
     pub effort: Option<String>,
     /// Provider API key (stored in memory only, never persisted).
     pub api_key: Option<String>,
-    /// SSH password held in memory (never in DB). Reused for follow-up messages.
-    pub ssh_password: Option<String>,
+    /// SSH private key path held in memory. Reused for follow-up messages.
+    pub ssh_key_path: Option<String>,
     /// Stdin handle for providers that use persistent stdin (e.g. ACP JSON-RPC).
     pub stdin: Option<Arc<std::sync::Mutex<Box<dyn std::io::Write + Send>>>>,
 }
@@ -126,7 +128,7 @@ impl SessionManager {
         provider: Option<&str>,
         ssh_host: Option<&str>,
         ssh_user: Option<&str>,
-        ssh_password: Option<String>,
+        ssh_key_path: Option<String>,
     ) -> Result<Session, String> {
         let project_name = std::path::Path::new(project_path)
             .file_name()
@@ -206,16 +208,16 @@ impl SessionManager {
             ssh_host: ssh_host.map(|s| s.to_string()),
             ssh_user: ssh_user.map(|s| s.to_string()),
             attention: None,
-            skip_permissions: true,
+            skip_permissions: permission_mode == "ignore",
             parent_session_id: None,
             depth: 0,
         };
 
-        // Persist SSH password encrypted to DB (api_key saved separately via set_api_key)
-        if ssh_password.is_some() {
+        // Persist SSH key path encrypted to DB (api_key saved separately via set_api_key)
+        if ssh_key_path.is_some() {
             let _ = self
                 .db
-                .save_session_secrets(session_id, None, ssh_password.as_deref());
+                .save_session_secrets(session_id, None, ssh_key_path.as_deref());
         }
 
         self.active.insert(
@@ -225,7 +227,7 @@ impl SessionManager {
                 claude_session_id: None,
                 effort: None,
                 api_key: None,
-                ssh_password,
+                ssh_key_path,
                 stdin: None,
             },
         );
@@ -257,7 +259,7 @@ impl SessionManager {
             resume_id,
             extra_env,
             spawn_mode,
-            ssh_password,
+            ssh_key_path,
             skip_permissions,
         ) = {
             let m = manager.read().unwrap_or_else(|e| e.into_inner());
@@ -296,7 +298,7 @@ impl SessionManager {
                 }
                 _ => crate::services::ssh::SpawnMode::Local,
             };
-            let ssh_password = a.ssh_password.clone();
+            let ssh_key_path = a.ssh_key_path.clone();
 
             (
                 m.db.clone(),
@@ -311,7 +313,7 @@ impl SessionManager {
                 a.claude_session_id.clone(),
                 env,
                 spawn_mode,
-                ssh_password,
+                ssh_key_path,
                 a.session.skip_permissions,
             )
         };
@@ -358,8 +360,8 @@ impl SessionManager {
                 }
             );
             eprintln!(
-                "[orbit:debug]   ssh_password: {}",
-                if ssh_password.is_some() {
+                "[orbit:debug]   ssh_key_path: {}",
+                if ssh_key_path.is_some() {
                     "<set>"
                 } else {
                     "<none>"
@@ -387,12 +389,15 @@ impl SessionManager {
             extra_env,
             effort,
             spawn_mode,
-            ssh_password,
+            ssh_key_path,
             skip_permissions,
         };
 
         // Write .mcp.json so the agent can use orbit-mcp tools for orchestration
-        let is_local = matches!(&spawn_config.spawn_mode, crate::services::ssh::SpawnMode::Local);
+        let is_local = matches!(
+            &spawn_config.spawn_mode,
+            crate::services::ssh::SpawnMode::Local
+        );
         if is_local {
             ensure_mcp_config(&cwd);
         }
@@ -442,24 +447,18 @@ impl SessionManager {
                             || trimmed.contains("overloaded_error")
                         {
                             // Set attention for rate limit
-                            let mut m =
-                                manager_err.write().unwrap_or_else(|e| e.into_inner());
+                            let mut m = manager_err.write().unwrap_or_else(|e| e.into_inner());
                             if let Some(a) = m.active.get_mut(&session_id) {
-                                a.session.attention =
-                                    Some(crate::models::AttentionState {
-                                        requires_attention: true,
-                                        reason: Some(
-                                            crate::models::AttentionReason::RateLimit,
-                                        ),
-                                        since: Some(chrono::Utc::now().to_rfc3339()),
-                                    });
+                                a.session.attention = Some(crate::models::AttentionState {
+                                    requires_attention: true,
+                                    reason: Some(crate::models::AttentionReason::RateLimit),
+                                    since: Some(chrono::Utc::now().to_rfc3339()),
+                                });
                             }
                             if let Some(state) = m.journal_states.get_mut(&session_id) {
                                 state.attention = crate::models::AttentionState {
                                     requires_attention: true,
-                                    reason: Some(
-                                        crate::models::AttentionReason::RateLimit,
-                                    ),
+                                    reason: Some(crate::models::AttentionReason::RateLimit),
                                     since: Some(chrono::Utc::now().to_rfc3339()),
                                 };
                             }
@@ -475,9 +474,7 @@ impl SessionManager {
         });
 
         // 6. Store stdin handle (if provider returned one, e.g. ACP)
-        let stdin_handle = handle
-            .stdin
-            .map(|s| Arc::new(std::sync::Mutex::new(s)));
+        let stdin_handle = handle.stdin.map(|s| Arc::new(std::sync::Mutex::new(s)));
 
         // 7. Emit spawn-started events
         Self::emit_spawn_started(
@@ -591,8 +588,7 @@ impl SessionManager {
                     }
 
                     if cfg!(debug_assertions) {
-                        let preview: String = trimmed.chars().take(200).collect();
-                        eprintln!("[orbit:debug] stdout {session_id}: {preview}");
+                        eprintln!("[orbit:debug] stdout {session_id}: {trimmed}");
                     }
 
                     // Extract and persist Claude session ID from system/init message
@@ -635,7 +631,7 @@ impl SessionManager {
 
                     let _ = db.insert_output(session_id, &trimmed);
 
-                    let (new_entries, state_event) = {
+                    let (new_entries, state_event, is_rate_limit) = {
                         let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
                         let cwd = m
                             .active
@@ -714,6 +710,8 @@ impl SessionManager {
                             model: state.model.clone(),
                             context_window: state.context_window.or(Some(window)),
                             attention: state.attention.clone(),
+                            rate_limit: state.rate_limit.clone(),
+                            cost_usd: state.cost_usd,
                         };
                         if let Some(ref model) = detected_model {
                             let _ = db.update_session_model(session_id, model);
@@ -722,8 +720,20 @@ impl SessionManager {
                             }
                         }
 
-                        (new_entries, event)
+                        let is_rate_limit = event.attention.requires_attention
+                            && event.attention.reason.as_ref().is_some_and(|r| {
+                                matches!(r, crate::models::AttentionReason::RateLimit)
+                            });
+                        (new_entries, event, is_rate_limit)
                     };
+
+                    // Emit rate-limit event when journal detects it in the output stream
+                    if is_rate_limit {
+                        let _ = app.emit(
+                            "session:rate-limit",
+                            serde_json::json!({ "sessionId": session_id }),
+                        );
+                    }
 
                     for entry in new_entries {
                         let mut e = entry.clone();
@@ -815,7 +825,7 @@ impl SessionManager {
                         .ok_or_else(|| format!("Session {session_id} not found"))?;
 
                 let claude_session_id = m.db.get_claude_session_id(session_id).ok().flatten();
-                let (api_key, ssh_password) =
+                let (api_key, ssh_key_path) =
                     m.db.load_session_secrets(session_id)
                         .unwrap_or((None, None));
 
@@ -826,7 +836,7 @@ impl SessionManager {
                         claude_session_id,
                         effort: None,
                         api_key,
-                        ssh_password,
+                        ssh_key_path,
                         stdin: None,
                     },
                 );
@@ -988,11 +998,7 @@ impl SessionManager {
     }
 
     /// Respond to a pending ACP permission request by writing a JSON-RPC response to stdin.
-    pub fn respond_permission(
-        &mut self,
-        session_id: SessionId,
-        allow: bool,
-    ) -> Result<(), String> {
+    pub fn respond_permission(&mut self, session_id: SessionId, allow: bool) -> Result<(), String> {
         let request_id = {
             let state = self
                 .journal_states
@@ -1005,10 +1011,7 @@ impl SessionManager {
         };
 
         let stdin = {
-            let a = self
-                .active
-                .get(&session_id)
-                .ok_or("Session not active")?;
+            let a = self.active.get(&session_id).ok_or("Session not active")?;
             a.stdin
                 .clone()
                 .ok_or("Session does not support interactive permissions (no stdin)")?
@@ -1029,9 +1032,10 @@ impl SessionManager {
         };
 
         {
-            let mut writer = stdin.lock().map_err(|e| format!("stdin lock failed: {e}"))?;
-            let line =
-                serde_json::to_string(&response).map_err(|e| format!("serialize: {e}"))?;
+            let mut writer = stdin
+                .lock()
+                .map_err(|e| format!("stdin lock failed: {e}"))?;
+            let line = serde_json::to_string(&response).map_err(|e| format!("serialize: {e}"))?;
             writer
                 .write_all(line.as_bytes())
                 .map_err(|e| format!("write: {e}"))?;
@@ -1077,10 +1081,10 @@ impl SessionManager {
     pub fn set_api_key(&mut self, session_id: SessionId, api_key: String) {
         if let Some(a) = self.active.get_mut(&session_id) {
             // Persist encrypted to DB so it survives app restart
-            let ssh_pw = a.ssh_password.as_deref();
+            let ssh_kp = a.ssh_key_path.as_deref();
             let _ = self
                 .db
-                .save_session_secrets(session_id, Some(&api_key), ssh_pw);
+                .save_session_secrets(session_id, Some(&api_key), ssh_kp);
             a.api_key = Some(api_key);
         }
     }

@@ -2,6 +2,7 @@
   import { onMount, createEventDispatcher } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import { createSession, getProviders, diagnoseProvider } from '../lib/tauri';
+  import { saveProviderKey } from '../lib/tauri/providers';
   import { backends as backendsStore, providerCaps, getCaps } from '../lib/stores/providers';
   import type { ProviderDiagnostic } from '../lib/tauri';
   import { generateAgentName } from '../lib/android-names';
@@ -26,11 +27,10 @@
   let generatedAgent = '';
   let generatedProject = '';
   let useWorktree = false;
-  let skipPermissions = true;
   let sshMode = false;
   let sshHost = '';
   let sshUser = 'ubuntu';
-  let sshPassword = '';
+  let sshKeyPath = '';
 
   $: backends = $backendsStore;
   $: selectedBackend = backends.find((b) => b.id === backendId) ?? null;
@@ -75,7 +75,7 @@
         projectPath: path.trim() || undefined,
         sshHost: sshMode ? sshHost.trim() || undefined : undefined,
         sshUser: sshMode ? sshUser.trim() || undefined : undefined,
-        sshPassword: sshMode ? sshPassword.trim() || undefined : undefined,
+        sshKeyPath: sshMode ? sshKeyPath.trim() || undefined : undefined,
       });
     } catch (e: any) {
       error = e?.message ?? String(e);
@@ -125,26 +125,34 @@
     const finalName = project ? `${agent} · ${project}` : agent;
     loading = true;
     error = '';
+    const resolvedProvider = resolveProvider();
+    const apiKeyForSession: string | undefined =
+      hasSubProviders &&
+      (selectedBackend?.subProviders.find((p) => p.id === subProviderId)?.env ?? []).length > 0 &&
+      apiKeyOverride.trim()
+        ? apiKeyOverride.trim()
+        : undefined;
     try {
       await createSession({
         projectPath: path.trim(),
         prompt: prompt.trim() || 'Hello',
         model: resolveModel(),
-        permissionMode: skipPermissions ? 'ignore' : 'approve',
+        permissionMode: 'ignore',
         sessionName: finalName,
-        useWorktree: caps.supportsEffort && !sshMode ? useWorktree : false,
-        provider: resolveProvider(),
-        apiKey:
-          hasSubProviders &&
-          (selectedBackend?.subProviders.find((p) => p.id === subProviderId)?.env ?? []).length >
-            0 &&
-          apiKeyOverride.trim()
-            ? apiKeyOverride.trim()
-            : undefined,
+        useWorktree: !sshMode ? useWorktree : false,
+        provider: resolvedProvider,
+        apiKey: apiKeyForSession,
         sshHost: sshMode ? sshHost.trim() : undefined,
         sshUser: sshMode ? sshUser.trim() : undefined,
-        sshPassword: sshMode && sshPassword.trim() ? sshPassword.trim() : undefined,
+        sshKeyPath: sshMode && sshKeyPath.trim() ? sshKeyPath.trim() : undefined,
       });
+      // Save API key per provider so next session auto-fills it
+      if (hasSubProviders && subProviderId && apiKeyForSession) {
+        const envVars =
+          selectedBackend?.subProviders.find((p) => p.id === subProviderId)?.env ?? [];
+        const envVar = envVars[0] ?? `${subProviderId.toUpperCase().replace(/-/g, '_')}_API_KEY`;
+        saveProviderKey(subProviderId, envVar, apiKeyForSession).catch(() => {});
+      }
       dispatch('done');
     } catch (e: any) {
       error = e?.message ?? String(e);
@@ -186,7 +194,7 @@
   />
 
   {#if sshMode}
-    <SshFields bind:sshHost bind:sshUser bind:sshPassword {loading} />
+    <SshFields bind:sshHost bind:sshUser bind:sshKeyPath {loading} />
   {/if}
 
   <div class="field">
@@ -231,7 +239,7 @@
     {/if}
   </div>
 
-  {#if caps.supportsEffort && !sshMode}
+  {#if !sshMode}
     <label class="toggle-row">
       <input type="checkbox" bind:checked={useWorktree} disabled={loading} />
       <span class="toggle-label">criar git worktree</span>
@@ -239,8 +247,8 @@
   {/if}
 
   <label class="toggle-row">
-    <input type="checkbox" bind:checked={skipPermissions} disabled={loading} />
-    <span class="toggle-label">skip permissions (auto-approve tools)</span>
+    <input type="checkbox" checked disabled />
+    <span class="toggle-label">skip permissions (always on)</span>
   </label>
 
   {#if error}

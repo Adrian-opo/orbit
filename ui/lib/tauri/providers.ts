@@ -66,7 +66,7 @@ export async function diagnoseProvider(
     projectPath?: string;
     sshHost?: string;
     sshUser?: string;
-    sshPassword?: string;
+    sshKeyPath?: string;
   }
 ): Promise<ProviderDiagnostic> {
   return await invoke('diagnose_provider', {
@@ -74,18 +74,36 @@ export async function diagnoseProvider(
     projectPath: opts?.projectPath ?? null,
     sshHost: opts?.sshHost ?? null,
     sshUser: opts?.sshUser ?? null,
-    sshPassword: opts?.sshPassword ?? null,
+    sshKeyPath: opts?.sshKeyPath ?? null,
   });
 }
 
 export async function testSsh(
   host: string,
   user: string,
-  password?: string
+  keyPath?: string
 ): Promise<SshTestResult> {
   return await invoke('test_ssh', {
     host,
     user,
-    password: password ?? null,
+    keyPath: keyPath ?? null,
   });
+}
+
+export async function saveProviderKey(
+  providerId: string,
+  envVar: string,
+  apiKey: string
+): Promise<void> {
+  await invoke('save_provider_key', { providerId, envVar, apiKey });
+}
+
+export async function loadProviderKey(
+  providerId: string
+): Promise<{ envVar: string; apiKey: string } | null> {
+  return await invoke('load_provider_key', { providerId });
+}
+
+export async function deleteProviderKey(providerId: string): Promise<void> {
+  await invoke('delete_provider_key', { providerId });
 }

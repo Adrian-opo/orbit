@@ -155,7 +155,7 @@ pub fn diagnose_provider(
     project_path: Option<String>,
     ssh_host: Option<String>,
     ssh_user: Option<String>,
-    ssh_password: Option<String>,
+    ssh_key_path: Option<String>,
     registry: tauri::State<crate::ipc::session::ProviderRegistryState>,
 ) -> serde_json::Value {
     let provider = match registry.0.resolve(&backend) {
@@ -180,7 +180,7 @@ pub fn diagnose_provider(
     // SSH mode: test connection → check CLI → check dir on remote
     if let (Some(ref host), Some(ref user)) = (&ssh_host, &ssh_user) {
         let ssh_result =
-            crate::services::ssh::test_ssh_connection(host, user, ssh_password.as_deref());
+            crate::services::ssh::test_ssh_connection(host, user, ssh_key_path.as_deref());
 
         if !ssh_result.ok {
             return serde_json::json!({
@@ -210,7 +210,7 @@ pub fn diagnose_provider(
         let (path, version, dir_ok) = match crate::services::ssh::spawn_via_ssh(
             host,
             user,
-            ssh_password.as_deref(),
+            ssh_key_path.as_deref(),
             &remote_script,
         ) {
             Ok((child, _guard)) => {

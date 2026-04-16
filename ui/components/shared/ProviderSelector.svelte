@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { CliBackend, SubProvider } from '../../lib/tauri';
+  import { loadProviderKey } from '../../lib/tauri/providers';
 
   export let backends: CliBackend[];
   export let backendId: string;
@@ -10,6 +11,8 @@
   export let loading: boolean;
 
   let subProviderSearch = '';
+  let savedKeyLoaded = false;
+  let hasSavedKey = false;
 
   $: selectedBackend = backends.find((b) => b.id === backendId) ?? null;
   $: hasSubProviders = selectedBackend?.hasSubProviders ?? false;
@@ -41,7 +44,7 @@
   $: envVars = selectedSubProvider?.env ?? [];
   $: needsApiKey = hasSubProviders && envVars.length > 0;
 
-  // Reset model when backend or sub-provider changes
+  // Reset model and load saved key when backend or sub-provider changes
   let prevBackendId = backendId;
   let prevSubProviderId = subProviderId;
   $: if (backendId !== prevBackendId || subProviderId !== prevSubProviderId) {
@@ -49,6 +52,24 @@
     prevSubProviderId = subProviderId;
     const first = currentModels[0];
     model = first?.id ?? '';
+    // Load saved API key for this provider
+    savedKeyLoaded = false;
+    hasSavedKey = false;
+    if (needsApiKey && subProviderId) {
+      loadProviderKey(subProviderId)
+        .then((result) => {
+          if (result) {
+            hasSavedKey = true;
+            if (!apiKeyOverride) {
+              apiKeyOverride = result.apiKey;
+            }
+          }
+          savedKeyLoaded = true;
+        })
+        .catch(() => {
+          savedKeyLoaded = true;
+        });
+    }
   }
 
   function selectSubProvider(p: SubProvider) {
@@ -177,14 +198,17 @@
 {#if needsApiKey}
   <div class="field">
     <label class="label" for="ns-apikey"
-      >API Key <span class="key-hint">(optional if already configured in CLI)</span></label
+      >API Key
+      {#if hasSavedKey}
+        <span class="key-saved">✓ saved</span>
+      {/if}</label
     >
     <input
       id="ns-apikey"
       class="input"
       type="password"
       bind:value={apiKeyOverride}
-      placeholder="paste API key to override..."
+      placeholder={hasSavedKey ? 'using saved key — paste to override' : 'paste API key...'}
       disabled={loading}
     />
   </div>
@@ -325,9 +349,9 @@
     text-align: center;
   }
 
-  .key-hint {
+  .key-saved {
+    color: var(--s-working);
     font-weight: normal;
-    color: var(--t3);
     font-size: 10px;
   }
 </style>

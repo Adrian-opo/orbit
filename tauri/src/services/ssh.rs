@@ -143,7 +143,7 @@ pub struct SshTestResult {
 
 /// Appends the baseline SSH `-o` options that are common to all SSH invocations
 /// made by Orbit.
-fn push_base_options(args: &mut Vec<String>, with_password: bool) {
+fn push_base_options(args: &mut Vec<String>) {
     let opts: &[&str] = &[
         "ConnectTimeout=10",
         "StrictHostKeyChecking=accept-new",
@@ -154,23 +154,17 @@ fn push_base_options(args: &mut Vec<String>, with_password: bool) {
         args.push("-o".into());
         args.push(o.to_string());
     }
-    if with_password {
-        args.push("-o".into());
-        args.push("PreferredAuthentications=keyboard-interactive,password".into());
-        args.push("-o".into());
-        args.push("NumberOfPasswordPrompts=1".into());
-    }
 }
 
 /// Builds the `ssh` [`Command`] used for diagnostics (test connection).
-fn build_test_command(host: &str, user: &str, with_password: bool) -> Command {
+fn build_test_command(host: &str, user: &str, _with_key: bool) -> Command {
     let mut args: Vec<String> = vec![
         "-o".into(),
         "BatchMode=no".into(),
         "-o".into(),
         "LogLevel=ERROR".into(),
     ];
-    push_base_options(&mut args, with_password);
+    push_base_options(&mut args);
 
     args.push(format!("{}@{}", user, host));
     args.push("echo __orbit_ok__".into());
@@ -194,26 +188,17 @@ fn build_test_command(host: &str, user: &str, with_password: bool) -> Command {
 // ── test_ssh_connection ───────────────────────────────────────────────────────
 
 /// Tests whether an SSH connection to `host` as `user` (optionally
-/// authenticated with `password`) succeeds. Uses a 15-second hard timeout.
-pub fn test_ssh_connection(host: &str, user: &str, password: Option<&str>) -> SshTestResult {
-    let with_password = password.is_some();
-    let mut cmd = build_test_command(host, user, with_password);
+/// authenticated with `ssh_key_path`) succeeds. Uses a 15-second hard timeout.
+pub fn test_ssh_connection(host: &str, user: &str, ssh_key_path: Option<&str>) -> SshTestResult {
+    let mut cmd = build_test_command(host, user, ssh_key_path.is_some());
 
-    // Attach askpass before spawning so the script file exists.
-    let _guard: Option<AskpassGuard> = if let Some(pw) = password {
-        match apply_askpass(&mut cmd, pw) {
-            Ok(g) => Some(g),
-            Err(e) => {
-                return SshTestResult {
-                    ok: false,
-                    latency_ms: 0,
-                    error: format!("failed to create askpass helper: {}", e),
-                };
-            }
-        }
-    } else {
-        None
-    };
+    // Attach identity file if provided
+    if let Some(key) = ssh_key_path {
+        cmd.arg("-i");
+        cmd.arg(key);
+    }
+
+    let _guard: Option<AskpassGuard> = None;
 
     let start = Instant::now();
 
@@ -304,6 +289,10 @@ pub fn test_ssh_connection(host: &str, user: &str, password: Option<&str>) -> Ss
 /// the [`Child`] process handle together with the optional [`AskpassGuard`]
 /// (which must be kept alive until the child exits).
 ///
+/// `ssh_key_path` is the path to a private key file (e.g. `~/.ssh/id_rsa`).
+/// When set, `-i <path>` is passed to ssh for key-based authentication.
+/// When `None`, the default SSH agent/key discovery is used.
+///
 /// `remote_script` should be a **plain** shell command with values already
 /// individually escaped via [`posix_escape`]. This function wraps it in a
 /// single `posix_escape` layer for `bash -lc '<script>'` so the remote login
@@ -311,22 +300,23 @@ pub fn test_ssh_connection(host: &str, user: &str, password: Option<&str>) -> Ss
 pub fn spawn_via_ssh(
     host: &str,
     user: &str,
-    password: Option<&str>,
+    ssh_key_path: Option<&str>,
     remote_script: &str,
 ) -> std::io::Result<(Child, Option<AskpassGuard>)> {
-    let with_password = password.is_some();
+    let _has_key = ssh_key_path.is_some();
 
     let mut args: Vec<String> = Vec::new();
 
-    // BatchMode: yes when using key auth, no when using password.
     args.push("-o".into());
-    args.push(if with_password {
-        "BatchMode=no".into()
-    } else {
-        "BatchMode=yes".into()
-    });
+    args.push("BatchMode=yes".into());
 
-    push_base_options(&mut args, with_password);
+    push_base_options(&mut args);
+
+    // Specify identity file if provided
+    if let Some(key) = ssh_key_path {
+        args.push("-i".into());
+        args.push(key.to_string());
+    }
 
     args.push(format!("{}@{}", user, host));
 
@@ -370,14 +360,8 @@ pub fn spawn_via_ssh(
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let guard: Option<AskpassGuard> = if let Some(pw) = password {
-        Some(apply_askpass(&mut cmd, pw)?)
-    } else {
-        None
-    };
-
     let child = cmd.spawn()?;
-    Ok((child, guard))
+    Ok((child, None))
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────

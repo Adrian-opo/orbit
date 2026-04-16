@@ -17,8 +17,8 @@ pub struct ProviderSpawnConfig {
     pub effort: Option<String>,
     /// How to spawn: locally or via SSH tunnel.
     pub spawn_mode: crate::services::ssh::SpawnMode,
-    /// SSH password (memory only, never persisted).
-    pub ssh_password: Option<String>,
+    /// SSH private key file path (memory only, never persisted directly).
+    pub ssh_key_path: Option<String>,
     /// Whether to skip permission prompts (auto-approve all tool calls).
     pub skip_permissions: bool,
 }

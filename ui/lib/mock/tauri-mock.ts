@@ -439,6 +439,15 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
     case 'set_session_api_key':
       return null;
 
+    case 'save_provider_key':
+      return null;
+
+    case 'load_provider_key':
+      return null;
+
+    case 'delete_provider_key':
+      return null;
+
     case 'get_tasks':
       return [];
 

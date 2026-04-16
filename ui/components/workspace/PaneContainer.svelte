@@ -2,27 +2,22 @@
   import {
     workspace,
     focusPane,
-    moveTab,
+    assignSession,
     splitPane,
-    addTab,
-    closeTab,
+    closePane,
   } from '../../lib/stores/workspace';
-  import type { TabTarget } from '../../lib/stores/workspace';
   import { sessions } from '../../lib/stores/sessions';
-  import TabBar from './TabBar.svelte';
   import SplitDropZone from './SplitDropZone.svelte';
   import CentralPanel from '../CentralPanel.svelte';
-  import TerminalPanel from '../TerminalPanel.svelte';
 
   export let paneId: string;
 
   $: pane = $workspace.panes[paneId];
   $: isFocused = $workspace.focusedPaneId === paneId;
-  $: activeTab = pane?.tabs.find((t) => t.id === pane.activeTabId) ?? null;
-  $: activeSession = (() => {
-    if (activeTab?.target.kind !== 'agent') return null;
-    const { sessionId } = activeTab.target;
-    return $sessions.find((s) => s.id === sessionId) ?? null;
+  $: canClose = Object.keys($workspace.panes).length > 1;
+  $: session = (() => {
+    if (!pane?.sessionId) return null;
+    return $sessions.find((s) => s.id === pane.sessionId) ?? null;
   })();
 
   let dragOver = false;
@@ -47,58 +42,33 @@
     dragOver = false;
   }
 
-  function handleSplitDrop(e: CustomEvent<{ position: 'center' | 'top' | 'bottom' | 'left' | 'right'; data: string }>) {
+  function handleSplitDrop(
+    e: CustomEvent<{
+      position: 'center' | 'top' | 'bottom' | 'left' | 'right';
+      data: string;
+    }>,
+  ) {
     dragOver = false;
     dragEnterCount = 0;
 
-    const { position, data } = e.detail;
-    let parsed: { tabId?: string; sourcePaneId?: string; sessionId?: number } = {};
+    let parsed: { sessionId?: number; sourcePaneId?: string } = {};
     try {
-      parsed = JSON.parse(data);
+      parsed = JSON.parse(e.detail.data);
     } catch {
       return;
     }
 
-    if (position === 'center') {
-      if (parsed.tabId && parsed.sourcePaneId) {
-        moveTab(parsed.sourcePaneId, paneId, parsed.tabId);
-      } else if (parsed.sessionId != null) {
-        addTab(paneId, { kind: 'agent', sessionId: parsed.sessionId });
-      }
+    const sid = parsed.sessionId ?? null;
+
+    if (e.detail.position === 'center') {
+      if (sid !== null) assignSession(paneId, sid);
     } else {
       const direction: 'horizontal' | 'vertical' =
-        position === 'left' || position === 'right' ? 'horizontal' : 'vertical';
-
-      let target: TabTarget | null = null;
-      if (parsed.tabId && parsed.sourcePaneId) {
-        const sourcePane = $workspace.panes[parsed.sourcePaneId];
-        const tab = sourcePane?.tabs.find((t) => t.id === parsed.tabId);
-        if (tab) target = tab.target;
-      } else if (parsed.sessionId != null) {
-        target = { kind: 'agent', sessionId: parsed.sessionId };
-      }
-
-      if (target) {
-        splitPane(paneId, direction, target);
-        if (parsed.tabId && parsed.sourcePaneId) {
-          closeTab(parsed.sourcePaneId, parsed.tabId);
-        }
-      }
+        e.detail.position === 'left' || e.detail.position === 'right'
+          ? 'horizontal'
+          : 'vertical';
+      splitPane(paneId, direction, sid);
     }
-  }
-
-  function handleAddAction(e: CustomEvent<{ action: 'terminal' | 'session' | 'open' }>) {
-    const { action } = e.detail;
-    if (action === 'terminal') {
-      addTab(paneId, { kind: 'terminal', terminalId: crypto.randomUUID().slice(0, 8) });
-    } else if (action === 'session') {
-      window.dispatchEvent(new CustomEvent('orbit:new-session'));
-    }
-    // 'open' is a no-op for now
-  }
-
-  function handlePaneClick() {
-    focusPane(paneId);
   }
 </script>
 
@@ -107,44 +77,25 @@
   class="pane-container"
   class:focused={isFocused}
   role="region"
-  on:click={handlePaneClick}
-  on:keydown={handlePaneClick}
+  on:click={() => focusPane(paneId)}
+  on:keydown={() => focusPane(paneId)}
   on:dragenter={handleDragEnter}
   on:dragleave={handleDragLeave}
   on:drop={handleDrop}
 >
-  {#if pane}
-    <TabBar
-      {paneId}
-      tabs={pane.tabs}
-      activeTabId={pane.activeTabId}
-      on:addaction={handleAddAction}
+  {#if session}
+    <CentralPanel
+      {session}
+      onClose={canClose ? () => closePane(paneId) : null}
     />
-
-    <div class="pane-content">
-      {#if activeTab}
-        {#if activeTab.target.kind === 'agent'}
-          {#if activeSession}
-            <CentralPanel session={activeSession} />
-          {:else}
-            <div class="empty-state">
-              <span class="icon">⚠</span>
-              <span class="hint">Session not found</span>
-            </div>
-          {/if}
-        {:else if activeTab.target.kind === 'terminal'}
-          <TerminalPanel sessionId={0} />
-        {/if}
-      {:else}
-        <div class="empty-state">
-          <span class="icon">+</span>
-          <span class="hint">Open a session or terminal to get started</span>
-        </div>
-      {/if}
-
-      <SplitDropZone visible={dragOver} on:drop={handleSplitDrop} />
+  {:else}
+    <div class="empty-state">
+      <span class="icon">+</span>
+      <span class="hint">click a session in the sidebar</span>
     </div>
   {/if}
+
+  <SplitDropZone visible={dragOver} on:drop={handleSplitDrop} />
 </div>
 
 <style>
@@ -175,14 +126,6 @@
 
   .pane-container.focused::before {
     opacity: 1;
-  }
-
-  .pane-content {
-    display: flex;
-    flex: 1;
-    min-height: 0;
-    position: relative;
-    overflow: hidden;
   }
 
   .empty-state {

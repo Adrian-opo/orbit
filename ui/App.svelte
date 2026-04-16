@@ -10,7 +10,7 @@
     type Session,
   } from './lib/stores/sessions';
   import { get } from 'svelte/store';
-  import { addTab, restoreWorkspace, workspace } from './lib/stores/workspace';
+  import { assignSession, restoreWorkspace, workspace } from './lib/stores/workspace';
   import { journal } from './lib/stores/journal';
   import { addToast } from './lib/stores/toasts';
   import {
@@ -103,14 +103,14 @@
     restoreWorkspace(new Set(existing.map((s) => s.id)));
     if (existing.length > 0 && !$selectedSessionId) {
       const ws = get(workspace);
-      if (ws.focusedPaneId) addTab(ws.focusedPaneId, { kind: 'agent', sessionId: existing[0].id });
+      if (ws.focusedPaneId) assignSession(ws.focusedPaneId, existing[0].id);
     }
 
     const u1 = onSessionCreated((s) => {
       sessions.update((l) => upsertSession(l, s));
       if (!$selectedSessionId) {
         const ws = get(workspace);
-        if (ws.focusedPaneId) addTab(ws.focusedPaneId, { kind: 'agent', sessionId: s.id });
+        if (ws.focusedPaneId) assignSession(ws.focusedPaneId, s.id);
       }
     });
 
@@ -250,13 +250,12 @@
     window.removeEventListener('orbit:new-session', handleOrbitNewSession);
   });
 
-  // Derive selected session from workspace focused pane's active agent tab
+  // Derive selected session from workspace focused pane
   $: selected = (() => {
     const ws = $workspace;
     const focusedPane = ws.focusedPaneId ? ws.panes[ws.focusedPaneId] : null;
-    const activeTab = focusedPane?.tabs.find((t) => t.id === focusedPane.activeTabId) ?? null;
-    if (activeTab?.target.kind === 'agent') {
-      return getSelectedSession($sessions, activeTab.target.sessionId);
+    if (focusedPane?.sessionId) {
+      return getSelectedSession($sessions, focusedPane.sessionId);
     }
     return null;
   })();

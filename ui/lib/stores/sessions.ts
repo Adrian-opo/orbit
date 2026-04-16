@@ -48,13 +48,10 @@ export interface Session {
 
 export const sessions = writable<Session[]>([]);
 
-// Derive selected session ID from workspace store: focused pane's active agent tab
+// Derive selected session ID from workspace focused pane
 export const selectedSessionId = derived(workspace, ($ws) => {
   const focusedPane = $ws.focusedPaneId ? $ws.panes[$ws.focusedPaneId] : null;
-  if (!focusedPane) return null;
-  const activeTab = focusedPane.tabs.find((t) => t.id === focusedPane.activeTabId) ?? null;
-  if (activeTab?.target.kind === 'agent') return activeTab.target.sessionId;
-  return null;
+  return focusedPane?.sessionId ?? null;
 });
 
 export function getSelectedSession(list: Session[], id: number | null): Session | null {

@@ -10,6 +10,7 @@
   import InputBar from './InputBar.svelte';
 
   export let session: Session;
+  export let onClose: (() => void) | null = null;
 
   let feedComponent: Feed;
   let atBottom = true;
@@ -72,8 +73,18 @@
 </script>
 
 <div class="panel">
-  <!-- Header -->
-  <div class="header">
+  <!-- Header — draggable to create splits -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="header"
+    draggable="true"
+    on:dragstart={(e) => {
+      if (e.dataTransfer) {
+        e.dataTransfer.setData('text/plain', JSON.stringify({ sessionId: session.id }));
+        e.dataTransfer.effectAllowed = 'move';
+      }
+    }}
+  >
     <div class="header-left">
       <span class="dot" style="color:{statusClr}" class:pulse={pulsing}>●</span>
       <span
@@ -153,6 +164,9 @@
             </svg>
           {/if}
         </button>
+        {#if onClose}
+          <button class="action-btn close-action" title="Close pane" on:click={onClose}>×</button>
+        {/if}
       </div>
     </div>
   </div>

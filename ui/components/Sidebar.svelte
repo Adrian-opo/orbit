@@ -1,6 +1,6 @@
 <script lang="ts">
   import { sessions, updateSessionState } from '../lib/stores/sessions';
-  import { workspace, addTab, splitPane } from '../lib/stores/workspace';
+  import { workspace, assignSession, splitPane } from '../lib/stores/workspace';
   import { get } from 'svelte/store';
   import { statusColor, statusLabel, isPulsing } from '../lib/status';
   import NewSessionModal from './NewSessionModal.svelte';
@@ -235,8 +235,8 @@
       <p class="empty">no sessions</p>
     {:else}
       {#each orderedSessions as s (s.id)}
-        {@const active = Object.values($workspace.panes).some((p) =>
-          p.tabs.some((t) => t.target.kind === 'agent' && t.target.sessionId === s.id)
+        {@const active = Object.values($workspace.panes).some(
+          (p) => p.sessionId === s.id
         )}
         {@const color = statusColor(s.status)}
         {@const pulsing = isPulsing(s.status)}
@@ -251,13 +251,13 @@
           }}
           on:click={() => {
             const ws = get(workspace);
-            if (ws.focusedPaneId) addTab(ws.focusedPaneId, { kind: 'agent', sessionId: s.id });
+            if (ws.focusedPaneId) assignSession(ws.focusedPaneId, s.id);
             if (s.attention?.requiresAttention) clearAttention(s.id);
           }}
           on:dblclick={() => {
             const ws = get(workspace);
             if (ws.focusedPaneId)
-              splitPane(ws.focusedPaneId, 'horizontal', { kind: 'agent', sessionId: s.id });
+              splitPane(ws.focusedPaneId, 'horizontal', s.id);
           }}
           on:contextmenu={(e) => onContextMenu(e, s)}
         >

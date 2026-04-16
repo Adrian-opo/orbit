@@ -1,5 +1,5 @@
 import { writable, derived } from 'svelte/store';
-import { splitLayout } from './layout';
+import { workspace } from './workspace';
 import type { SubagentInfo } from '../types';
 
 export interface TokenUsage {
@@ -47,7 +47,15 @@ export interface Session {
 }
 
 export const sessions = writable<Session[]>([]);
-export const selectedSessionId = derived(splitLayout, ($l) => $l.panes[$l.focused] ?? null);
+
+// Derive selected session ID from workspace store: focused pane's active agent tab
+export const selectedSessionId = derived(workspace, ($ws) => {
+  const focusedPane = $ws.focusedPaneId ? $ws.panes[$ws.focusedPaneId] : null;
+  if (!focusedPane) return null;
+  const activeTab = focusedPane.tabs.find((t) => t.id === focusedPane.activeTabId) ?? null;
+  if (activeTab?.target.kind === 'agent') return activeTab.target.sessionId;
+  return null;
+});
 
 export function getSelectedSession(list: Session[], id: number | null): Session | null {
   if (id === null) return null;

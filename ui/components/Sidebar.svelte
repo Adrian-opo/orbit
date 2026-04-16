@@ -1,6 +1,7 @@
 <script lang="ts">
   import { sessions, updateSessionState } from '../lib/stores/sessions';
-  import { splitLayout, assignSession, clearSession } from '../lib/stores/layout';
+  import { workspace, addTab, splitPane } from '../lib/stores/workspace';
+  import { get } from 'svelte/store';
   import { statusColor, statusLabel, isPulsing } from '../lib/status';
   import NewSessionModal from './NewSessionModal.svelte';
   import ContextMenu from './ContextMenu.svelte';
@@ -123,7 +124,7 @@
     } else {
       collapsedParents.add(id);
     }
-    collapsedParents = collapsedParents; // trigger reactivity
+    collapsedParents = new Set(collapsedParents); // trigger reactivity
   }
 
   // Count children per parent
@@ -175,7 +176,6 @@
             confirmDelete = null;
             await deleteSession(id);
             sessions.update((l) => l.filter((s) => s.id !== id));
-            clearSession(id);
           }}>delete</button
         >
       </div>
@@ -235,7 +235,9 @@
       <p class="empty">no sessions</p>
     {:else}
       {#each orderedSessions as s (s.id)}
-        {@const active = Object.values($splitLayout.panes).includes(s.id)}
+        {@const active = Object.values($workspace.panes).some((p) =>
+          p.tabs.some((t) => t.target.kind === 'agent' && t.target.sessionId === s.id)
+        )}
         {@const color = statusColor(s.status)}
         {@const pulsing = isPulsing(s.status)}
         {@const isChild = !!s.parentSessionId}
@@ -243,9 +245,19 @@
           class="item"
           class:active
           class:child={isChild}
+          draggable="true"
+          on:dragstart={(e) => {
+            e.dataTransfer?.setData('text/plain', JSON.stringify({ sessionId: s.id }));
+          }}
           on:click={() => {
-            assignSession($splitLayout.focused, s.id);
+            const ws = get(workspace);
+            if (ws.focusedPaneId) addTab(ws.focusedPaneId, { kind: 'agent', sessionId: s.id });
             if (s.attention?.requiresAttention) clearAttention(s.id);
+          }}
+          on:dblclick={() => {
+            const ws = get(workspace);
+            if (ws.focusedPaneId)
+              splitPane(ws.focusedPaneId, 'horizontal', { kind: 'agent', sessionId: s.id });
           }}
           on:contextmenu={(e) => onContextMenu(e, s)}
         >

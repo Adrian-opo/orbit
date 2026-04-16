@@ -19,10 +19,11 @@
   $: pane = $workspace.panes[paneId];
   $: isFocused = $workspace.focusedPaneId === paneId;
   $: activeTab = pane?.tabs.find((t) => t.id === pane.activeTabId) ?? null;
-  $: activeSession =
-    activeTab?.target.kind === 'agent'
-      ? ($sessions.find((s) => s.id === activeTab!.target.sessionId) ?? null)
-      : null;
+  $: activeSession = (() => {
+    if (activeTab?.target.kind !== 'agent') return null;
+    const { sessionId } = activeTab.target;
+    return $sessions.find((s) => s.id === sessionId) ?? null;
+  })();
 
   let dragOver = false;
   let dragEnterCount = 0;
@@ -101,11 +102,13 @@
   }
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
   class="pane-container"
   class:focused={isFocused}
+  role="region"
   on:click={handlePaneClick}
+  on:keydown={handlePaneClick}
   on:dragenter={handleDragEnter}
   on:dragleave={handleDragLeave}
   on:drop={handleDrop}
@@ -122,7 +125,7 @@
       {#if activeTab}
         {#if activeTab.target.kind === 'agent'}
           {#if activeSession}
-            <CentralPanel session={activeSession} onSplit={null} onClose={null} />
+            <CentralPanel session={activeSession} />
           {:else}
             <div class="empty-state">
               <span class="icon">⚠</span>

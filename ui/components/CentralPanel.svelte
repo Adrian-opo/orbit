@@ -8,47 +8,8 @@
   import { mutedSessions, toggleMute } from '../lib/stores/ui';
   import Feed from './Feed.svelte';
   import InputBar from './InputBar.svelte';
-  import TerminalPanel from './TerminalPanel.svelte';
-  import { ptyCreate, ptyKill } from '../lib/tauri/terminal';
-
-  let terminalOpen = false;
-  let ptyActive = false;
-  let ptyLoading = false;
-  let ptyError = '';
-
-  async function activateTerminal() {
-    if (ptyActive || ptyLoading || !session) return;
-
-    const cwd = session.cwd ?? '.';
-    // Spawn a shell in the project directory (the agent already runs in Feed)
-    const shell =
-      navigator.platform.startsWith('Win') ? 'powershell.exe' : '/bin/bash';
-    ptyLoading = true;
-    ptyError = '';
-
-    try {
-      const pid = await ptyCreate(session.id, shell, [], cwd, [], 24, 80);
-      console.log(`[orbit] PTY created: pid=${pid}, shell=${shell}, cwd=${cwd}`);
-      ptyActive = true;
-    } catch (e: any) {
-      const msg = typeof e === 'string' ? e : e?.message ?? JSON.stringify(e);
-      console.error('[orbit] PTY create failed:', msg);
-      ptyError = msg;
-    } finally {
-      ptyLoading = false;
-    }
-  }
-
-  function switchTab(tab: ViewTab) {
-    activeTab = tab;
-    if (tab === 'terminal' && !ptyActive) {
-      activateTerminal();
-    }
-  }
 
   export let session: Session;
-  export let onSplit: (() => void) | null = null;
-  export let onClose: (() => void) | null = null;
 
   let feedComponent: Feed;
   let atBottom = true;
@@ -192,12 +153,6 @@
             </svg>
           {/if}
         </button>
-        {#if onSplit}
-          <button class="action-btn" title="Split panel" on:click={onSplit}>⊞</button>
-        {/if}
-        {#if onClose}
-          <button class="action-btn close-action" title="Close panel" on:click={onClose}>×</button>
-        {/if}
       </div>
     </div>
   </div>
@@ -219,74 +174,33 @@
     </div>
   {/if}
 
-  <!-- View tabs -->
-  <div class="tab-bar">
-    <button
-      class="tab-btn"
-      class:active={activeTab === 'feed'}
-      on:click={() => switchTab('feed')}
-    >
-      Feed
-    </button>
-    <button
-      class="tab-btn"
-      class:active={activeTab === 'terminal'}
-      on:click={() => switchTab('terminal')}
-    >
-      Terminal
-    </button>
-  </div>
-
-  <!-- Feed / Terminal -->
-  {#if activeTab === 'feed'}
-    <div class="feed-wrap">
-      {#if entries.length === 0 && $pendingMessages.length === 0}
-        <div class="feed-empty">
-          <span>session #{session.id} · {statusStr}</span>
-        </div>
-      {:else}
-        {#key session.id}
-          <Feed
-            bind:this={feedComponent}
-            {entries}
-            status={session.status}
-            provider={session.provider}
-            on:bottomchange={onFeedBottomChange}
-          />
-        {/key}
-        {#each $pendingMessages as msg (msg.id)}
-          <div class="pending-msg">
-            <span class="pending-arrow">›</span>
-            <span>{msg.text}</span>
-          </div>
-        {/each}
-      {/if}
-    </div>
-
-    {#if !atBottom}
-      <button class="scroll-btn" on:click={scrollToBottom}>↓ scroll to bottom</button>
-    {/if}
-  {:else}
-    {#if ptyError}
-      <div class="terminal-wrap terminal-center">
-        <div class="terminal-status terminal-error">{ptyError}</div>
-        <button class="terminal-retry" on:click={() => { ptyError = ''; activateTerminal(); }}>
-          retry
-        </button>
-      </div>
-    {:else if ptyLoading}
-      <div class="terminal-wrap terminal-center">
-        <div class="terminal-status">starting terminal...</div>
-      </div>
-    {:else if ptyActive}
-      <div class="terminal-wrap">
-        <TerminalPanel sessionId={session.id} />
+  <!-- Feed -->
+  <div class="feed-wrap">
+    {#if entries.length === 0 && $pendingMessages.length === 0}
+      <div class="feed-empty">
+        <span>session #{session.id} · {statusStr}</span>
       </div>
     {:else}
-      <div class="terminal-wrap terminal-center">
-        <div class="terminal-status">initializing...</div>
-      </div>
+      {#key session.id}
+        <Feed
+          bind:this={feedComponent}
+          {entries}
+          status={session.status}
+          provider={session.provider}
+          on:bottomchange={onFeedBottomChange}
+        />
+      {/key}
+      {#each $pendingMessages as msg (msg.id)}
+        <div class="pending-msg">
+          <span class="pending-arrow">›</span>
+          <span>{msg.text}</span>
+        </div>
+      {/each}
     {/if}
+  </div>
+
+  {#if !atBottom}
+    <button class="scroll-btn" on:click={scrollToBottom}>↓ scroll to bottom</button>
   {/if}
 
   <!-- Input -->
@@ -438,78 +352,6 @@
     color: var(--s-input);
   }
 
-  .tab-bar {
-    display: flex;
-    gap: 0;
-    border-bottom: 1px solid var(--bd);
-    background: var(--bg1);
-    flex-shrink: 0;
-  }
-
-  .tab-btn {
-    padding: var(--sp-2) var(--sp-6);
-    font-size: var(--xs);
-    color: var(--t2);
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    transition:
-      color 0.15s,
-      border-color 0.15s;
-  }
-
-  .tab-btn:hover {
-    color: var(--t0);
-  }
-
-  .tab-btn.active {
-    color: var(--ac);
-    border-bottom-color: var(--ac);
-  }
-
-  .terminal-wrap {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .terminal-center {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--sp-4);
-  }
-
-  .terminal-status {
-    font-size: var(--sm);
-    color: var(--t3);
-  }
-
-  .terminal-error {
-    color: var(--s-error);
-    max-width: 400px;
-    text-align: center;
-    line-height: 1.5;
-  }
-
-  .terminal-retry {
-    background: none;
-    border: 1px solid var(--bd1);
-    border-radius: var(--radius-sm);
-    color: var(--t1);
-    font-size: var(--xs);
-    padding: var(--sp-2) var(--sp-5);
-    cursor: pointer;
-    font-family: var(--mono);
-  }
-
-  .terminal-retry:hover {
-    border-color: var(--ac);
-    color: var(--ac);
-  }
-
   .feed-wrap {
     flex: 1;
     overflow: hidden;
@@ -546,11 +388,6 @@
   .action-btn:hover {
     border-color: var(--ac);
     color: var(--ac);
-  }
-
-  .action-btn.close-action:hover {
-    border-color: var(--s-error);
-    color: var(--s-error);
   }
 
   .mute-btn {

@@ -9,7 +9,8 @@
     getSelectedSession,
     type Session,
   } from './lib/stores/sessions';
-  import { assignSession } from './lib/stores/layout';
+  import { get } from 'svelte/store';
+  import { addTab, restoreWorkspace, workspace } from './lib/stores/workspace';
   import { journal } from './lib/stores/journal';
   import { addToast } from './lib/stores/toasts';
   import {
@@ -34,7 +35,8 @@
   import { installUpdate } from './lib/tauri';
   import type { UpdateInfo } from './lib/types';
   import Sidebar from './components/Sidebar.svelte';
-  import PaneGrid from './components/PaneGrid.svelte';
+  import WorkspaceContainer from './components/workspace/WorkspaceContainer.svelte';
+  import NewSessionModal from './components/NewSessionModal.svelte';
   import MetaPanel from './components/MetaPanel.svelte';
   import { metaPanelVisible, sidebarVisible } from './lib/stores/preferences';
   import { mutedSessions } from './lib/stores/ui';
@@ -98,11 +100,18 @@
 
     claudeCheck = check;
     sessions.set(existing);
-    if (existing.length > 0 && !$selectedSessionId) assignSession('tl', existing[0].id);
+    restoreWorkspace(new Set(existing.map((s) => s.id)));
+    if (existing.length > 0 && !$selectedSessionId) {
+      const ws = get(workspace);
+      if (ws.focusedPaneId) addTab(ws.focusedPaneId, { kind: 'agent', sessionId: existing[0].id });
+    }
 
     const u1 = onSessionCreated((s) => {
       sessions.update((l) => upsertSession(l, s));
-      if (!$selectedSessionId) assignSession('tl', s.id);
+      if (!$selectedSessionId) {
+        const ws = get(workspace);
+        if (ws.focusedPaneId) addTab(ws.focusedPaneId, { kind: 'agent', sessionId: s.id });
+      }
     });
 
     const u2 = onSessionOutput(({ sessionId, entry }) => {
@@ -231,14 +240,32 @@
 
     setTimeout(tryCheckUpdate, 3000);
     updateInterval = setInterval(tryCheckUpdate, 30 * 60 * 1000);
+
+    window.addEventListener('orbit:new-session', handleOrbitNewSession);
   });
 
   onDestroy(() => {
     unlisteners.forEach((fn) => fn());
     if (updateInterval) clearInterval(updateInterval);
+    window.removeEventListener('orbit:new-session', handleOrbitNewSession);
   });
 
-  $: selected = getSelectedSession($sessions, $selectedSessionId);
+  // Derive selected session from workspace focused pane's active agent tab
+  $: selected = (() => {
+    const ws = $workspace;
+    const focusedPane = ws.focusedPaneId ? ws.panes[ws.focusedPaneId] : null;
+    const activeTab = focusedPane?.tabs.find((t) => t.id === focusedPane.activeTabId) ?? null;
+    if (activeTab?.target.kind === 'agent') {
+      return getSelectedSession($sessions, activeTab.target.sessionId);
+    }
+    return null;
+  })();
+
+  let showNewSessionModal = false;
+
+  function handleOrbitNewSession() {
+    showNewSessionModal = true;
+  }
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'F12') {
@@ -253,6 +280,13 @@
 
 {#if showChangelog}
   <ChangelogModal {changelogContent} currentVersion={appVersion} onClose={closeChangelog} />
+{/if}
+
+{#if showNewSessionModal}
+  <NewSessionModal
+    on:done={() => (showNewSessionModal = false)}
+    on:cancel={() => (showNewSessionModal = false)}
+  />
 {/if}
 
 <div class="layout">
@@ -276,7 +310,7 @@
       </div>
     </div>
   {:else}
-    <PaneGrid />
+    <WorkspaceContainer />
   {/if}
   {#if selected && $metaPanelVisible}
     <MetaPanel session={selected} />

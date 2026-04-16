@@ -110,23 +110,43 @@
 
   .resize-handle {
     flex-shrink: 0;
-    background: var(--border, #333);
-    transition: background 0.15s;
-    z-index: 1;
+    position: relative;
+    background: var(--bd);
+    z-index: 2;
   }
 
-  .resize-handle:hover,
-  .resize-handle:active {
-    background: var(--accent, #4e8ef7);
-  }
-
+  /* Thin visible line */
   .handle-horizontal {
-    width: 4px;
+    width: 1px;
     cursor: col-resize;
   }
 
   .handle-vertical {
-    height: 4px;
+    height: 1px;
     cursor: row-resize;
+  }
+
+  /* Wider invisible hit area via pseudo-element */
+  .resize-handle::after {
+    content: '';
+    position: absolute;
+  }
+
+  .handle-horizontal::after {
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    right: -3px;
+  }
+
+  .handle-vertical::after {
+    left: 0;
+    right: 0;
+    top: -3px;
+    bottom: -3px;
+  }
+
+  .resize-handle:hover {
+    background: var(--ac);
   }
 </style>

@@ -142,7 +142,7 @@
   $: orderedSessions = (() => {
     const roots = $sessions.filter((s) => !s.parentSessionId);
     const children = $sessions.filter((s) => s.parentSessionId);
-    const result: (typeof $sessions[0])[] = [];
+    const result: (typeof $sessions)[0][] = [];
     for (const root of roots) {
       result.push(root);
       if (!collapsedParents.has(root.id)) {
@@ -235,9 +235,7 @@
       <p class="empty">no sessions</p>
     {:else}
       {#each orderedSessions as s (s.id)}
-        {@const active = Object.values($workspace.panes).some(
-          (p) => p.sessionId === s.id
-        )}
+        {@const active = Object.values($workspace.panes).some((p) => p.sessionId === s.id)}
         {@const color = statusColor(s.status)}
         {@const pulsing = isPulsing(s.status)}
         {@const isChild = !!s.parentSessionId}
@@ -256,8 +254,7 @@
           }}
           on:dblclick={() => {
             const ws = get(workspace);
-            if (ws.focusedPaneId)
-              splitPane(ws.focusedPaneId, 'horizontal', s.id);
+            if (ws.focusedPaneId) splitPane(ws.focusedPaneId, 'horizontal', s.id);
           }}
           on:contextmenu={(e) => onContextMenu(e, s)}
         >
@@ -311,8 +308,8 @@
               <span
                 class="attention-dot"
                 style="color:{attentionColor(s.attention.reason)}"
-                title={s.attention.reason ?? 'needs attention'}
-              >●</span>
+                title={s.attention.reason ?? 'needs attention'}>●</span
+              >
             {/if}
           </div>
         </button>

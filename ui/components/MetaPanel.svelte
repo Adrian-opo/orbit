@@ -83,6 +83,11 @@
               <span>cache·w</span><span>{formatTokens(tokens.cacheWrite)}</span>
             </div>
           {/if}
+          {#if session.costUsd != null}
+            <div class="stat-row">
+              <span>cost</span><span class="cost-val">${session.costUsd.toFixed(4)}</span>
+            </div>
+          {/if}
         </div>
 
         {#if ctx > 0}
@@ -111,6 +116,53 @@
               <span>max</span><span>{formatTokens(maxCtx)}</span>
             </div>
           </div>
+        {/if}
+
+        {#if session.rateLimit && session.rateLimit.filter((rl) => rl.status === 'allowed_warning' || rl.status === 'exceeded' || rl.status === 'blocked').length > 0}
+          {#each session.rateLimit.filter((rl) => rl.status === 'allowed_warning' || rl.status === 'exceeded' || rl.status === 'blocked') as rl}
+            <div class="stat-group">
+              <div class="stat-label rate-limit-label">
+                rate limit ({rl.rateLimitType === 'five_hour'
+                  ? '5h'
+                  : rl.rateLimitType === 'seven_day'
+                    ? '7d'
+                    : rl.rateLimitType})
+              </div>
+              <div class="ctx-row">
+                <div class="ctx-bar">
+                  <div
+                    class="ctx-fill rate-limit-fill"
+                    style="width:{Math.min(Math.round(rl.utilization * 100), 100)}%"
+                  ></div>
+                </div>
+                <span class="ctx-pct rate-limit-pct">{Math.round(rl.utilization * 100)}%</span>
+              </div>
+              {#if rl.resetsAt}
+                <div class="stat-row dim">
+                  <span>resets</span><span
+                    >{new Date(rl.resetsAt * 1000).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}</span
+                  >
+                </div>
+              {/if}
+              <div class="stat-row dim">
+                <span>status</span><span
+                  >{rl.status === 'allowed_warning'
+                    ? 'warning'
+                    : rl.status === 'exceeded'
+                      ? 'exceeded'
+                      : rl.status}</span
+                >
+              </div>
+              {#if rl.isUsingOverage}
+                <div class="stat-row dim">
+                  <span>overage</span><span>yes</span>
+                </div>
+              {/if}
+            </div>
+          {/each}
         {/if}
 
         {#if session.miniLog && session.miniLog.length > 0}
@@ -290,6 +342,20 @@
     font-size: var(--xs);
     color: var(--t2);
     flex-shrink: 0;
+  }
+
+  .rate-limit-label {
+    color: var(--s-input);
+  }
+  .rate-limit-fill {
+    background: var(--s-input);
+  }
+  .rate-limit-pct {
+    color: var(--s-input);
+  }
+  .cost-val {
+    color: var(--t0);
+    font-size: var(--xs);
   }
 
   .log-row {

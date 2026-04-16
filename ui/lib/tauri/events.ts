@@ -19,6 +19,8 @@ export interface SessionStatePayload {
   model: string | null;
   contextWindow: number | null;
   attention: { requiresAttention: boolean; reason: string | null; since: string | null } | null;
+  rateLimit: import('../types').RateLimitInfo[];
+  costUsd: number | null;
 }
 
 export function onSessionCreated(cb: (session: Session) => void) {

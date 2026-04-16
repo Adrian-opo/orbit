@@ -141,6 +141,8 @@
           ...(p.model != null ? { model: p.model } : {}),
           ...(p.contextWindow != null ? { contextWindow: p.contextWindow } : {}),
           ...(p.attention != null ? { attention: p.attention } : {}),
+          ...(p.rateLimit?.length ? { rateLimit: p.rateLimit } : {}),
+          ...(p.costUsd != null ? { costUsd: p.costUsd } : {}),
         })
       );
     });
@@ -163,11 +165,7 @@
     });
 
     const u7 = onSessionRateLimit((_id) => {
-      addToast({
-        type: 'warning',
-        message: 'Rate limit reached. Please wait a moment and try again.',
-        autoDismiss: false,
-      });
+      // Rate limit info is shown inline in the chat feed as a System entry
     });
 
     const u8 = listen<{
@@ -180,7 +178,7 @@
       const parent = $sessions.find((s) => s.id === parentSessionId);
       if (!parent) return;
       // Add a virtual child session to the store
-      const childId = -(Date.now()); // negative ID = virtual (not in DB)
+      const childId = -Date.now(); // negative ID = virtual (not in DB)
       const child: Session = {
         id: childId,
         projectId: parent.projectId,

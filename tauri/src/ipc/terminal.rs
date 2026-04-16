@@ -68,10 +68,7 @@ pub fn pty_resize(
 }
 
 #[tauri::command]
-pub fn pty_kill(
-    state: State<'_, PtyManagerState>,
-    session_id: SessionId,
-) -> Result<(), IpcError> {
+pub fn pty_kill(state: State<'_, PtyManagerState>, session_id: SessionId) -> Result<(), IpcError> {
     let mut mgr = state.0.lock().map_err(|e| format!("lock: {e}"))?;
     mgr.kill(session_id).map_err(IpcError::from)
 }

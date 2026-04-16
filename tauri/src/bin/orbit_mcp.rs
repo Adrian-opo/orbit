@@ -101,8 +101,23 @@ fn find_cli(name: &str) -> Option<String> {
             .creation_flags(CREATE_NO_WINDOW)
             .output()
             .ok()?;
+        if !out.status.success() {
+            return None;
+        }
         let stdout = String::from_utf8_lossy(&out.stdout);
-        stdout.lines().next().map(|l| l.trim().to_string())
+        let lines: Vec<&str> = stdout
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
+        // On Windows, prefer .cmd/.exe over extensionless shell scripts (os error 193).
+        if let Some(win) = lines.iter().find(|l| {
+            let lower = l.to_lowercase();
+            lower.ends_with(".cmd") || lower.ends_with(".exe")
+        }) {
+            return Some(win.to_string());
+        }
+        lines.first().map(|l| l.to_string())
     }
 
     #[cfg(not(windows))]
@@ -159,11 +174,15 @@ fn build_spawn_args(provider: &str, model: &str, prompt: &str) -> Vec<String> {
             args
         }
         "opencode" => {
-            let mut args = vec!["--json".to_string()];
+            let mut args = vec![
+                "run".to_string(),
+                "--format".to_string(),
+                "json".to_string(),
+            ];
             if !model.is_empty() {
                 args.extend(["--model".to_string(), model.to_string()]);
             }
-            args.extend(["-p".to_string(), prompt.to_string()]);
+            args.push(prompt.to_string());
             args
         }
         // ACP providers
@@ -178,10 +197,7 @@ fn tool_create_agent(state: &mut McpState, params: &Value) -> Result<Value, Stri
         .get("provider")
         .and_then(|v| v.as_str())
         .unwrap_or("claude-code");
-    let model = params
-        .get("model")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let model = params.get("model").and_then(|v| v.as_str()).unwrap_or("");
     let cwd = params
         .get("cwd")
         .and_then(|v| v.as_str())
@@ -190,10 +206,7 @@ fn tool_create_agent(state: &mut McpState, params: &Value) -> Result<Value, Stri
         .get("prompt")
         .and_then(|v| v.as_str())
         .ok_or("missing 'prompt' parameter")?;
-    let wait = params
-        .get("wait")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(true);
+    let wait = params.get("wait").and_then(|v| v.as_bool()).unwrap_or(true);
     let timeout_secs = params
         .get("timeoutSecs")
         .and_then(|v| v.as_u64())
@@ -205,8 +218,21 @@ fn tool_create_agent(state: &mut McpState, params: &Value) -> Result<Value, Stri
 
     let args = build_spawn_args(provider, model, prompt);
 
+    // On Windows, .cmd wrappers reject arguments containing newlines.
+    // For opencode, pipe prompt via stdin (-) when needed.
+    let use_stdin = provider == "opencode" && (cfg!(windows) || prompt.contains('\n'));
+
     let mut cmd = Command::new(&cli_path);
-    cmd.args(&args);
+    if use_stdin {
+        // Replace last arg (the prompt) with "-"
+        let mut stdin_args = args.clone();
+        stdin_args.pop();
+        stdin_args.push("-".to_string());
+        cmd.args(&stdin_args);
+        cmd.stdin(Stdio::piped());
+    } else {
+        cmd.args(&args);
+    }
     cmd.current_dir(cwd);
     cmd.env("PATH", extended_path());
     cmd.stdout(Stdio::piped());
@@ -220,6 +246,16 @@ fn tool_create_agent(state: &mut McpState, params: &Value) -> Result<Value, Stri
     }
 
     let mut child = cmd.spawn().map_err(|e| format!("spawn failed: {e}"))?;
+
+    if use_stdin {
+        use std::io::Write;
+        let mut stdin_pipe = child.stdin.take().ok_or("no stdin")?;
+        stdin_pipe
+            .write_all(prompt.as_bytes())
+            .map_err(|e| format!("write prompt to stdin: {e}"))?;
+        drop(stdin_pipe);
+    }
+
     let pid = child.id();
     let session_id = state.next_id;
     state.next_id += 1;
@@ -261,8 +297,7 @@ fn tool_create_agent(state: &mut McpState, params: &Value) -> Result<Value, Stri
 
     if wait {
         // Block until finished or timeout
-        let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
         loop {
             if *finished.lock().unwrap() {
                 break;
@@ -336,10 +371,7 @@ fn tool_send_message(state: &mut McpState, params: &Value) -> Result<Value, Stri
         .ok_or("missing 'message' parameter")?;
 
     // Remove old agent and get its metadata
-    let old_agent = state
-        .agents
-        .remove(&session_id)
-        .ok_or("agent not found")?;
+    let old_agent = state.agents.remove(&session_id).ok_or("agent not found")?;
 
     // Extract claude_session_id from output (for --resume)
     let lines = old_agent.output.lock().unwrap();
@@ -353,8 +385,7 @@ fn tool_send_message(state: &mut McpState, params: &Value) -> Result<Value, Stri
 
     // Re-spawn with --resume
     let cli_name = provider_to_cli(&old_agent.provider);
-    let cli_path =
-        find_cli(cli_name).ok_or_else(|| format!("{cli_name} not found in PATH"))?;
+    let cli_path = find_cli(cli_name).ok_or_else(|| format!("{cli_name} not found in PATH"))?;
 
     let mut args = vec![];
     match old_agent.provider.as_str() {
@@ -475,6 +506,22 @@ fn extract_assistant_text(lines: &[String]) -> String {
                 if let Some(text) = val.pointer("/item/text").and_then(|t| t.as_str()) {
                     texts.push(text.to_string());
                 }
+            }
+            // OpenCode: {"type":"text","part":{"text":"..."}}
+            if val.get("type").and_then(|t| t.as_str()) == Some("text") {
+                if let Some(text) = val.pointer("/part/text").and_then(|t| t.as_str()) {
+                    texts.push(text.to_string());
+                }
+            }
+            // Error events from any provider
+            if val.get("type").and_then(|t| t.as_str()) == Some("error") {
+                let msg = val
+                    .pointer("/error/data/message")
+                    .or_else(|| val.pointer("/error/message"))
+                    .or_else(|| val.pointer("/error/name"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown error");
+                texts.push(format!("Error: {msg}"));
             }
         }
     }
@@ -610,10 +657,7 @@ fn handle_tools_list(id: &Value) -> Value {
 }
 
 fn handle_tools_call(state: &mut McpState, id: &Value, params: &Value) -> Value {
-    let tool_name = params
-        .get("name")
-        .and_then(|n| n.as_str())
-        .unwrap_or("");
+    let tool_name = params.get("name").and_then(|n| n.as_str()).unwrap_or("");
     let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
 
     let result = match tool_name {

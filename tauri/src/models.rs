@@ -49,6 +49,17 @@ pub struct SubagentInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RateLimitInfo {
+    pub status: String,
+    pub rate_limit_type: String,
+    pub utilization: f64,
+    pub resets_at: Option<i64>,
+    pub is_using_overage: bool,
+    pub surpassed_threshold: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentState {
     pub session_id: String,
     pub project: String,

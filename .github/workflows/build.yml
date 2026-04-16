@@ -47,9 +47,20 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: tauri -> tauri/target
-          shared-key: "rust-windows"
+          shared-key: 'rust-windows'
 
       - run: npm ci
+
+      - name: Create sidecar placeholder for Tauri build validation
+        shell: pwsh
+        run: |
+          $triple = rustc -vV | Select-String '^host:' | ForEach-Object { ($_ -split ':')[1].Trim() }
+          $ext = if ($triple -match 'windows') { '.exe' } else { '' }
+          $dir = 'tauri/binaries'
+          New-Item -ItemType Directory -Path $dir -Force | Out-Null
+          $path = Join-Path $dir "orbit-mcp-$triple$ext"
+          if (-not (Test-Path $path)) { New-Item -ItemType File -Path $path -Force | Out-Null }
+          Write-Host "Created placeholder: $path"
 
       - name: Format check — Rust (rustfmt)
         run: cargo fmt --manifest-path tauri/Cargo.toml --check
@@ -88,7 +99,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: tauri -> tauri/target
-          shared-key: "rust-windows"
+          shared-key: 'rust-windows'
 
       - name: Install Node dependencies
         run: npm ci
@@ -309,7 +320,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: tauri -> tauri/target
-          shared-key: "rust-linux"
+          shared-key: 'rust-linux'
 
       - name: Install Tauri system dependencies
         run: |
@@ -435,7 +446,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: tauri -> tauri/target
-          shared-key: "rust-macos"
+          shared-key: 'rust-macos'
 
       - name: Install Node dependencies
         run: npm ci

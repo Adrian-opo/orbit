@@ -54,6 +54,7 @@ export function assignSession(paneId: string, sessionId: number): void {
     }
     ws.panes[paneId] = { sessionId };
     ws.focusedPaneId = paneId;
+    compact(ws);
     return ws;
   });
 }
@@ -63,6 +64,7 @@ export function clearPane(paneId: string): void {
   workspace.update((ws) => {
     if (!ws.panes[paneId]) return ws;
     ws.panes[paneId] = { sessionId: null };
+    compact(ws);
     return ws;
   });
 }
@@ -99,6 +101,7 @@ export function splitPane(
         }
       }
     }
+    compact(ws);
     return ws;
   });
 }
@@ -145,11 +148,54 @@ export function moveSession(fromPaneId: string, toPaneId: string): void {
     ws.panes[toPaneId] = { sessionId: from.sessionId };
     ws.panes[fromPaneId] = { sessionId: null };
     ws.focusedPaneId = toPaneId;
+    compact(ws);
     return ws;
   });
 }
 
 // ── Tree helpers ───────────────────────────────────────────────────────
+
+function collectLeafIds(node: SplitNode): Set<string> {
+  if (node.type === 'leaf') return new Set([node.paneId]);
+  const ids = new Set<string>();
+  for (const child of node.children) {
+    for (const id of collectLeafIds(child)) ids.add(id);
+  }
+  return ids;
+}
+
+function compactTree(node: SplitNode, panes: Record<string, PaneState>): SplitNode {
+  if (node.type === 'leaf') return node;
+  const left = compactTree(node.children[0], panes);
+  const right = compactTree(node.children[1], panes);
+  const leftEmpty = left.type === 'leaf' && panes[left.paneId]?.sessionId === null;
+  const rightEmpty = right.type === 'leaf' && panes[right.paneId]?.sessionId === null;
+  if (leftEmpty && rightEmpty) return left;
+  if (leftEmpty) return right;
+  if (rightEmpty) return left;
+  if (left !== node.children[0] || right !== node.children[1]) {
+    return { ...node, children: [left, right] };
+  }
+  return node;
+}
+
+function compact(ws: WorkspaceState): void {
+  ws.root = compactTree(ws.root, ws.panes);
+  const inTree = collectLeafIds(ws.root);
+  for (const pid of Object.keys(ws.panes)) {
+    if (!inTree.has(pid)) delete ws.panes[pid];
+  }
+  if (Object.keys(ws.panes).length === 0) {
+    const paneId = newPaneId();
+    ws.panes[paneId] = { sessionId: null };
+    ws.root = { type: 'leaf', paneId };
+    ws.focusedPaneId = paneId;
+  }
+  if (!ws.panes[ws.focusedPaneId ?? '']) {
+    const ids = Object.keys(ws.panes);
+    ws.focusedPaneId = ids.length > 0 ? ids[0] : null;
+  }
+}
 
 function replaceLeaf(node: SplitNode, paneId: string, replacement: SplitNode): SplitNode {
   if (node.type === 'leaf') {
@@ -198,6 +244,7 @@ export function clearSession(sessionId: number): void {
         pane.sessionId = null;
       }
     }
+    compact(ws);
     return ws;
   });
 }

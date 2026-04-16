@@ -98,6 +98,10 @@ impl DatabaseService {
         let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN ssh_user TEXT");
         let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN api_key_enc TEXT");
         let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN ssh_password_enc TEXT");
+        let _ = conn
+            .execute_batch("ALTER TABLE sessions ADD COLUMN skip_permissions INTEGER DEFAULT 1");
+        let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN parent_session_id INTEGER");
+        let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN depth INTEGER DEFAULT 0");
 
         conn.execute_batch(
             "
@@ -124,7 +128,10 @@ impl DatabaseService {
                 updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
                 provider          TEXT DEFAULT 'claude-code',
                 ssh_host          TEXT,
-                ssh_user          TEXT
+                ssh_user          TEXT,
+                skip_permissions  INTEGER DEFAULT 1,
+                parent_session_id INTEGER REFERENCES sessions(id),
+                depth             INTEGER DEFAULT 0
             );
             -- Add claude_session_id column if upgrading from older schema
             CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY);
@@ -292,7 +299,7 @@ impl DatabaseService {
         let mut stmt = conn.prepare(
             "SELECT id, project_id, name, status, worktree_path, branch_name,
                     permission_mode, model, pid, cwd, created_at, updated_at, provider,
-                    ssh_host, ssh_user
+                    ssh_host, ssh_user, skip_permissions, parent_session_id, depth
              FROM sessions ORDER BY created_at DESC",
         )?;
         let sessions = stmt
@@ -321,6 +328,14 @@ impl DatabaseService {
                     mini_log: None,
                     ssh_host: row.get(13)?,
                     ssh_user: row.get(14)?,
+                    attention: None,
+                    skip_permissions: row
+                        .get::<_, Option<bool>>(15)
+                        .ok()
+                        .flatten()
+                        .unwrap_or(true),
+                    parent_session_id: row.get(16).ok().flatten(),
+                    depth: row.get::<_, Option<i32>>(17).ok().flatten().unwrap_or(0),
                 })
             })?
             .collect::<SqlResult<Vec<_>>>()?;
@@ -361,6 +376,14 @@ impl DatabaseService {
                     mini_log: None,
                     ssh_host: row.get(13)?,
                     ssh_user: row.get(14)?,
+                    attention: None,
+                    skip_permissions: row
+                        .get::<_, Option<bool>>(15)
+                        .ok()
+                        .flatten()
+                        .unwrap_or(true),
+                    parent_session_id: row.get(16).ok().flatten(),
+                    depth: row.get::<_, Option<i32>>(17).ok().flatten().unwrap_or(0),
                 })
             })
             .optional()?;

@@ -180,12 +180,10 @@ pub fn spawn_claude(config: SpawnConfig) -> Result<SpawnHandle, String> {
     })?;
 
     let mut cmd = std::process::Command::new(&claude);
-    cmd.args([
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--dangerously-skip-permissions",
-    ]);
+    cmd.args(["--output-format", "stream-json", "--verbose"]);
+    if config.permission_mode == "ignore" {
+        cmd.arg("--dangerously-skip-permissions");
+    }
 
     if let Some(ref model) = config.model {
         if model != "auto" {
@@ -245,7 +243,7 @@ pub fn find_codex() -> Option<String> {
 }
 
 /// Generic CLI lookup using augmented PATH.
-fn find_cli_in_path(name: &str) -> Option<String> {
+pub fn find_cli_in_path(name: &str) -> Option<String> {
     let aug = extended_path();
 
     #[cfg(windows)]
@@ -319,6 +317,7 @@ pub struct CodexConfig {
     pub prompt: String,
     /// Codex session (thread) ID for follow-ups
     pub codex_session_id: Option<String>,
+    pub skip_permissions: bool,
 }
 
 /// Spawn opencode in non-interactive JSON mode.
@@ -377,23 +376,18 @@ pub fn spawn_codex(config: CodexConfig) -> Result<SpawnHandle, String> {
     let mut cmd = std::process::Command::new(&codex);
 
     if let Some(ref sid) = config.codex_session_id {
-        // Resume: codex exec resume <thread_id> "prompt"
-        cmd.args([
-            "exec",
-            "resume",
-            "--json",
-            "--dangerously-bypass-approvals-and-sandbox",
-        ]);
+        cmd.args(["exec", "resume", "--json"]);
+        if config.skip_permissions {
+            cmd.arg("--dangerously-bypass-approvals-and-sandbox");
+        }
         cmd.args(["-m", &config.model]);
         cmd.arg(sid);
         cmd.arg(&config.prompt);
     } else {
-        // New session: codex exec --json "prompt"
-        cmd.args([
-            "exec",
-            "--json",
-            "--dangerously-bypass-approvals-and-sandbox",
-        ]);
+        cmd.args(["exec", "--json"]);
+        if config.skip_permissions {
+            cmd.arg("--dangerously-bypass-approvals-and-sandbox");
+        }
         cmd.args(["-m", &config.model]);
         cmd.arg(&config.prompt);
     }

@@ -20,7 +20,11 @@ impl Provider for ClaudeProvider {
             SpawnMode::Local => spawn_claude(SpawnConfig {
                 session_id: config.session_id,
                 cwd: config.cwd,
-                permission_mode: "ignore".to_string(),
+                permission_mode: if config.skip_permissions {
+                    "ignore".to_string()
+                } else {
+                    "approve".to_string()
+                },
                 model: if config.model == "auto" {
                     None
                 } else {
@@ -36,8 +40,10 @@ impl Provider for ClaudeProvider {
                     "--output-format".to_string(),
                     "stream-json".to_string(),
                     "--verbose".to_string(),
-                    "--dangerously-skip-permissions".to_string(),
                 ];
+                if config.skip_permissions {
+                    parts.push("--dangerously-skip-permissions".to_string());
+                }
                 if config.model != "auto" && !config.model.is_empty() {
                     parts.push("--model".to_string());
                     parts.push(ssh::posix_escape(&config.model));

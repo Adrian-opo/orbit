@@ -26,6 +26,7 @@
   let generatedAgent = '';
   let generatedProject = '';
   let useWorktree = false;
+  let skipPermissions = true;
   let sshMode = false;
   let sshHost = '';
   let sshUser = 'ubuntu';
@@ -129,7 +130,7 @@
         projectPath: path.trim(),
         prompt: prompt.trim() || 'Hello',
         model: resolveModel(),
-        permissionMode: 'ignore',
+        permissionMode: skipPermissions ? 'ignore' : 'approve',
         sessionName: finalName,
         useWorktree: caps.supportsEffort && !sshMode ? useWorktree : false,
         provider: resolveProvider(),
@@ -237,11 +238,27 @@
     </label>
   {/if}
 
+  <label class="toggle-row">
+    <input type="checkbox" bind:checked={skipPermissions} disabled={loading} />
+    <span class="toggle-label">skip permissions (auto-approve tools)</span>
+  </label>
+
   {#if error}
     <p class="error">! {error}</p>
   {/if}
 
-  {#if diag}
+  <!-- Local mode: show install hint only when CLI is missing -->
+  {#if !sshMode && selectedBackend && !selectedBackend.cliAvailable}
+    <div class="diag">
+      <div class="diag-row fail">
+        {selectedBackend.cliName}: ✗ not found
+      </div>
+      <div class="diag-row fail">install: {selectedBackend.installHint}</div>
+    </div>
+  {/if}
+
+  <!-- SSH mode: full diagnose result -->
+  {#if sshMode && diag}
     <div class="diag">
       {#if diag.ssh}
         <div class="diag-row" class:ok={diag.ssh.ok} class:fail={!diag.ssh.ok}>
@@ -268,13 +285,15 @@
   {/if}
 
   <div class="actions">
-    <button
-      class="btn ghost"
-      on:click={runDiag}
-      disabled={diagRunning || loading || (sshMode && (!sshHost.trim() || !sshUser.trim()))}
-    >
-      {diagRunning ? 'testing...' : '⚙ diagnose'}
-    </button>
+    {#if sshMode}
+      <button
+        class="btn ghost"
+        on:click={runDiag}
+        disabled={diagRunning || loading || !sshHost.trim() || !sshUser.trim()}
+      >
+        {diagRunning ? 'testing...' : '⚙ diagnose'}
+      </button>
+    {/if}
     <button class="btn ghost" on:click={() => dispatch('cancel')} disabled={loading}>cancel</button>
     <button class="btn primary" on:click={submit} disabled={loading || !path}>
       {loading ? 'spawning...' : 'start session'}

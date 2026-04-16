@@ -23,6 +23,7 @@ impl Provider for CodexProvider {
                 model: config.model,
                 prompt: config.prompt,
                 codex_session_id: config.resume_id,
+                skip_permissions: config.skip_permissions,
             }),
             SpawnMode::Ssh { ref host, ref user } => {
                 let mut parts = vec!["codex".to_string()];
@@ -31,17 +32,22 @@ impl Provider for CodexProvider {
                         "exec".to_string(),
                         "resume".to_string(),
                         "--json".to_string(),
-                        "--dangerously-bypass-approvals-and-sandbox".to_string(),
+                    ]);
+                    if config.skip_permissions {
+                        parts.push("--dangerously-bypass-approvals-and-sandbox".to_string());
+                    }
+                    parts.extend([
                         "-m".to_string(),
                         ssh::posix_escape(&config.model),
                         ssh::posix_escape(sid),
                         ssh::posix_escape(&config.prompt),
                     ]);
                 } else {
+                    parts.extend(["exec".to_string(), "--json".to_string()]);
+                    if config.skip_permissions {
+                        parts.push("--dangerously-bypass-approvals-and-sandbox".to_string());
+                    }
                     parts.extend([
-                        "exec".to_string(),
-                        "--json".to_string(),
-                        "--dangerously-bypass-approvals-and-sandbox".to_string(),
                         "-m".to_string(),
                         ssh::posix_escape(&config.model),
                         ssh::posix_escape(&config.prompt),

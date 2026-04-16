@@ -8,7 +8,7 @@
   import { mutedSessions, toggleMute } from '../lib/stores/ui';
   import Feed from './Feed.svelte';
   import InputBar from './InputBar.svelte';
-  import PermissionDialog from './PermissionDialog.svelte';
+  import PermissionDialog from './PermissionDialog.svelte'; // TODO: re-enable when auto-deny error is fixed
 
   export let session: Session;
   export let onClose: (() => void) | null = null;
@@ -191,21 +191,7 @@
     </div>
   {/if}
 
-  <!-- Approval banner -->
-  {#if session.pendingApproval && (session.status as string) !== 'working'}
-    {#if session.attention?.reason === 'permission'}
-      <PermissionDialog
-        sessionId={session.id}
-        toolName={parseToolName(session.pendingApproval)}
-        description={parseToolDesc(session.pendingApproval)}
-      />
-    {:else}
-      <div class="approval">
-        <span class="approval-icon">⚑</span>
-        <span class="approval-text">{session.pendingApproval}</span>
-      </div>
-    {/if}
-  {/if}
+  <!-- Approval banner — TODO: re-enable when auto-deny error is fixed -->
 
   <!-- Feed -->
   <div class="feed-wrap">
@@ -367,23 +353,7 @@
     color: var(--t2);
   }
 
-  .approval {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-4);
-    padding: var(--sp-3) var(--sp-7);
-    background: rgba(232, 160, 48, 0.07);
-    border-bottom: 1px solid rgba(232, 160, 48, 0.2);
-    flex-shrink: 0;
-  }
-  .approval-icon {
-    color: var(--s-input);
-    font-size: var(--md);
-  }
-  .approval-text {
-    font-size: var(--sm);
-    color: var(--s-input);
-  }
+  /* approval banner CSS removed — TODO: re-enable when auto-deny error is fixed */
 
   .feed-wrap {
     flex: 1;

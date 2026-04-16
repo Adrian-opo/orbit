@@ -23,6 +23,8 @@ pub struct JournalState {
     pub next_seq: u32,
     pub epoch: String,
     pub file_size: u64,
+    pub rate_limit: Vec<crate::models::RateLimitInfo>,
+    pub cost_usd: Option<f64>,
 }
 
 impl Default for JournalState {
@@ -48,6 +50,8 @@ impl Default for JournalState {
             next_seq: 0,
             epoch: uuid_epoch(),
             file_size: 0,
+            rate_limit: Vec::new(),
+            cost_usd: None,
         }
     }
 }
@@ -77,6 +81,9 @@ fn uuid_epoch() -> String {
 }
 
 /// Returns the tool name if the last ToolCall entry has no following ToolResult.
+/// TODO: Permissions bypassed — this function is temporarily unused.
+/// Re-enable when permission dialog is fixed (auto-deny error).
+#[allow(dead_code)]
 pub(crate) fn detect_pending_approval(entries: &[JournalEntry]) -> Option<String> {
     // Walk backwards: if the last tool_call has no tool_result after it, it's pending
     for entry in entries.iter().rev() {

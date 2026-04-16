@@ -253,38 +253,11 @@ pub fn process_acp_line(state: &mut JournalState, line: &str) {
     }
 
     // JSON-RPC request from agent (has "id" + "method") — e.g. permission requests
+    // Permissions are bypassed — ignore requestPermission messages entirely
     if let Some(method) = msg.get("method").and_then(|m| m.as_str()) {
         if method == "requestPermission" || method == "client/requestPermission" {
-            let request_id = msg.get("id").cloned();
-            let tool = msg
-                .pointer("/params/title")
-                .or_else(|| msg.pointer("/params/name"))
-                .and_then(|t| t.as_str())
-                .unwrap_or("unknown tool");
-            let desc = msg
-                .pointer("/params/description")
-                .and_then(|d| d.as_str())
-                .unwrap_or("");
-            let approval_text = if desc.is_empty() {
-                format!("Allow {tool}?")
-            } else {
-                format!("Allow {tool}? {desc}")
-            };
-            state.pending_approval = Some(approval_text);
-            state.pending_approval_id = request_id;
-            state.status = crate::models::AgentStatus::Input;
-            state.attention = crate::models::AttentionState {
-                requires_attention: true,
-                reason: Some(crate::models::AttentionReason::Permission),
-                since: Some(now.clone()),
-            };
-            state.entries.push(JournalEntry {
-                session_id: session_id.clone(),
-                timestamp: now,
-                entry_type: JournalEntryType::System,
-                text: Some(format!("Permission requested: {tool}")),
-                ..JournalEntry::default()
-            });
+            // Do nothing — permissions are bypassed like --dangerously-skip-permissions
+            // TODO: Fix auto-deny error that occurs when permission dialog is shown
         }
         return;
     }

@@ -7,6 +7,12 @@
     "core:default",
     "opener:default",
     "dialog:default",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "shell:allow-open",
+    "shell:allow-stdin-write",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [{ "name": "orbit-mcp", "sidecar": true }]
+    }
   ]
 }

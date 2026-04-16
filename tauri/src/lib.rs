@@ -24,6 +24,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Resolve app data directory for SQLite DB
@@ -91,6 +92,7 @@ pub fn run() {
             ipc::session::set_session_api_key,
             ipc::session::test_ssh,
             ipc::session::clear_attention,
+            ipc::session::respond_permission,
             ipc::project::create_project,
             ipc::project::list_projects,
             commands::agents::get_subagents,

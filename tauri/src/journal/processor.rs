@@ -232,6 +232,11 @@ pub fn process_line(state: &mut JournalState, line: &str) {
                 // Non-Bash tools may need approval
                 state.status = AgentStatus::Input;
                 state.pending_approval = detect_pending_approval(&state.entries);
+                state.attention = crate::models::AttentionState {
+                    requires_attention: true,
+                    reason: Some(crate::models::AttentionReason::Permission),
+                    since: Some(chrono::Utc::now().to_rfc3339()),
+                };
             } else if has_tool_use {
                 // Bash-only tools auto-run with --dangerously-skip-permissions
                 state.status = AgentStatus::Working;

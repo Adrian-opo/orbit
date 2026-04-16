@@ -10,6 +10,22 @@
   import { sidebarVisible } from '../lib/stores/preferences';
   import { modelShortName } from '../lib/status';
   import { onMount } from 'svelte';
+  import { clearAttention } from '../lib/tauri/attention';
+
+  function attentionColor(reason: string | null): string {
+    switch (reason) {
+      case 'permission':
+        return 'var(--s-input)';
+      case 'completed':
+        return 'var(--s-idle)';
+      case 'error':
+        return 'var(--s-error)';
+      case 'rateLimit':
+        return 'var(--s-input)';
+      default:
+        return 'var(--ac)';
+    }
+  }
 
   let appVersion = '';
   import { formatTokens } from '../lib/cost';
@@ -98,6 +114,48 @@
   function displayName(s: (typeof $sessions)[0]): string {
     return s.name ?? s.projectName ?? s.cwd?.split(/[\\/]/).pop() ?? `#${s.id}`;
   }
+
+  let collapsedParents: Set<number> = new Set();
+
+  function toggleCollapse(id: number) {
+    if (collapsedParents.has(id)) {
+      collapsedParents.delete(id);
+    } else {
+      collapsedParents.add(id);
+    }
+    collapsedParents = collapsedParents; // trigger reactivity
+  }
+
+  // Count children per parent
+  $: childCounts = (() => {
+    const counts: Record<number, number> = {};
+    for (const s of $sessions) {
+      if (s.parentSessionId) {
+        counts[s.parentSessionId] = (counts[s.parentSessionId] ?? 0) + 1;
+      }
+    }
+    return counts;
+  })();
+
+  // Group sessions: top-level first, then children nested under parents
+  $: orderedSessions = (() => {
+    const roots = $sessions.filter((s) => !s.parentSessionId);
+    const children = $sessions.filter((s) => s.parentSessionId);
+    const result: (typeof $sessions[0])[] = [];
+    for (const root of roots) {
+      result.push(root);
+      if (!collapsedParents.has(root.id)) {
+        for (const child of children) {
+          if (child.parentSessionId === root.id) result.push(child);
+        }
+      }
+    }
+    // Add orphans (children whose parent isn't loaded)
+    for (const child of children) {
+      if (!roots.some((r) => r.id === child.parentSessionId)) result.push(child);
+    }
+    return result;
+  })();
 </script>
 
 {#if showModal}
@@ -176,14 +234,19 @@
     {#if $sessions.length === 0}
       <p class="empty">no sessions</p>
     {:else}
-      {#each $sessions as s (s.id)}
+      {#each orderedSessions as s (s.id)}
         {@const active = Object.values($splitLayout.panes).includes(s.id)}
         {@const color = statusColor(s.status)}
         {@const pulsing = isPulsing(s.status)}
+        {@const isChild = !!s.parentSessionId}
         <button
           class="item"
           class:active
-          on:click={() => assignSession($splitLayout.focused, s.id)}
+          class:child={isChild}
+          on:click={() => {
+            assignSession($splitLayout.focused, s.id);
+            if (s.attention?.requiresAttention) clearAttention(s.id);
+          }}
           on:contextmenu={(e) => onContextMenu(e, s)}
         >
           <div class="item-top">
@@ -208,6 +271,18 @@
               </span>
             {/if}
             <span class="status" style="color:{color}">{statusLabel(s.status)}</span>
+            {#if childCounts[s.id]}
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <span
+                class="collapse-toggle"
+                on:click|stopPropagation={() => toggleCollapse(s.id)}
+                on:keydown|stopPropagation
+                title={collapsedParents.has(s.id) ? 'Expand sub-agents' : 'Collapse sub-agents'}
+              >
+                <span class="child-count">{childCounts[s.id]}</span>
+                <span class="collapse-arrow" class:collapsed={collapsedParents.has(s.id)}>▾</span>
+              </span>
+            {/if}
           </div>
           <div class="item-meta">
             <span title={s.model ?? ''}>{fmtModel(s.model)}</span>
@@ -219,6 +294,13 @@
             <span>{fmtTokens(s)}</span>
             {#if s.pendingApproval}
               <span class="approval-dot" title={s.pendingApproval}>⚑</span>
+            {/if}
+            {#if s.attention?.requiresAttention}
+              <span
+                class="attention-dot"
+                style="color:{attentionColor(s.attention.reason)}"
+                title={s.attention.reason ?? 'needs attention'}
+              >●</span>
             {/if}
           </div>
         </button>
@@ -351,6 +433,15 @@
     padding-left: var(--sp-5);
   }
 
+  .item.child {
+    padding-left: var(--sp-9);
+    border-left: 2px solid var(--bd);
+  }
+
+  .item.child.active {
+    border-left-color: var(--ac);
+  }
+
   .item-top {
     display: flex;
     align-items: center;
@@ -452,6 +543,46 @@
   .approval-dot {
     color: var(--s-input);
     margin-left: var(--sp-2);
+  }
+
+  .attention-dot {
+    font-size: 8px;
+    margin-left: var(--sp-2);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .collapse-toggle {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    padding: 0 2px;
+    cursor: pointer;
+    color: var(--t3);
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  .collapse-toggle:hover {
+    color: var(--t0);
+  }
+
+  .child-count {
+    background: var(--bg3);
+    border-radius: var(--radius-sm);
+    padding: 0 4px;
+    font-size: 9px;
+    color: var(--t2);
+    line-height: 14px;
+  }
+
+  .collapse-arrow {
+    transition: transform 0.15s;
+  }
+
+  .collapse-arrow.collapsed {
+    transform: rotate(-90deg);
   }
 
   .muted-icon {

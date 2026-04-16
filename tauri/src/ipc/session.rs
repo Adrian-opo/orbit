@@ -158,6 +158,53 @@ pub fn get_session_journal(session_id: SessionId, state: State<SessionState>) ->
     state.write().get_journal(session_id)
 }
 
+/// Get a paginated slice of journal entries for a session.
+/// `cursor` is the seq number to start from, `limit` is max entries to return.
+/// `direction` is "forward" (newer) or "backward" (older).
+#[tauri::command]
+pub fn get_session_journal_page(
+    session_id: SessionId,
+    cursor: Option<u32>,
+    limit: Option<usize>,
+    direction: Option<String>,
+    state: State<SessionState>,
+) -> Vec<JournalEntry> {
+    let entries = state.write().get_journal(session_id);
+    let limit = limit.unwrap_or(100);
+    let is_backward = direction.as_deref() == Some("backward");
+
+    match cursor {
+        Some(seq) => {
+            if is_backward {
+                entries
+                    .into_iter()
+                    .filter(|e| e.seq < seq)
+                    .rev()
+                    .take(limit)
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .rev()
+                    .collect()
+            } else {
+                entries
+                    .into_iter()
+                    .filter(|e| e.seq > seq)
+                    .take(limit)
+                    .collect()
+            }
+        }
+        None => {
+            // No cursor: return latest entries
+            let len = entries.len();
+            if len > limit {
+                entries[len - limit..].to_vec()
+            } else {
+                entries
+            }
+        }
+    }
+}
+
 /// Diagnostic: check if claude CLI is available and return its path or an error message.
 #[tauri::command]
 pub fn check_claude() -> serde_json::Value {
@@ -261,6 +308,13 @@ pub fn rename_session(
 #[tauri::command]
 pub fn delete_session(session_id: SessionId, state: State<SessionState>) -> Result<(), IpcError> {
     state.write().delete_session(session_id)?;
+    Ok(())
+}
+
+/// Clear attention flag for a session (called when user focuses/clicks it).
+#[tauri::command]
+pub fn clear_attention(session_id: SessionId, state: State<SessionState>) -> Result<(), IpcError> {
+    state.write().clear_attention(session_id)?;
     Ok(())
 }
 

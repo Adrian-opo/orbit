@@ -18,6 +18,7 @@ export interface SessionStatePayload {
   subagents: SubagentInfo[];
   model: string | null;
   contextWindow: number | null;
+  attention: { requiresAttention: boolean; reason: string | null; since: string | null } | null;
 }
 
 export function onSessionCreated(cb: (session: Session) => void) {

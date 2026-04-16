@@ -38,6 +38,10 @@ export interface Session {
   sshHost: string | null;
   sshUser: string | null;
   subagents?: SubagentInfo[];
+  attention?: { requiresAttention: boolean; reason: string | null; since: string | null } | null;
+  skipPermissions?: boolean;
+  parentSessionId?: number | null;
+  depth?: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -17,6 +17,9 @@ pub struct JournalState {
     pub status: AgentStatus,
     pub pending_approval: Option<String>,
     pub mini_log: Vec<MiniLogEntry>,
+    pub attention: AttentionState,
+    pub next_seq: u32,
+    pub epoch: String,
     pub file_size: u64,
 }
 
@@ -34,6 +37,13 @@ impl Default for JournalState {
             status: AgentStatus::New,
             pending_approval: None,
             mini_log: Vec::new(),
+            attention: AttentionState {
+                requires_attention: false,
+                reason: None,
+                since: None,
+            },
+            next_seq: 0,
+            epoch: uuid_epoch(),
             file_size: 0,
         }
     }
@@ -51,6 +61,16 @@ pub(crate) struct RawEntry {
     #[serde(default)]
     #[allow(dead_code)]
     pub data: Option<Value>,
+}
+
+/// Generate a short epoch identifier for this session run.
+fn uuid_epoch() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    format!("e-{ts}")
 }
 
 /// Returns the tool name if the last ToolCall entry has no following ToolResult.

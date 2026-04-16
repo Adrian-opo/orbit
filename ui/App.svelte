@@ -7,6 +7,7 @@
     upsertSession,
     updateSessionState,
     getSelectedSession,
+    type Session,
   } from './lib/stores/sessions';
   import { assignSession } from './lib/stores/layout';
   import { journal } from './lib/stores/journal';
@@ -25,6 +26,7 @@
     getAppVersion,
     getChangelog,
   } from './lib/tauri';
+  import { listen } from './lib/tauri/invoke';
   import type { ClaudeCheck } from './lib/tauri';
   import ChangelogModal from './components/ChangelogModal.svelte';
   import ToastContainer from './components/ToastContainer.svelte';
@@ -129,6 +131,7 @@
           // (Codex/OpenCode don't emit model — preserve the one set at creation)
           ...(p.model != null ? { model: p.model } : {}),
           ...(p.contextWindow != null ? { contextWindow: p.contextWindow } : {}),
+          ...(p.attention != null ? { attention: p.attention } : {}),
         })
       );
     });
@@ -158,8 +161,47 @@
       });
     });
 
+    const u8 = listen<{
+      parentSessionId: number;
+      description: string;
+      tool: string;
+    }>('session:subagent-created', (e) => {
+      const { parentSessionId, description } = e.payload;
+      // Find parent session to inherit provider/cwd
+      const parent = $sessions.find((s) => s.id === parentSessionId);
+      if (!parent) return;
+      // Add a virtual child session to the store
+      const childId = -(Date.now()); // negative ID = virtual (not in DB)
+      const child: Session = {
+        id: childId,
+        projectId: parent.projectId,
+        name: description,
+        status: 'running',
+        permissionMode: parent.permissionMode,
+        model: parent.model,
+        provider: parent.provider,
+        pid: null,
+        cwd: parent.cwd,
+        projectName: parent.projectName,
+        gitBranch: parent.gitBranch,
+        worktreePath: null,
+        branchName: null,
+        tokens: null,
+        contextPercent: null,
+        pendingApproval: null,
+        miniLog: null,
+        sshHost: null,
+        sshUser: null,
+        parentSessionId,
+        depth: (parent.depth ?? 0) + 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      sessions.update((l) => [child, ...l]);
+    });
+
     // Resolve all unlisten functions and store for cleanup
-    Promise.all([u1, u2, u3, u4, u5, u6, u7]).then((fns) => {
+    Promise.all([u1, u2, u3, u4, u5, u6, u7, u8]).then((fns) => {
       unlisteners = fns;
     });
 

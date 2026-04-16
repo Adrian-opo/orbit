@@ -13,6 +13,46 @@ use crate::providers::{ProviderRegistry, ProviderSpawnConfig};
 use crate::services::database::DatabaseService;
 
 /// Reads `.git/HEAD` to detect the current branch without spawning a subprocess.
+/// Write `.mcp.json` in the project directory so agents can use orbit-mcp tools.
+/// Skips if the file already exists (user may have customized it).
+fn ensure_mcp_config(cwd: &str) {
+    let config_path = Path::new(cwd).join(".mcp.json");
+    if config_path.exists() {
+        return;
+    }
+
+    let mcp_bin = find_orbit_mcp().unwrap_or_else(|| "orbit-mcp".to_string());
+    let config = serde_json::json!({
+        "mcpServers": {
+            "orbit": {
+                "command": mcp_bin
+            }
+        }
+    });
+
+    if let Ok(content) = serde_json::to_string_pretty(&config) {
+        let _ = std::fs::write(&config_path, content);
+    }
+}
+
+/// Find the orbit-mcp binary: next to current exe, or in PATH.
+fn find_orbit_mcp() -> Option<String> {
+    if let Ok(exe) = std::env::current_exe() {
+        let name = if cfg!(windows) {
+            "orbit-mcp.exe"
+        } else {
+            "orbit-mcp"
+        };
+        if let Some(dir) = exe.parent() {
+            let sibling = dir.join(name);
+            if sibling.is_file() {
+                return Some(sibling.to_string_lossy().into_owned());
+            }
+        }
+    }
+    crate::services::spawn_manager::find_cli_in_path("orbit-mcp")
+}
+
 fn detect_git_branch(cwd: &str) -> Option<String> {
     let head = std::fs::read_to_string(Path::new(cwd).join(".git/HEAD")).ok()?;
     head.trim()
@@ -40,6 +80,7 @@ pub struct SessionStateEvent {
     pub subagents: Vec<crate::models::SubagentInfo>,
     pub model: Option<String>,
     pub context_window: Option<u64>,
+    pub attention: crate::models::AttentionState,
 }
 
 struct ActiveSession {
@@ -161,6 +202,10 @@ impl SessionManager {
             mini_log: None,
             ssh_host: ssh_host.map(|s| s.to_string()),
             ssh_user: ssh_user.map(|s| s.to_string()),
+            attention: None,
+            skip_permissions: true,
+            parent_session_id: None,
+            depth: 0,
         };
 
         // Persist SSH password encrypted to DB (api_key saved separately via set_api_key)
@@ -199,7 +244,18 @@ impl SessionManager {
         registry: &ProviderRegistry,
     ) {
         // 1. Read session data from the active map
-        let (db, cwd, model, provider_id, effort, resume_id, extra_env, spawn_mode, ssh_password) = {
+        let (
+            db,
+            cwd,
+            model,
+            provider_id,
+            effort,
+            resume_id,
+            extra_env,
+            spawn_mode,
+            ssh_password,
+            skip_permissions,
+        ) = {
             let m = manager.read().unwrap_or_else(|e| e.into_inner());
             let a = match m.active.get(&session_id) {
                 Some(a) => a,
@@ -252,6 +308,7 @@ impl SessionManager {
                 env,
                 spawn_mode,
                 ssh_password,
+                a.session.skip_permissions,
             )
         };
 
@@ -327,12 +384,29 @@ impl SessionManager {
             effort,
             spawn_mode,
             ssh_password,
+            skip_permissions,
         };
+
+        // Write .mcp.json so the agent can use orbit-mcp tools for orchestration
+        let is_local = matches!(&spawn_config.spawn_mode, crate::services::ssh::SpawnMode::Local);
+        if is_local {
+            ensure_mcp_config(&cwd);
+        }
 
         let handle = match provider.spawn(spawn_config) {
             Ok(h) => h,
             Err(e) => {
                 let _ = db.update_session_status(session_id, crate::models::SessionStatus::Error);
+                {
+                    let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
+                    if let Some(a) = m.active.get_mut(&session_id) {
+                        a.session.attention = Some(crate::models::AttentionState {
+                            requires_attention: true,
+                            reason: Some(crate::models::AttentionReason::Error),
+                            since: Some(chrono::Utc::now().to_rfc3339()),
+                        });
+                    }
+                }
                 let _ = app.emit(
                     "session:error",
                     serde_json::json!({
@@ -345,6 +419,7 @@ impl SessionManager {
 
         // 5. Stderr monitoring for rate limit detection
         let app_err = app.clone();
+        let manager_err = Arc::clone(&manager);
         let stderr_reader = handle.stderr;
         std::thread::spawn(move || {
             use std::io::BufRead;
@@ -362,6 +437,29 @@ impl SessionManager {
                         if trimmed.contains("rate_limit_error")
                             || trimmed.contains("overloaded_error")
                         {
+                            // Set attention for rate limit
+                            let mut m =
+                                manager_err.write().unwrap_or_else(|e| e.into_inner());
+                            if let Some(a) = m.active.get_mut(&session_id) {
+                                a.session.attention =
+                                    Some(crate::models::AttentionState {
+                                        requires_attention: true,
+                                        reason: Some(
+                                            crate::models::AttentionReason::RateLimit,
+                                        ),
+                                        since: Some(chrono::Utc::now().to_rfc3339()),
+                                    });
+                            }
+                            if let Some(state) = m.journal_states.get_mut(&session_id) {
+                                state.attention = crate::models::AttentionState {
+                                    requires_attention: true,
+                                    reason: Some(
+                                        crate::models::AttentionReason::RateLimit,
+                                    ),
+                                    since: Some(chrono::Utc::now().to_rfc3339()),
+                                };
+                            }
+                            drop(m);
                             let _ = app_err.emit(
                                 "session:rate-limit",
                                 serde_json::json!({ "sessionId": session_id }),
@@ -541,6 +639,12 @@ impl SessionManager {
                         let prev_len = state.entries.len();
                         let prev_model = state.model.clone();
                         line_processor(state, &trimmed);
+                        // Assign seq/epoch to new entries
+                        for entry in &mut state.entries[prev_len..] {
+                            entry.seq = state.next_seq;
+                            entry.epoch = state.epoch.clone();
+                            state.next_seq += 1;
+                        }
                         let new_entries: Vec<_> = state.entries[prev_len..].to_vec();
 
                         // Persist model to DB + active session when first detected
@@ -592,6 +696,7 @@ impl SessionManager {
                             subagents,
                             model: state.model.clone(),
                             context_window: state.context_window.or(Some(window)),
+                            attention: state.attention.clone(),
                         };
                         if let Some(ref model) = detected_model {
                             let _ = db.update_session_model(session_id, model);
@@ -606,6 +711,30 @@ impl SessionManager {
                     for entry in new_entries {
                         let mut e = entry.clone();
                         e.session_id = session_id.to_string();
+
+                        // Detect sub-agent spawns (Agent/Task tool calls)
+                        if e.entry_type == crate::models::JournalEntryType::ToolCall {
+                            if let Some(ref tool) = e.tool {
+                                if tool == "Agent" || tool == "Task" {
+                                    let desc = e
+                                        .tool_input
+                                        .as_ref()
+                                        .and_then(|v| v.get("description"))
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("subagent")
+                                        .to_string();
+                                    let _ = app.emit(
+                                        "session:subagent-created",
+                                        serde_json::json!({
+                                            "parentSessionId": session_id,
+                                            "description": desc,
+                                            "tool": tool,
+                                        }),
+                                    );
+                                }
+                            }
+                        }
+
                         let _ = app.emit(
                             "session:output",
                             SessionOutputEvent {
@@ -623,9 +752,19 @@ impl SessionManager {
             let mut m = manager.write().unwrap_or_else(|e| e.into_inner());
             if let Some(a) = m.active.get_mut(&session_id) {
                 a.session.status = crate::models::SessionStatus::Completed;
+                a.session.attention = Some(crate::models::AttentionState {
+                    requires_attention: true,
+                    reason: Some(crate::models::AttentionReason::Completed),
+                    since: Some(chrono::Utc::now().to_rfc3339()),
+                });
             }
             if let Some(state) = m.journal_states.get_mut(&session_id) {
                 state.status = AgentStatus::Idle;
+                state.attention = crate::models::AttentionState {
+                    requires_attention: true,
+                    reason: Some(crate::models::AttentionReason::Completed),
+                    since: Some(chrono::Utc::now().to_rfc3339()),
+                };
             }
             let _ = db.update_session_status(session_id, crate::models::SessionStatus::Completed);
         }
@@ -826,6 +965,24 @@ impl SessionManager {
     ) -> Result<(), String> {
         if let Some(a) = self.active.get_mut(&session_id) {
             a.effort = Some(effort.to_string());
+        }
+        Ok(())
+    }
+
+    pub fn clear_attention(&mut self, session_id: SessionId) -> Result<(), String> {
+        if let Some(a) = self.active.get_mut(&session_id) {
+            a.session.attention = Some(crate::models::AttentionState {
+                requires_attention: false,
+                reason: None,
+                since: None,
+            });
+        }
+        if let Some(state) = self.journal_states.get_mut(&session_id) {
+            state.attention = crate::models::AttentionState {
+                requires_attention: false,
+                reason: None,
+                since: None,
+            };
         }
         Ok(())
     }

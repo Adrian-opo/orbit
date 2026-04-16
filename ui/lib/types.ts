@@ -59,6 +59,8 @@ export interface JournalEntry {
   output: string | null;
   exitCode: number | null;
   linesChanged: { added: number; removed: number } | null;
+  seq: number;
+  epoch: string;
 }
 
 export interface SlashCommand {
@@ -75,6 +77,14 @@ export interface TaskItem {
   status: 'pending' | 'in_progress' | 'completed';
   blocks: string[];
   blockedBy: string[];
+}
+
+export type AttentionReason = 'permission' | 'completed' | 'error' | 'rateLimit';
+
+export interface AttentionState {
+  requiresAttention: boolean;
+  reason: AttentionReason | null;
+  since: string | null;
 }
 
 export interface UpdateInfo {

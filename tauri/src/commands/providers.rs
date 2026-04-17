@@ -51,7 +51,15 @@ pub fn get_providers(
             .unwrap_or(usize::MAX)
     });
 
-    let opencode_sub_providers = read_opencode_providers().unwrap_or_default();
+    let mut opencode_sub_providers = read_opencode_providers().unwrap_or_default();
+    // Merge custom providers from opencode.jsonc — skip IDs already present from cache
+    let jsonc_providers = read_opencode_jsonc_providers().unwrap_or_default();
+    for custom in jsonc_providers {
+        if !opencode_sub_providers.iter().any(|sp| sp.id == custom.id) {
+            opencode_sub_providers.push(custom);
+        }
+    }
+    opencode_sub_providers.sort_by(|a, b| a.name.cmp(&b.name));
 
     providers
         .iter()
@@ -376,6 +384,144 @@ fn read_opencode_providers() -> Option<Vec<SubProvider>> {
         .collect();
 
     result.sort_by(|a, b| a.name.cmp(&b.name));
+    Some(result)
+}
+
+/// Strip `//` line comments and `/* */` block comments from a JSONC string.
+///
+/// Tracks parser state to avoid stripping comment-like sequences inside JSON string literals.
+/// Newlines inside stripped line comments are preserved so line numbers stay accurate.
+fn strip_jsonc_comments(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+    let mut in_string = false;
+    let mut in_line_comment = false;
+    let mut in_block_comment = false;
+
+    while i < len {
+        let c = chars[i];
+        let next = if i + 1 < len {
+            Some(chars[i + 1])
+        } else {
+            None
+        };
+
+        if in_line_comment {
+            // Preserve the newline so line numbers stay intact, then exit comment mode
+            if c == '\n' {
+                in_line_comment = false;
+                out.push(c);
+            }
+            i += 1;
+            continue;
+        }
+
+        if in_block_comment {
+            if c == '*' && next == Some('/') {
+                in_block_comment = false;
+                i += 2;
+            } else {
+                // Preserve newlines inside block comments for the same reason
+                if c == '\n' {
+                    out.push(c);
+                }
+                i += 1;
+            }
+            continue;
+        }
+
+        if in_string {
+            out.push(c);
+            if c == '\\' && next.is_some() {
+                // Consume the escaped character so `\"` doesn't end the string
+                i += 1;
+                out.push(chars[i]);
+            } else if c == '"' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+
+        // Outside string and comment — check for comment starts
+        if c == '/' && next == Some('/') {
+            in_line_comment = true;
+            i += 2;
+            continue;
+        }
+        if c == '/' && next == Some('*') {
+            in_block_comment = true;
+            i += 2;
+            continue;
+        }
+        if c == '"' {
+            in_string = true;
+        }
+        out.push(c);
+        i += 1;
+    }
+
+    out
+}
+
+/// Read user-defined providers from `~/.config/opencode/opencode.jsonc`.
+///
+/// Returns `None` silently if the file is absent, unreadable, or unparseable —
+/// callers merge the result with the models.json cache via `unwrap_or_default()`.
+fn read_opencode_jsonc_providers() -> Option<Vec<SubProvider>> {
+    let home = dirs::home_dir()?;
+    let path = home.join(".config").join("opencode").join("opencode.jsonc");
+    let raw = std::fs::read_to_string(&path).ok()?;
+    let stripped = strip_jsonc_comments(&raw);
+    let data: serde_json::Value = serde_json::from_str(&stripped).ok()?;
+    let providers_obj = data.get("provider").and_then(|v| v.as_object())?;
+
+    let result = providers_obj
+        .iter()
+        .map(|(id, provider)| {
+            let name = provider
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or(id)
+                .to_string();
+
+            // Custom providers store their API key inline in options.apiKey, not in env vars
+            let configured = provider
+                .pointer("/options/apiKey")
+                .and_then(|v| v.as_str())
+                .is_some_and(|key| !key.is_empty());
+
+            let models: Vec<ModelInfo> = provider
+                .get("models")
+                .and_then(|v| v.as_object())
+                .map(|m| {
+                    m.iter()
+                        .map(|(mid, mval)| ModelInfo {
+                            id: mid.clone(),
+                            name: mval
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or(mid)
+                                .to_string(),
+                            context: mval.pointer("/limit/context").and_then(|v| v.as_u64()),
+                            output: mval.pointer("/limit/output").and_then(|v| v.as_u64()),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            SubProvider {
+                id: id.clone(),
+                name,
+                env: vec![],
+                configured,
+                models,
+            }
+        })
+        .collect();
+
     Some(result)
 }
 

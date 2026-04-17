@@ -22,7 +22,7 @@
 ## Features
 
 - **Multi-provider** — run Claude Code, Codex, and OpenCode sessions side by side
-- **Split panes** — view up to 4 sessions simultaneously in a 2x2 grid
+- **Split panes** — view multiple sessions simultaneously with drag-and-drop layout
 - **SSH remote sessions** — run sessions on remote servers via SSH with any provider, key-based auth
 - **Git worktree** — isolate each session in its own branch, works locally and via SSH
 - **MCP orchestrator** — built-in MCP server lets any agent spawn other agents across providers

@@ -36,22 +36,30 @@ fn ensure_mcp_config(cwd: &str) {
     }
 }
 
-/// Find the orbit-mcp binary: next to current exe, or in PATH.
+/// Find the orbit-mcp binary: next to current exe (with or without target triple), or in PATH.
 fn find_orbit_mcp() -> Option<String> {
     if let Ok(exe) = std::env::current_exe() {
-        let name = if cfg!(windows) {
-            "orbit-mcp.exe"
-        } else {
-            "orbit-mcp"
-        };
         if let Some(dir) = exe.parent() {
-            let sibling = dir.join(name);
-            if sibling.is_file() {
-                return Some(sibling.to_string_lossy().into_owned());
+            let ext = if cfg!(windows) { ".exe" } else { "" };
+            // Tauri sidecar: orbit-mcp-<triple>[.exe]
+            let triple = current_target_triple();
+            let sidecar_name = format!("orbit-mcp-{triple}{ext}");
+            let sidecar = dir.join(&sidecar_name);
+            if sidecar.is_file() {
+                return Some(sidecar.to_string_lossy().into_owned());
+            }
+            // Dev build: orbit-mcp[.exe]
+            let plain = dir.join(format!("orbit-mcp{ext}"));
+            if plain.is_file() {
+                return Some(plain.to_string_lossy().into_owned());
             }
         }
     }
     crate::services::spawn_manager::find_cli_in_path("orbit-mcp")
+}
+
+fn current_target_triple() -> &'static str {
+    env!("TARGET_TRIPLE")
 }
 
 fn detect_git_branch(cwd: &str) -> Option<String> {

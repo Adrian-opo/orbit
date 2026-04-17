@@ -2,38 +2,27 @@ use crate::ipc::IpcError;
 use std::path::Path;
 
 /// Find the orbit-mcp binary path. Checks:
-/// 1. Next to the current executable (production install)
-/// 2. In the cargo target directory (dev mode)
+/// 1. Tauri sidecar name (orbit-mcp-<triple>) next to exe
+/// 2. Plain name (orbit-mcp) next to exe (dev builds)
 /// 3. In PATH
 fn find_orbit_mcp() -> Option<String> {
-    // 1. Next to current exe
     if let Ok(exe) = std::env::current_exe() {
-        let sibling = exe.with_file_name(orbit_mcp_filename());
-        if sibling.is_file() {
-            return Some(sibling.to_string_lossy().into_owned());
-        }
-    }
-
-    // 2. Cargo target dir (dev)
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(target_dir) = exe.parent() {
-            let dev_path = target_dir.join(orbit_mcp_filename());
-            if dev_path.is_file() {
-                return Some(dev_path.to_string_lossy().into_owned());
+        if let Some(dir) = exe.parent() {
+            let ext = if cfg!(windows) { ".exe" } else { "" };
+            // Tauri sidecar: orbit-mcp-<triple>[.exe]
+            let triple = env!("TARGET_TRIPLE");
+            let sidecar = dir.join(format!("orbit-mcp-{triple}{ext}"));
+            if sidecar.is_file() {
+                return Some(sidecar.to_string_lossy().into_owned());
+            }
+            // Dev build: orbit-mcp[.exe]
+            let plain = dir.join(format!("orbit-mcp{ext}"));
+            if plain.is_file() {
+                return Some(plain.to_string_lossy().into_owned());
             }
         }
     }
-
-    // 3. PATH lookup
     crate::services::spawn_manager::find_cli_in_path("orbit-mcp")
-}
-
-fn orbit_mcp_filename() -> &'static str {
-    if cfg!(windows) {
-        "orbit-mcp.exe"
-    } else {
-        "orbit-mcp"
-    }
 }
 
 /// Write `.mcp.json` to a project directory, configuring orbit-mcp as an MCP server.

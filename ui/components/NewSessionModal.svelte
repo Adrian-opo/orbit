@@ -2,7 +2,7 @@
   import { onMount, createEventDispatcher } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import { createSession, getProviders, diagnoseProvider } from '../lib/tauri';
-  import { saveProviderKey } from '../lib/tauri/providers';
+  import { saveProviderKey, testSsh } from '../lib/tauri/providers';
   import { backends as backendsStore, providerCaps, getCaps } from '../lib/stores/providers';
   import type { ProviderDiagnostic } from '../lib/tauri';
   import { generateAgentName } from '../lib/android-names';
@@ -22,11 +22,19 @@
   let error = '';
   let diagRunning = false;
   let diag: ProviderDiagnostic | null = null;
+  let sshConnected = false;
+  let sshTestRunning = false;
   $: sshReady = !sshMode || (diag?.ssh?.ok && diag?.found && diag?.projectDirOk === true);
 
-  // Reset diag when SSH fields or path change so user must re-verify
+  // Reset SSH connection state when SSH fields change
   $: if (sshMode) {
-    void [sshHost, sshUser, sshKeyPath, path];
+    void [sshHost, sshUser, sshKeyPath];
+    sshConnected = false;
+    diag = null;
+  }
+  // Reset diag (but keep connection) when path changes
+  $: if (sshMode && sshConnected) {
+    void path;
     diag = null;
   }
   let agentName = '';
@@ -72,6 +80,23 @@
     resolvedAgent && resolvedProject
       ? `${resolvedAgent} · ${resolvedProject}`
       : resolvedAgent || resolvedProject;
+
+  async function testSshConnection() {
+    sshTestRunning = true;
+    error = '';
+    try {
+      const result = await testSsh(sshHost.trim(), sshUser.trim(), sshKeyPath.trim() || undefined);
+      if (result.ok) {
+        sshConnected = true;
+      } else {
+        error = `SSH: ${result.error}`;
+      }
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    } finally {
+      sshTestRunning = false;
+    }
+  }
 
   async function runDiag() {
     diagRunning = true;
@@ -186,25 +211,38 @@
   />
 
   {#if sshMode}
-    <SshFields bind:sshHost bind:sshUser bind:sshKeyPath {loading} />
+    <SshFields bind:sshHost bind:sshUser bind:sshKeyPath loading={loading || sshTestRunning} />
+    {#if !sshConnected}
+      <button
+        class="btn ghost ssh-connect-btn"
+        on:click={testSshConnection}
+        disabled={sshTestRunning || loading || !sshHost.trim() || !sshUser.trim()}
+      >
+        {sshTestRunning ? 'connecting...' : '⚡ connect'}
+      </button>
+    {:else}
+      <span class="ssh-ok">✓ connected to {sshHost}</span>
+    {/if}
   {/if}
 
-  <div class="field">
-    <label class="label" for="ns-path">{sshMode ? 'remote path' : 'path'}</label>
-    <div class="path-row">
-      <input
-        id="ns-path"
-        class="input"
-        bind:value={path}
-        placeholder={sshMode ? '/home/ubuntu/project' : '/home/user/project'}
-        disabled={loading}
-        on:keydown={(e) => e.key === 'Enter' && prompt && submit()}
-      />
-      {#if !sshMode}
-        <button class="browse" on:click={browse} disabled={loading} title="browse">⌘</button>
-      {/if}
+  {#if !sshMode || sshConnected}
+    <div class="field">
+      <label class="label" for="ns-path">{sshMode ? 'remote path' : 'path'}</label>
+      <div class="path-row">
+        <input
+          id="ns-path"
+          class="input"
+          bind:value={path}
+          placeholder={sshMode ? '/home/ubuntu/project' : '/home/user/project'}
+          disabled={loading}
+          on:keydown={(e) => e.key === 'Enter' && prompt && submit()}
+        />
+        {#if !sshMode}
+          <button class="browse" on:click={browse} disabled={loading} title="browse">⌘</button>
+        {/if}
+      </div>
     </div>
-  </div>
+  {/if}
 
   <div class="field">
     <label class="label" for="ns-prompt">prompt</label>
@@ -373,6 +411,16 @@
   .browse:hover {
     border-color: var(--bd2);
     color: var(--t0);
+  }
+
+  .ssh-connect-btn {
+    align-self: flex-start;
+    margin-top: calc(-1 * var(--sp-3));
+  }
+  .ssh-ok {
+    font-size: var(--sm);
+    color: var(--s-idle);
+    margin-top: calc(-1 * var(--sp-3));
   }
 
   .error {

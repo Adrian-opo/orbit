@@ -144,7 +144,7 @@
         model: resolveModel(),
         permissionMode: 'ignore',
         sessionName: finalName,
-        useWorktree: !sshMode ? useWorktree : false,
+        useWorktree,
         provider: resolvedProvider,
         apiKey: apiKeyForSession,
         sshHost: sshMode ? sshHost.trim() : undefined,
@@ -246,12 +246,10 @@
     {/if}
   </div>
 
-  {#if !sshMode}
-    <label class="toggle-row">
-      <input type="checkbox" bind:checked={useWorktree} disabled={loading} />
-      <span class="toggle-label">criar git worktree</span>
-    </label>
-  {/if}
+  <label class="toggle-row">
+    <input type="checkbox" bind:checked={useWorktree} disabled={loading} />
+    <span class="toggle-label">criar git worktree</span>
+  </label>
 
   <label class="toggle-row">
     <input type="checkbox" checked disabled />

@@ -164,8 +164,6 @@ impl SessionManager {
             )
             .map_err(|e| e.to_string())?;
 
-        let use_worktree = use_worktree && ssh_host.is_none();
-
         let (worktree_path_val, branch_name_val) = if use_worktree {
             let full_name = session_name.unwrap_or(&project_name);
             let (prefix, suffix) = full_name.split_once(" · ").unwrap_or((full_name, ""));
@@ -180,12 +178,25 @@ impl SessionManager {
             } else {
                 format!("{prefix_slug}-{suffix_compact}-{session_id}")
             };
-            let wt_path = crate::services::worktree::create_worktree(
-                std::path::Path::new(project_path),
-                &slug,
-            )?;
-            let branch = format!("orbit/{slug}");
-            let wt_str = wt_path.to_string_lossy().to_string();
+            let (wt_str, branch) = if let (Some(host), Some(user)) = (ssh_host, ssh_user) {
+                let remote_path = crate::services::worktree::create_worktree_remote(
+                    host,
+                    user,
+                    ssh_key_path.as_deref(),
+                    project_path,
+                    &slug,
+                )?;
+                let branch = format!("orbit/{slug}");
+                (remote_path, branch)
+            } else {
+                let wt_path = crate::services::worktree::create_worktree(
+                    std::path::Path::new(project_path),
+                    &slug,
+                )?;
+                let branch = format!("orbit/{slug}");
+                let wt_str = wt_path.to_string_lossy().to_string();
+                (wt_str, branch)
+            };
             let _ = self
                 .db
                 .update_session_worktree(session_id, &wt_str, &branch);

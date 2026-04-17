@@ -1,6 +1,36 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Creates a git worktree on a remote host via SSH.
+/// Returns the remote path to the created worktree.
+pub fn create_worktree_remote(
+    host: &str,
+    user: &str,
+    ssh_key_path: Option<&str>,
+    remote_project_path: &str,
+    slug: &str,
+) -> Result<String, String> {
+    let worktree_path = format!("{remote_project_path}/.worktrees/{slug}");
+    let branch_name = format!("orbit/{slug}");
+    let script = format!(
+        "git -C {remote_project_path} worktree add {worktree_path} -b {branch_name}",
+    );
+
+    let (child, _guard) = super::ssh::spawn_via_ssh(host, user, ssh_key_path, &script)
+        .map_err(|e| format!("failed to spawn ssh: {e}"))?;
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("ssh command failed: {e}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(stderr.trim().to_string());
+    }
+
+    Ok(worktree_path)
+}
+
 /// Converts a session name into a valid git branch slug.
 /// "hammerhead · orbit" → "hammerhead-orbit"
 pub fn generate_branch_slug(name: &str) -> String {

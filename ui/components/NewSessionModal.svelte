@@ -113,18 +113,7 @@
           sshKeyPath: sshKeyPath.trim() || undefined,
         });
         diag = d;
-        if (!d.ssh?.ok) {
-          error = `SSH connection failed: ${d.ssh?.error ?? 'unknown error'}`;
-          loading = false;
-          return;
-        }
-        if (!d.found) {
-          error = `${d.cliName} not found on remote host`;
-          loading = false;
-          return;
-        }
-        if (d.projectDirOk === false) {
-          error = `remote path not found: ${path.trim()}`;
+        if (!d.ssh?.ok || !d.found || d.projectDirOk === false) {
           loading = false;
           return;
         }

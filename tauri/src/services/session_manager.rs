@@ -18,18 +18,20 @@ use crate::services::database::DatabaseService;
 /// Skips if the file already exists (user may have customized it).
 fn ensure_mcp_config(cwd: &str) {
     let config_path = Path::new(cwd).join(".mcp.json");
-    if config_path.exists() {
-        return;
-    }
-
     let mcp_bin = find_orbit_mcp().unwrap_or_else(|| "orbit-mcp".to_string());
-    let config = serde_json::json!({
-        "mcpServers": {
-            "orbit": {
-                "command": mcp_bin
-            }
-        }
-    });
+
+    // Read existing config and merge — preserve user-added MCP servers
+    let mut config: serde_json::Value = if config_path.exists() {
+        std::fs::read_to_string(&config_path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_else(|| serde_json::json!({ "mcpServers": {} }))
+    } else {
+        serde_json::json!({ "mcpServers": {} })
+    };
+
+    // Always update orbit server path (may have changed between dev/prod installs)
+    config["mcpServers"]["orbit"] = serde_json::json!({ "command": mcp_bin });
 
     if let Ok(content) = serde_json::to_string_pretty(&config) {
         let _ = std::fs::write(&config_path, content);

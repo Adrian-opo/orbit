@@ -9,7 +9,12 @@
   export let status: string = '';
   export let provider: string = 'claude-code';
 
-  $: agentLabel = $backends.find((b) => b.id === provider)?.name.toLowerCase() ?? 'agent';
+  $: agentLabel = (() => {
+    const direct = $backends.find((b) => b.id === provider);
+    if (direct) return direct.name.toLowerCase();
+    const parent = $backends.find((b) => b.subProviders?.some((s) => s.id === provider));
+    return parent?.name.toLowerCase() ?? provider;
+  })();
 
   const dispatch = createEventDispatcher<{ bottomchange: { atBottom: boolean } }>();
 

@@ -434,9 +434,7 @@ impl SessionManager {
             }
         };
 
-        // 5. Stderr monitoring for rate limit detection
-        let app_err = app.clone();
-        let manager_err = Arc::clone(&manager);
+        // 5. Stderr drain — rate limit detection is handled by stdout rate_limit_event
         let stderr_reader = handle.stderr;
         std::thread::spawn(move || {
             use std::io::BufRead;
@@ -447,34 +445,11 @@ impl SessionManager {
                 match reader.read_line(&mut line) {
                     Ok(0) | Err(_) => break,
                     Ok(_) => {
-                        let trimmed = line.trim();
-                        if cfg!(debug_assertions) && !trimmed.is_empty() {
-                            eprintln!("[orbit:debug] stderr {session_id}: {trimmed}");
-                        }
-                        if trimmed.contains("rate_limit_error")
-                            || trimmed.contains("overloaded_error")
-                        {
-                            // Set attention for rate limit
-                            let mut m = manager_err.write().unwrap_or_else(|e| e.into_inner());
-                            if let Some(a) = m.active.get_mut(&session_id) {
-                                a.session.attention = Some(crate::models::AttentionState {
-                                    requires_attention: true,
-                                    reason: Some(crate::models::AttentionReason::RateLimit),
-                                    since: Some(chrono::Utc::now().to_rfc3339()),
-                                });
+                        if cfg!(debug_assertions) {
+                            let trimmed = line.trim();
+                            if !trimmed.is_empty() {
+                                eprintln!("[orbit:debug] stderr {session_id}: {trimmed}");
                             }
-                            if let Some(state) = m.journal_states.get_mut(&session_id) {
-                                state.attention = crate::models::AttentionState {
-                                    requires_attention: true,
-                                    reason: Some(crate::models::AttentionReason::RateLimit),
-                                    since: Some(chrono::Utc::now().to_rfc3339()),
-                                };
-                            }
-                            drop(m);
-                            let _ = app_err.emit(
-                                "session:rate-limit",
-                                serde_json::json!({ "sessionId": session_id }),
-                            );
                         }
                     }
                 }

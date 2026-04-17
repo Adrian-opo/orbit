@@ -24,11 +24,16 @@
   let diag: ProviderDiagnostic | null = null;
   let sshConnected = false;
   let sshTestRunning = false;
+  let sshAutoTimer: ReturnType<typeof setTimeout> | null = null;
   $: sshReady = !sshMode || (diag?.ssh?.ok && diag?.found && diag?.projectDirOk === true);
 
-  // Reset SSH connection state when SSH fields change
-  $: if (sshMode) {
-    void [sshHost, sshUser, sshKeyPath];
+  // Auto-test SSH when host+user are filled (debounced)
+  $: if (sshMode && sshHost.trim() && sshUser.trim()) {
+    sshConnected = false;
+    diag = null;
+    if (sshAutoTimer) clearTimeout(sshAutoTimer);
+    sshAutoTimer = setTimeout(() => testSshConnection(), 600);
+  } else if (sshMode) {
     sshConnected = false;
     diag = null;
   }
@@ -212,15 +217,9 @@
 
   {#if sshMode}
     <SshFields bind:sshHost bind:sshUser bind:sshKeyPath loading={loading || sshTestRunning} />
-    {#if !sshConnected}
-      <button
-        class="btn ghost ssh-connect-btn"
-        on:click={testSshConnection}
-        disabled={sshTestRunning || loading || !sshHost.trim() || !sshUser.trim()}
-      >
-        {sshTestRunning ? 'connecting...' : '⚡ connect'}
-      </button>
-    {:else}
+    {#if sshTestRunning}
+      <span class="ssh-status">connecting to {sshHost}…</span>
+    {:else if sshConnected}
       <span class="ssh-ok">✓ connected to {sshHost}</span>
     {/if}
   {/if}
@@ -413,8 +412,9 @@
     color: var(--t0);
   }
 
-  .ssh-connect-btn {
-    align-self: flex-start;
+  .ssh-status {
+    font-size: var(--sm);
+    color: var(--t3);
     margin-top: calc(-1 * var(--sp-3));
   }
   .ssh-ok {

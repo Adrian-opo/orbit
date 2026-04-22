@@ -4,6 +4,12 @@
 
 ## April 2026
 
+### 04/22 · Improvement — Better scrollbar visibility
+The feed scroller now uses a wider, more visible scrollbar so you can quickly grab and drag it. Scrollbar width increased from 3px to 7px, and the thumb color now clearly contrasts with the background.
+
+### 04/22 · Fix — Markdown code blocks wrap correctly
+User-sent code blocks no longer extend past the chat window. Instead, long lines wrap naturally so everything stays readable without horizontal scrolling.
+
 ### 04/22 · Improvement — Copy always copies the full file content
 The copy button on file tool calls (Read, Edit, Write) now reads the actual file from disk and copies its current complete content to the clipboard. Previously, copying an Edit only grabbed the small replacement snippet, leaving most of the file behind. A fallback keeps copying inline data when the file cannot be accessed (for example, in remote SSH sessions).
 

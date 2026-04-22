@@ -74,7 +74,7 @@
   // ── Chunk-based loading ────────────────────────────────────────────────────
   // Render the last PAGE_SIZE items. When the user scrolls to the top,
   // prepend another chunk. Normal browser scroll — no spacers, no height cache.
-  const PAGE_SIZE = 50;
+  const PAGE_SIZE = 200;
 
   let visibleFrom = 0; // index into display[] from which we render
   let isAtBottom = true;

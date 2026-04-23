@@ -280,33 +280,48 @@
             {/if}
           </div>
         </button>
-        {#if expanded}
-          {#each children as c (c.id)}
-            {@const cActive = Object.values($workspace.panes).some((p) => p.sessionId === c.id)}
-            {@const cColor = statusColor(c.status)}
-            {@const cPulsing = isPulsing(c.status)}
-            <button
-              class="item child"
-              class:active={cActive}
-              on:click={() => {
-                const ws = get(workspace);
-                if (ws.focusedPaneId) assignSession(ws.focusedPaneId, c.id);
-                if (c.attention?.requiresAttention) clearAttention(c.id);
-              }}
-              on:contextmenu={(e) => onContextMenu(e, c)}
-            >
-              <div class="item-top">
-                <span class="dot" style="color:{cColor}" class:pulse={cPulsing}>●</span>
-                <span class="name">{displayName(c)}</span>
-                <span class="status" style="color:{cColor}">{statusLabel(c.status)}</span>
-              </div>
-              <div class="item-meta">
-                <span title={c.model ?? ''}>{fmtModel(c.model)}</span>
-                <span class="sep">·</span>
-                <span>{fmtTokens(c)}</span>
-              </div>
-            </button>
-          {/each}
+        {#if expanded && children.length > 0}
+          <div class="cards">
+            {#each children as c (c.id)}
+              {@const cActive = Object.values($workspace.panes).some((p) => p.sessionId === c.id)}
+              {@const cColor = statusColor(c.status)}
+              {@const cPulsing = isPulsing(c.status)}
+              {@const pct = c.contextPercent ?? 0}
+              <button
+                class="card"
+                class:active={cActive}
+                style="--card-color:{cColor}"
+                draggable="true"
+                on:dragstart={(e) => {
+                  e.dataTransfer?.setData('text/plain', JSON.stringify({ sessionId: c.id }));
+                }}
+                on:click={() => {
+                  const ws = get(workspace);
+                  if (ws.focusedPaneId) assignSession(ws.focusedPaneId, c.id);
+                  if (c.attention?.requiresAttention) clearAttention(c.id);
+                }}
+                on:contextmenu={(e) => onContextMenu(e, c)}
+              >
+                <div class="card-top">
+                  <span class="card-dot" class:pulse={cPulsing}>●</span>
+                  <span class="card-name">{displayName(c)}</span>
+                  <span class="card-status" style="color:{cColor}">{statusLabel(c.status)}</span>
+                </div>
+                <div class="card-meta">
+                  <span>{fmtModel(c.model)}</span>
+                  {#if c.provider === 'claude-code'}
+                    <span class="sep">·</span>
+                    <span>{sessionEffort.get($sessionEffort, String(c.id))}</span>
+                  {/if}
+                  <span class="sep">·</span>
+                  <span>{fmtTokens(c)}</span>
+                </div>
+                <div class="card-bar">
+                  <div class="card-fill" style="width:{Math.min(pct, 100)}%"></div>
+                </div>
+              </button>
+            {/each}
+          </div>
         {/if}
       {/each}
     {/if}
@@ -453,23 +468,85 @@
   .item.has-children.expanded .item-meta::after {
     transform: rotate(90deg);
   }
-  .item.child {
-    padding-left: calc(var(--sp-6) + 16px);
-    background: var(--bg0);
-    border-bottom: none;
-  }
-  .item.child + .item.child {
-    border-top: 1px solid color-mix(in srgb, var(--bd), transparent 50%);
-  }
-  .item.child:last-child {
+
+  .cards {
+    padding: var(--sp-3) var(--sp-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
     border-bottom: 1px solid var(--bd);
+    background: var(--bg0);
   }
-  .item.child.active {
+  .card {
+    background: var(--bg1);
+    border: 1px solid var(--bd);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-3) var(--sp-4);
+    cursor: pointer;
+    text-align: left;
+    transition:
+      background 0.1s,
+      border-color 0.15s,
+      box-shadow 0.15s;
+  }
+  .card:hover {
+    background: var(--bg2);
+    border-color: var(--bd1);
+  }
+  .card.active {
     background: var(--ac-d2);
-    padding-left: calc(var(--sp-5) + 16px);
+    border-color: var(--ac);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ac), transparent 70%);
   }
-  .item.child .item-meta {
-    padding-left: calc(var(--sp-7) + 4px);
+  .card-top {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+  .card-dot {
+    font-size: 6px;
+    color: var(--card-color);
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .card-dot.pulse {
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .card-name {
+    font-size: var(--xs);
+    color: var(--t0);
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .card-status {
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: 10px;
+    color: var(--t2);
+    margin-top: 2px;
+  }
+  .card-bar {
+    margin-top: var(--sp-2);
+    height: 2px;
+    background: var(--bg0);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .card-fill {
+    height: 100%;
+    background: var(--card-color);
+    border-radius: 1px;
+    transition: width 0.3s ease;
   }
 
   .item-top {
@@ -518,7 +595,6 @@
     gap: var(--sp-2);
     font-size: var(--xs);
     color: var(--t2);
-    padding-left: var(--sp-7);
   }
   .confirm-overlay {
     position: fixed;

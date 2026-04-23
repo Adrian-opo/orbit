@@ -59,7 +59,7 @@
     {/if}
     {#if caps.supportsSubagents}
       <button class="tab" class:active={tab === 'agents'} on:click={() => (tab = 'agents')}
-        >sub-agents</button
+        >s-agents</button
       >
     {/if}
     <span class="tabs-spacer"></span>

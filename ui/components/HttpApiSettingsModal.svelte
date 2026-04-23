@@ -30,12 +30,14 @@
   let qrSvg = '';
 
   $: accessUrl =
-    enabled && lanIp && keys.length > 0
-      ? `http://${lanIp}:${port}?token=${justCreatedKey?.key ?? 'YOUR_KEY'}`
+    enabled && lanIp && justCreatedKey
+      ? `http://${lanIp}:${port}?token=${justCreatedKey.key}`
       : '';
 
-  $: if (accessUrl && justCreatedKey) {
-    qrSvg = generateQrSvg(accessUrl, 180);
+  $: if (accessUrl) {
+    generateQrSvg(accessUrl, 200).then((svg) => (qrSvg = svg));
+  } else {
+    qrSvg = '';
   }
 
   onMount(async () => {
@@ -192,7 +194,7 @@
     {/if}
   </div>
 
-  {#if enabled && justCreatedKey && lanIp}
+  {#if qrSvg}
     <div class="divider"></div>
 
     <div class="section">
@@ -436,7 +438,10 @@
     flex-shrink: 0;
     border-radius: var(--radius-sm);
     overflow: hidden;
-    border: 1px solid var(--bd1);
+    background: #ffffff;
+    padding: 4px;
+    width: 200px;
+    height: 200px;
   }
   .qr-info {
     display: flex;

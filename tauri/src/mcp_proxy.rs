@@ -100,10 +100,7 @@ fn inject_orbit_context(line: &str, orbit_sid: Option<i64>) -> String {
         "initialize" => {
             if let Some(params) = msg.get_mut("params") {
                 if let Some(obj) = params.as_object_mut() {
-                    obj.insert(
-                        "_orbitSessionId".into(),
-                        Value::Number(parent.into()),
-                    );
+                    obj.insert("_orbitSessionId".into(), Value::Number(parent.into()));
                 }
             } else {
                 msg.as_object_mut().map(|o| {
@@ -115,16 +112,13 @@ fn inject_orbit_context(line: &str, orbit_sid: Option<i64>) -> String {
             }
         }
         "tools/call" => {
-            let is_create = msg.pointer("/params/name")
-                == Some(&Value::String("orbit_create_agent".into()));
+            let is_create =
+                msg.pointer("/params/name") == Some(&Value::String("orbit_create_agent".into()));
             if is_create {
                 if let Some(args) = msg.pointer_mut("/params/arguments") {
                     if args.get("parentSessionId").is_none() {
                         args.as_object_mut().map(|o| {
-                            o.insert(
-                                "parentSessionId".into(),
-                                Value::Number(parent.into()),
-                            )
+                            o.insert("parentSessionId".into(), Value::Number(parent.into()))
                         });
                     }
                 }
@@ -498,8 +492,7 @@ pub mod standalone {
         );
 
         if wait {
-            let deadline =
-                std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
             loop {
                 if *finished.lock().unwrap() {
                     break;
@@ -582,8 +575,7 @@ pub mod standalone {
         let _ = child.wait();
 
         let cli_name = provider_to_cli(&old_agent.provider);
-        let cli_path =
-            find_cli(cli_name).ok_or_else(|| format!("{cli_name} not found in PATH"))?;
+        let cli_path = find_cli(cli_name).ok_or_else(|| format!("{cli_name} not found in PATH"))?;
 
         let mut args = vec![];
         match old_agent.provider.as_str() {

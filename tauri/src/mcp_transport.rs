@@ -22,9 +22,7 @@ fn socket_name() -> interprocess::local_socket::Name<'static> {
 }
 
 impl McpTransport {
-    pub fn start(
-        handler: Arc<dyn Fn(&str) -> String + Send + Sync + 'static>,
-    ) -> Self {
+    pub fn start(handler: Arc<dyn Fn(&str) -> String + Send + Sync + 'static>) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
         let stop_clone = Arc::clone(&stop);
 

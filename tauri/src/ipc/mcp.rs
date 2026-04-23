@@ -69,14 +69,8 @@ impl McpHandler {
             "tools/list" => jsonrpc_ok(id, json!({ "tools": tools_schema() })),
 
             "tools/call" => {
-                let name = params
-                    .get("name")
-                    .and_then(|n| n.as_str())
-                    .unwrap_or("");
-                let args = params
-                    .get("arguments")
-                    .cloned()
-                    .unwrap_or(json!({}));
+                let name = params.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                let args = params.get("arguments").cloned().unwrap_or(json!({}));
                 self.dispatch_tool(id, name, args)
             }
 
@@ -143,8 +137,12 @@ impl McpHandler {
 
         if let Some(pid) = provider_id {
             if self.registry.get(pid).is_none() {
-                let available: Vec<String> =
-                    self.registry.all().iter().map(|p| p.id().to_string()).collect();
+                let available: Vec<String> = self
+                    .registry
+                    .all()
+                    .iter()
+                    .map(|p| p.id().to_string())
+                    .collect();
                 return Err(format!(
                     "Unknown provider \"{pid}\". Available: {}",
                     available.join(", ")
@@ -207,8 +205,7 @@ impl McpHandler {
             }));
         }
 
-        let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
         loop {
             std::thread::sleep(std::time::Duration::from_millis(500));
 
@@ -217,40 +214,38 @@ impl McpHandler {
                 .read()
                 .unwrap_or_else(|e| e.into_inner());
 
-            let status = m
-                .db
-                .get_session(session_id)
-                .ok()
-                .flatten()
-                .map(|s| s.status)
-                .unwrap_or(SessionStatus::Error);
+            let status =
+                m.db.get_session(session_id)
+                    .ok()
+                    .flatten()
+                    .map(|s| s.status)
+                    .unwrap_or(SessionStatus::Error);
 
             let is_terminal = matches!(
                 status,
                 SessionStatus::Completed | SessionStatus::Stopped | SessionStatus::Error
             );
 
-            let (tokens, context_percent) =
-                if let Some(js) = m.journal_states.get(&session_id) {
-                    let window = js.context_window.unwrap_or(200_000);
-                    let total = js.input_tokens + js.cache_read;
-                    let pct = if window > 0 {
-                        (total as f64 / window as f64) * 100.0
-                    } else {
-                        0.0
-                    };
-                    (
-                        json!({
-                            "input": js.input_tokens,
-                            "output": js.output_tokens,
-                            "cacheRead": js.cache_read,
-                            "cacheWrite": js.cache_write,
-                        }),
-                        pct,
-                    )
+            let (tokens, context_percent) = if let Some(js) = m.journal_states.get(&session_id) {
+                let window = js.context_window.unwrap_or(200_000);
+                let total = js.input_tokens + js.cache_read;
+                let pct = if window > 0 {
+                    (total as f64 / window as f64) * 100.0
                 } else {
-                    (json!(null), 0.0)
+                    0.0
                 };
+                (
+                    json!({
+                        "input": js.input_tokens,
+                        "output": js.output_tokens,
+                        "cacheRead": js.cache_read,
+                        "cacheWrite": js.cache_write,
+                    }),
+                    pct,
+                )
+            } else {
+                (json!(null), 0.0)
+            };
 
             drop(m);
 
@@ -305,11 +300,10 @@ impl McpHandler {
             .read()
             .unwrap_or_else(|e| e.into_inner());
 
-        let session = m
-            .db
-            .get_session(session_id)
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| format!("Session {session_id} not found"))?;
+        let session =
+            m.db.get_session(session_id)
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| format!("Session {session_id} not found"))?;
 
         let (tokens, context_percent, mini_log) =
             if let Some(js) = m.journal_states.get(&session_id) {
@@ -334,11 +328,7 @@ impl McpHandler {
                 (json!(null), 0.0, vec![])
             };
 
-        let claude_sid = m
-            .db
-            .get_claude_session_id(session_id)
-            .ok()
-            .flatten();
+        let claude_sid = m.db.get_claude_session_id(session_id).ok().flatten();
 
         drop(m);
 
@@ -389,10 +379,9 @@ impl McpHandler {
             .unwrap_or_else(|e| e.into_inner())
             .stop_session(session_id)?;
 
-        let _ = self.app.emit(
-            "session:stopped",
-            json!({ "sessionId": session_id }),
-        );
+        let _ = self
+            .app
+            .emit("session:stopped", json!({ "sessionId": session_id }));
 
         Ok(json!({ "sessionId": session_id, "status": "stopped" }))
     }
@@ -427,14 +416,11 @@ impl McpHandler {
             .read()
             .unwrap_or_else(|e| e.into_inner());
 
-        let claude_sid = m
-            .db
-            .get_claude_session_id(session_id)
-            .ok()
-            .flatten()
-            .ok_or_else(|| {
-                format!("No Claude session ID found for session {session_id}")
-            })?;
+        let claude_sid =
+            m.db.get_claude_session_id(session_id)
+                .ok()
+                .flatten()
+                .ok_or_else(|| format!("No Claude session ID found for session {session_id}"))?;
 
         drop(m);
 

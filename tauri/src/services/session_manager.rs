@@ -339,10 +339,7 @@ impl SessionManager {
             let pid_str = a.session.provider.clone();
 
             let mut env = vec![];
-            env.push((
-                "ORBIT_SESSION_ID".to_string(),
-                session_id.to_string(),
-            ));
+            env.push(("ORBIT_SESSION_ID".to_string(), session_id.to_string()));
             if let Some(ref key) = a.api_key {
                 let var_name = format!("{}_API_KEY", pid_str.to_uppercase().replace('-', "_"));
                 env.push((var_name, key.clone()));
@@ -924,8 +921,7 @@ impl SessionManager {
         if let Some(a) = self.active.get(&session_id) {
             if let Some(pid) = a.session.pid {
                 kill_pid(pid as u32);
-                let pid_file =
-                    std::env::temp_dir().join(format!("orbit-session-{pid}.id"));
+                let pid_file = std::env::temp_dir().join(format!("orbit-session-{pid}.id"));
                 let _ = std::fs::remove_file(pid_file);
             }
         }

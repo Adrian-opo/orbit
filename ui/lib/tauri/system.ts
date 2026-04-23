@@ -1,4 +1,3 @@
-import { getVersion as _getVersion } from '@tauri-apps/api/app';
 import type { UpdateInfo } from '../types';
 import { invoke, IS_MOCK, IS_WEB } from './invoke';
 
@@ -44,7 +43,8 @@ export async function diagnoseSpawn(): Promise<SpawnDiagnostic> {
 
 export async function getAppVersion(): Promise<string> {
   if (IS_MOCK || IS_WEB) return '0.0.0';
-  return _getVersion();
+  const { getVersion } = await import('@tauri-apps/api/app');
+  return getVersion();
 }
 
 export async function checkUpdate(): Promise<UpdateInfo | null> {

@@ -30,9 +30,7 @@
   let qrSvg = '';
 
   $: accessUrl =
-    enabled && lanIp && justCreatedKey
-      ? `http://${lanIp}:${port}?token=${justCreatedKey.key}`
-      : '';
+    enabled && lanIp && justCreatedKey ? `http://${lanIp}:${port}?token=${justCreatedKey.key}` : '';
 
   $: if (accessUrl) {
     generateQrSvg(accessUrl, 200).then((svg) => (qrSvg = svg));

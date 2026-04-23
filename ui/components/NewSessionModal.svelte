@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
-  import { open } from '@tauri-apps/plugin-dialog';
+  import { HAS_TAURI } from '../lib/tauri/invoke';
   import { createSession, getProviders, diagnoseProvider } from '../lib/tauri';
   import { saveProviderKey } from '../lib/tauri/providers';
   import { backends as backendsStore, providerCaps, getCaps } from '../lib/stores/providers';
@@ -66,6 +66,8 @@
       : resolvedAgent || resolvedProject;
 
   async function browse() {
+    if (!HAS_TAURI) return;
+    const { open } = await import('@tauri-apps/plugin-dialog');
     const sel = await open({ directory: true, multiple: false });
     if (sel && typeof sel === 'string') path = sel;
   }

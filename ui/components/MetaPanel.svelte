@@ -57,9 +57,11 @@
         >tasks</button
       >
     {/if}
-    <button class="tab" class:active={tab === 'agents'} on:click={() => (tab = 'agents')}
-      >agents</button
-    >
+    {#if caps.supportsSubagents}
+      <button class="tab" class:active={tab === 'agents'} on:click={() => (tab = 'agents')}
+        >sub-agents</button
+      >
+    {/if}
     <span class="tabs-spacer"></span>
     <button class="collapse-btn" on:click={() => metaPanelVisible.set(false)} title="Hide panel"
       >›</button

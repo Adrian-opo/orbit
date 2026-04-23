@@ -696,11 +696,10 @@ impl SessionManager {
                             .active
                             .get(&session_id)
                             .and_then(|a| a.claude_session_id.clone());
-                        let mut subagents = claude_session_id
+                        let subagents = claude_session_id
                             .as_deref()
                             .map(crate::agent_tree::read_subagents)
                             .unwrap_or_default();
-                        subagents.extend(m.get_mcp_subagents(session_id));
 
                         let state = m.journal_states.entry(session_id).or_default();
 

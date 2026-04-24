@@ -13,7 +13,7 @@ pub struct ProviderSpawnConfig {
     pub prompt: String,
     pub resume_id: Option<String>,
     pub extra_env: Vec<(String, String)>,
-    /// Effort level for thinking (low, medium, high, max). Only used by Claude Code.
+    /// Effort level for thinking. Only used by providers that support it.
     pub effort: Option<String>,
     /// How to spawn: locally or via SSH tunnel.
     pub spawn_mode: crate::services::ssh::SpawnMode,

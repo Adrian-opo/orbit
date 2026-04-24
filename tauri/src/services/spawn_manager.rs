@@ -324,6 +324,21 @@ pub struct CodexConfig {
     pub skip_permissions: bool,
 }
 
+pub(crate) fn codex_model_args(model: &str) -> Option<[String; 2]> {
+    if model.is_empty() || model == "auto" {
+        None
+    } else {
+        Some(["-m".to_string(), model.to_string()])
+    }
+}
+
+pub(crate) fn codex_effort_config_args(effort: &str) -> [String; 2] {
+    [
+        "--config".to_string(),
+        format!("model_reasoning_effort=\"{}\"", effort.replace('"', "\\\"")),
+    ]
+}
+
 pub(crate) fn prompt_requires_stdin(prompt: &str) -> bool {
     cfg!(windows) || prompt.contains('\n')
 }
@@ -419,9 +434,11 @@ pub fn spawn_codex(config: CodexConfig) -> Result<SpawnHandle, String> {
             cmd.arg("--dangerously-bypass-approvals-and-sandbox");
         }
         if let Some(ref effort) = config.effort {
-            cmd.args(["--config", &format!("model_reasoning_effort=\"{effort}\"")]);
+            cmd.args(codex_effort_config_args(effort));
         }
-        cmd.args(["-m", &config.model]);
+        if let Some(args) = codex_model_args(&config.model) {
+            cmd.args(args);
+        }
         cmd.arg(sid);
         if use_stdin {
             cmd.arg("-");
@@ -434,9 +451,11 @@ pub fn spawn_codex(config: CodexConfig) -> Result<SpawnHandle, String> {
             cmd.arg("--dangerously-bypass-approvals-and-sandbox");
         }
         if let Some(ref effort) = config.effort {
-            cmd.args(["--config", &format!("model_reasoning_effort=\"{effort}\"")]);
+            cmd.args(codex_effort_config_args(effort));
         }
-        cmd.args(["-m", &config.model]);
+        if let Some(args) = codex_model_args(&config.model) {
+            cmd.args(args);
+        }
         if use_stdin {
             cmd.arg("-");
         } else {
@@ -502,6 +521,43 @@ mod tests {
         let result = prompt_requires_stdin("line 1\nline 2");
         t.phase("Assert");
         t.ok("multiline prompts require stdin", result);
+    }
+
+    #[test]
+    fn codex_model_args_should_skip_auto_and_empty_models() {
+        let mut t = TestCase::new("codex_model_args_should_skip_auto_and_empty_models");
+
+        t.phase("Assert");
+        t.none("empty model skips -m", &codex_model_args(""));
+        t.none("auto model skips -m", &codex_model_args("auto"));
+    }
+
+    #[test]
+    fn codex_model_args_should_emit_model_flag_for_explicit_model() {
+        let mut t = TestCase::new("codex_model_args_should_emit_model_flag_for_explicit_model");
+
+        t.phase("Act");
+        let args = codex_model_args("gpt-5.4").expect("args");
+
+        t.phase("Assert");
+        t.eq("flag", args[0].as_str(), "-m");
+        t.eq("model", args[1].as_str(), "gpt-5.4");
+    }
+
+    #[test]
+    fn codex_effort_config_args_should_set_model_reasoning_effort() {
+        let mut t = TestCase::new("codex_effort_config_args_should_set_model_reasoning_effort");
+
+        t.phase("Act");
+        let args = codex_effort_config_args("xhigh");
+
+        t.phase("Assert");
+        t.eq("flag", args[0].as_str(), "--config");
+        t.eq(
+            "config",
+            args[1].as_str(),
+            "model_reasoning_effort=\"xhigh\"",
+        );
     }
 
     #[test]

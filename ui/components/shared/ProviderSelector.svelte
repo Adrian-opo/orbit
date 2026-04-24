@@ -14,7 +14,6 @@
   let subProviderSearch = '';
   let savedKeyLoaded = false;
   let hasSavedKey = false;
-  let showCustomProviderSteps = false;
 
   $: selectedBackend = backends.find((b) => b.id === backendId) ?? null;
   $: hasSubProviders = selectedBackend?.hasSubProviders ?? false;
@@ -147,47 +146,15 @@
   </div>
 </div>
 
+<div class="details-divider" aria-hidden="true"></div>
+
 {#if isOpenCodeBackend(selectedBackend)}
-  <div class="opencode-help">
-    <div class="help-title">Custom providers</div>
-    <div class="help-body">
-      <p>
-        Alem dos providers padrao do OpenCode, voce tambem pode selecionar um custom provider aqui,
-        se ele estiver configurado.
-      </p>
-      <button
-        type="button"
-        class="help-link"
-        on:click={() => (showCustomProviderSteps = !showCustomProviderSteps)}
-      >
-        {showCustomProviderSteps ? 'Ocultar passo a passo' : 'Ver como configurar'}
-      </button>
-      {#if showCustomProviderSteps}
-        <div class="help-steps">
-          <p>
-            1. Edite <code>~/.config/opencode/opencode.jsonc</code> ou
-            <code>~/.config/opencode/opencode.json</code>.
-          </p>
-          <p>2. Adicione seu provider na secao <code>provider</code>.</p>
-          <p>3. Defina pelo menos <code>name</code> e os <code>models</code> que quer expor.</p>
-          <p>4. Reinicie o Orbit para o provider aparecer no seletor.</p>
-        </div>
-        <pre>{`{
-  "provider": {
-    "my-provider": {
-      "name": "My Provider",
-      "options": { "apiKey": "sk-..." },
-      "models": {
-        "my-model": {
-          "name": "My Model",
-          "limit": { "context": 128000, "output": 4096 }
-        }
-      }
-    }
-  }
-}`}</pre>
-      {/if}
-    </div>
+  <div class="provider-tip">
+    <span class="tip-label">tip</span>
+    <span>
+      voce tambem pode usar custom providers do OpenCode configurados em
+      <code>~/.config/opencode</code>.
+    </span>
   </div>
 {/if}
 
@@ -332,67 +299,31 @@
     line-height: 1;
   }
 
-  .opencode-help {
-    border: 1px solid var(--bd1);
-    border-radius: var(--radius-sm);
-    background: var(--bg2);
-    color: var(--t1);
+  .provider-tip {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    color: var(--t2);
     font-size: var(--xs);
-    overflow: hidden;
+    line-height: 1.45;
+    padding: 0 var(--sp-1);
   }
-  .help-title {
-    padding: var(--sp-3) var(--sp-4);
+  .tip-label {
     color: var(--ac);
     font-weight: 600;
-    border-bottom: 1px solid var(--bd);
+    flex: 0 0 auto;
   }
-  .help-body {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    padding: 0 var(--sp-4) var(--sp-4);
-  }
-  .help-body p {
-    margin: var(--sp-3) 0 0;
-    line-height: 1.5;
-  }
-  .help-link {
-    align-self: flex-start;
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--ac);
-    font: inherit;
-    cursor: pointer;
-  }
-  .help-link:hover {
-    text-decoration: underline;
-  }
-  .help-steps {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-  }
-  .help-steps p {
-    margin: 0;
-  }
-  .help-body code {
+  .provider-tip code {
     color: var(--t0);
     background: var(--bg3);
     border: 1px solid var(--bd);
     border-radius: 4px;
     padding: 1px 4px;
   }
-  .help-body pre {
-    margin: 0;
-    overflow-x: auto;
-    color: var(--t0);
-    background: var(--bg1);
-    border: 1px solid var(--bd);
-    border-radius: var(--radius-sm);
-    padding: var(--sp-3);
-    line-height: 1.45;
-    white-space: pre;
+  .details-divider {
+    height: 1px;
+    background: var(--bd1);
+    margin: var(--sp-1) 0;
   }
 
   /* Sub-provider list */

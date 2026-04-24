@@ -6,7 +6,7 @@ use crate::services::ssh::{self, SpawnMode};
 
 pub struct CodexProvider;
 
-const CODEX_EFFORT_LEVELS: &[&str] = &["none", "minimal", "low", "medium", "high", "xhigh"];
+const CODEX_EFFORT_LEVELS: &[&str] = &["low", "medium", "high", "xhigh"];
 
 impl Provider for CodexProvider {
     fn id(&self) -> &str {
@@ -45,12 +45,10 @@ impl Provider for CodexProvider {
                             "model_reasoning_effort=\"{effort}\""
                         )));
                     }
-                    parts.extend([
-                        "-m".to_string(),
-                        ssh::posix_escape(&config.model),
-                        ssh::posix_escape(sid),
-                        ssh::posix_escape(&config.prompt),
-                    ]);
+                    if config.model != "auto" && !config.model.is_empty() {
+                        parts.extend(["-m".to_string(), ssh::posix_escape(&config.model)]);
+                    }
+                    parts.extend([ssh::posix_escape(sid), ssh::posix_escape(&config.prompt)]);
                 } else {
                     parts.extend(["exec".to_string(), "--json".to_string()]);
                     if config.skip_permissions {
@@ -62,11 +60,10 @@ impl Provider for CodexProvider {
                             "model_reasoning_effort=\"{effort}\""
                         )));
                     }
-                    parts.extend([
-                        "-m".to_string(),
-                        ssh::posix_escape(&config.model),
-                        ssh::posix_escape(&config.prompt),
-                    ]);
+                    if config.model != "auto" && !config.model.is_empty() {
+                        parts.extend(["-m".to_string(), ssh::posix_escape(&config.model)]);
+                    }
+                    parts.push(ssh::posix_escape(&config.prompt));
                 }
 
                 let cwd_str = config.cwd.to_string_lossy();
@@ -133,7 +130,11 @@ impl Provider for CodexProvider {
         crate::journal::process_line_codex
     }
     fn format_model(&self, raw_model: &str, _provider_id: &str) -> String {
-        raw_model.to_string()
+        if raw_model.is_empty() || raw_model == "auto" {
+            "auto".to_string()
+        } else {
+            raw_model.to_string()
+        }
     }
     fn cli_name(&self) -> &str {
         "codex"
@@ -169,9 +170,21 @@ mod tests {
         t.ok("supports_effort is true", provider.supports_effort());
         t.eq(
             "xhigh is exposed for codex",
-            provider.effort_levels("gpt-5.5")[5],
+            provider.effort_levels("gpt-5.5")[3],
             "xhigh",
         );
+    }
+
+    #[test]
+    fn should_normalize_empty_model_to_auto() {
+        let mut t = TestCase::new("should_normalize_empty_model_to_auto");
+        let provider = CodexProvider;
+
+        t.phase("Act");
+        let formatted = provider.format_model("", "codex");
+
+        t.phase("Assert");
+        t.eq("empty model becomes auto", formatted.as_str(), "auto");
     }
 
     #[test]

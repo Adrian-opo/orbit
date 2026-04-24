@@ -450,6 +450,9 @@ impl SessionManager {
             if let Some(ref rid) = resume_id {
                 eprintln!("[orbit:debug]   resume: {rid}");
             }
+            if let Some(ref effort) = effort {
+                eprintln!("[orbit:debug]   effort: {effort}");
+            }
             eprintln!(
                 "[orbit:debug]   prompt: {}…",
                 &prompt.chars().take(80).collect::<String>()

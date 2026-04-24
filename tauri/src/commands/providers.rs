@@ -69,6 +69,13 @@ pub fn build_cli_backends(registry: &crate::providers::ProviderRegistry) -> Vec<
             let has_subs = p.id() == "opencode" && !opencode_sub_providers.is_empty();
             let models = get_provider_models(p.id());
             let mut effort_levels = std::collections::HashMap::new();
+            let default_levels = p.effort_levels("auto");
+            if !default_levels.is_empty() {
+                effort_levels.insert(
+                    "auto".to_string(),
+                    default_levels.iter().map(|s| s.to_string()).collect(),
+                );
+            }
             for model in &models {
                 let levels = p.effort_levels(&model.id);
                 if !levels.is_empty() {

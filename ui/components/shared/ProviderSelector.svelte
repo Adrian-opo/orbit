@@ -144,19 +144,9 @@
       </button>
     {/each}
   </div>
+
+  <div class="details-divider" aria-hidden="true"></div>
 </div>
-
-<div class="details-divider" aria-hidden="true"></div>
-
-{#if isOpenCodeBackend(selectedBackend)}
-  <div class="provider-tip">
-    <span class="tip-label">tip</span>
-    <span>
-      voce tambem pode usar custom providers do OpenCode configurados em
-      <code>~/.config/opencode</code>.
-    </span>
-  </div>
-{/if}
 
 <!-- OpenCode: sub-provider selector -->
 {#if hasSubProviders}
@@ -190,6 +180,15 @@
         <div class="no-results">no providers match "{subProviderSearch}"</div>
       {/if}
     </div>
+    {#if isOpenCodeBackend(selectedBackend)}
+      <div class="provider-tip">
+        <span class="tip-label">tip</span>
+        <span>
+          You can also use custom OpenCode providers configured in
+          <code>~/.config/opencode</code>.
+        </span>
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -302,11 +301,11 @@
   .provider-tip {
     display: flex;
     align-items: flex-start;
-    gap: var(--sp-3);
+    gap: var(--sp-2);
     color: var(--t2);
     font-size: var(--xs);
-    line-height: 1.45;
-    padding: 0 var(--sp-1);
+    line-height: 1.35;
+    padding: 0;
   }
   .tip-label {
     color: var(--ac);
@@ -323,7 +322,7 @@
   .details-divider {
     height: 1px;
     background: var(--bd1);
-    margin: var(--sp-1) 0;
+    margin: 0;
   }
 
   /* Sub-provider list */

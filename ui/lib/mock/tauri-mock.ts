@@ -1,5 +1,123 @@
 import type { Session, TokenUsage } from '../stores/sessions';
-import type { JournalEntry, SlashCommand } from '../types';
+import type { JournalEntry, SlashCommand, SubagentInfo, TaskItem } from '../types';
+
+const nowIso = () => new Date().toISOString();
+
+const MOCK_SUBAGENTS: Record<number, SubagentInfo[]> = {
+  1: [
+    {
+      id: 'task-1',
+      agentType: 'Task',
+      description: 'Write auth regression tests',
+      status: 'running',
+    },
+    {
+      id: 'task-2',
+      agentType: 'Task',
+      description: 'Verify token refresh behavior',
+      status: 'done',
+    },
+  ],
+  2: [],
+  3: [],
+};
+
+const MOCK_TASKS: Record<string, TaskItem[]> = {
+  '1': [
+    {
+      id: 'task-1',
+      subject: 'Write tests',
+      description: 'Cover refresh token edge cases',
+      activeForm: 'Writing tests',
+      status: 'in_progress',
+      blocks: [],
+      blockedBy: [],
+    },
+    {
+      id: 'task-2',
+      subject: 'Verify fix',
+      description: 'Confirm expiry is back to one hour',
+      activeForm: null,
+      status: 'pending',
+      blocks: [],
+      blockedBy: ['task-1'],
+    },
+  ],
+};
+
+const MOCK_SUBAGENT_JOURNAL: Record<string, JournalEntry[]> = {
+  '1:task-1': [
+    {
+      sessionId: 'task-1',
+      timestamp: new Date(Date.now() - 45000).toISOString(),
+      entryType: 'assistant',
+      text: 'I am adding regression coverage for token refresh.',
+      thinking: null,
+      thinkingDuration: null,
+      tool: null,
+      toolInput: null,
+      output: null,
+      exitCode: null,
+      linesChanged: null,
+      seq: 0,
+      epoch: '',
+    },
+    {
+      sessionId: 'task-1',
+      timestamp: new Date(Date.now() - 42000).toISOString(),
+      entryType: 'toolCall',
+      text: null,
+      thinking: null,
+      thinkingDuration: null,
+      tool: 'Read',
+      toolInput: { file_path: 'src/auth/auth.test.ts' },
+      output: null,
+      exitCode: null,
+      linesChanged: null,
+      seq: 0,
+      epoch: '',
+    },
+  ],
+  '1:task-2': [
+    {
+      sessionId: 'task-2',
+      timestamp: new Date(Date.now() - 70000).toISOString(),
+      entryType: 'assistant',
+      text: 'Verified the fix manually and through the existing tests.',
+      thinking: null,
+      thinkingDuration: null,
+      tool: null,
+      toolInput: null,
+      output: null,
+      exitCode: null,
+      linesChanged: null,
+      seq: 0,
+      epoch: '',
+    },
+  ],
+};
+
+let mockProjects = [
+  { id: 1, name: 'api-server', path: 'C:\\Users\\dev\\api-server' },
+  { id: 2, name: 'dashboard', path: 'C:\\Users\\dev\\dashboard' },
+];
+
+let mockHttpSettings = {
+  enabled: true,
+  host: '0.0.0.0',
+  port: 9999,
+};
+
+let mockApiKeys = [
+  {
+    id: 'key-1',
+    label: 'phone-1',
+    key: 'orbit_mock_phone_token',
+    createdAt: nowIso(),
+  },
+];
+
+const savedProviderKeys = new Map<string, { envVar: string; apiKey: string }>();
 
 const MOCK_SESSIONS: Session[] = [
   {
@@ -21,6 +139,7 @@ const MOCK_SESSIONS: Session[] = [
       { tool: 'Read', target: 'auth.ts', result: null, success: true },
       { tool: 'Bash', target: 'git status', result: null, success: true },
     ],
+    subagents: MOCK_SUBAGENTS[1],
     sshHost: null,
     sshUser: null,
 
@@ -45,6 +164,7 @@ const MOCK_SESSIONS: Session[] = [
     contextPercent: 51.3,
     pendingApproval: null,
     miniLog: null,
+    subagents: MOCK_SUBAGENTS[2],
     sshHost: null,
     sshUser: null,
 
@@ -69,6 +189,7 @@ const MOCK_SESSIONS: Session[] = [
     contextPercent: 3.1,
     pendingApproval: null,
     miniLog: null,
+    subagents: MOCK_SUBAGENTS[3],
     sshHost: null,
     sshUser: null,
 
@@ -339,6 +460,13 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
       return journals[id] ?? [];
     }
 
+    case 'get_session_journal_page': {
+      const id = Number(args?.sessionId ?? 0);
+      const offset = Number(args?.offset ?? 0);
+      const limit = Number(args?.limit ?? 200);
+      return (journals[id] ?? []).slice(offset, offset + limit);
+    }
+
     case 'create_session': {
       const id = nextId++;
       const newSession: Session = {
@@ -347,7 +475,7 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
         name: (args?.sessionName as string) ?? null,
         status: 'initializing',
         permissionMode: (args?.permissionMode as string) ?? 'ignore',
-        model: (args?.modelId as string) ?? null,
+        model: (args?.model as string) ?? null,
         pid: null,
         cwd: args?.projectPath as string,
         projectName:
@@ -361,6 +489,7 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
         contextPercent: null,
         pendingApproval: null,
         miniLog: null,
+        subagents: [],
         sshHost: null,
         sshUser: null,
         provider: (args?.provider as string) ?? 'claude-code',
@@ -413,15 +542,44 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
       return { found: true, path: '/mock/claude', searchedPath: '' };
 
     case 'get_slash_commands': {
-      const cmds: SlashCommand[] = [
-        { cmd: '/help', desc: 'Show help', category: 'built-in' },
-        { cmd: '/compact', desc: 'Compact context', category: 'built-in' },
-        { cmd: '/clear', desc: 'Clear conversation', category: 'built-in' },
-        { cmd: '/cost', desc: 'Show token cost', category: 'built-in' },
-        { cmd: '/model', desc: 'Switch model', category: 'built-in' },
-      ];
+      const provider = (args?.provider as string | null) ?? 'claude-code';
+      const cmds: SlashCommand[] = [{ cmd: '/help', desc: 'Show help', category: 'built-in' }];
+      if (provider === 'claude-code') {
+        cmds.push(
+          { cmd: '/compact', desc: 'Compact context', category: 'built-in' },
+          { cmd: '/clear', desc: 'Clear conversation', category: 'built-in' },
+          { cmd: '/cost', desc: 'Show token cost', category: 'built-in' },
+          { cmd: '/model', desc: 'Switch model', category: 'built-in' },
+          { cmd: '/fast', desc: 'Toggle fast output mode', category: 'built-in' }
+        );
+      } else if (provider === 'codex') {
+        cmds.push(
+          { cmd: '/model', desc: 'Choose model and reasoning effort', category: 'built-in' },
+          { cmd: '/fast', desc: 'Toggle Fast mode for faster inference', category: 'built-in' }
+        );
+      } else {
+        cmds.push(
+          { cmd: '/compact', desc: 'Compact context', category: 'built-in' },
+          { cmd: '/clear', desc: 'Clear conversation', category: 'built-in' },
+          { cmd: '/cost', desc: 'Show token cost', category: 'built-in' },
+          { cmd: '/model', desc: 'Switch model', category: 'built-in' }
+        );
+      }
       return cmds;
     }
+
+    case 'create_project': {
+      const project = {
+        id: mockProjects.length + 1,
+        name: String(args?.name ?? `project-${mockProjects.length + 1}`),
+        path: String(args?.path ?? ''),
+      };
+      mockProjects = [...mockProjects, project];
+      return project;
+    }
+
+    case 'list_projects':
+      return mockProjects;
 
     case 'list_project_files':
       return ['src/index.ts', 'src/auth/auth.ts', 'src/api/routes.ts', 'package.json', 'README.md'];
@@ -445,19 +603,34 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
       return null;
 
     case 'save_provider_key':
+      if (args?.providerId && args?.envVar && args?.apiKey) {
+        savedProviderKeys.set(String(args.providerId), {
+          envVar: String(args.envVar),
+          apiKey: String(args.apiKey),
+        });
+      }
       return null;
 
     case 'load_provider_key':
-      return null;
+      return args?.providerId ? (savedProviderKeys.get(String(args.providerId)) ?? null) : null;
 
     case 'delete_provider_key':
+      if (args?.providerId) {
+        savedProviderKeys.delete(String(args.providerId));
+      }
       return null;
 
     case 'get_tasks':
-      return [];
+      return MOCK_TASKS[String(args?.sessionId ?? '')] ?? [];
 
     case 'get_subagents':
-      return Promise.resolve([]);
+      return Promise.resolve(MOCK_SUBAGENTS[Number(args?.sessionId ?? 0)] ?? []);
+
+    case 'get_subagent_journal': {
+      const sessionId = String(args?.sessionId ?? '');
+      const subagentId = String(args?.subagentId ?? '');
+      return MOCK_SUBAGENT_JOURNAL[`${sessionId}:${subagentId}`] ?? [];
+    }
 
     case 'get_changelog':
       return '# Changelog\n\n## April 2026\n\n### 04/07 · New — In-app changelog\nYou can now view the history of Orbit updates directly inside the app.';
@@ -507,12 +680,11 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
           ],
           subProviders: [],
           effortLevels: {
-            auto: ['low', 'medium', 'high', 'xhigh'],
-            'gpt-5.5': ['low', 'medium', 'high', 'xhigh'],
-            'gpt-5.4': ['low', 'medium', 'high', 'xhigh'],
-            'gpt-5.4-mini': ['low', 'medium', 'high', 'xhigh'],
-            'gpt-5.3-codex': ['low', 'medium', 'high', 'xhigh'],
-            'gpt-5.2': ['low', 'medium', 'high', 'xhigh'],
+            'gpt-5.5': ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'],
+            'gpt-5.4': ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'],
+            'gpt-5.4-mini': ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'],
+            'gpt-5.3-codex': ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'],
+            'gpt-5.2': ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'],
           },
           taskToolNames: ['todo_list'],
           taskFormat: 'codex_item_list',
@@ -523,7 +695,7 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
           cliAvailable: true,
           supportsEffort: false,
           supportsSsh: false,
-          supportsSubagents: false,
+          supportsSubagents: true,
           supportsTasks: true,
           hasSubProviders: true,
           models: [],
@@ -565,6 +737,46 @@ export async function mockInvoke(cmd: string, args?: Record<string, unknown>): P
 
     case 'check_env_var':
       return false;
+
+    case 'generate_api_key': {
+      const created = {
+        id: `key-${mockApiKeys.length + 1}`,
+        label: String(args?.label ?? `key-${mockApiKeys.length + 1}`),
+        key: `orbit_mock_${Math.random().toString(36).slice(2, 14)}`,
+        createdAt: nowIso(),
+      };
+      mockApiKeys = [...mockApiKeys, created];
+      return { id: created.id, label: created.label, key: created.key };
+    }
+
+    case 'list_api_keys':
+      return mockApiKeys.map(({ id, label, createdAt }) => ({ id, label, createdAt }));
+
+    case 'revoke_api_key': {
+      const before = mockApiKeys.length;
+      mockApiKeys = mockApiKeys.filter((key) => key.id !== String(args?.id ?? ''));
+      return mockApiKeys.length !== before;
+    }
+
+    case 'get_http_settings':
+      return mockHttpSettings;
+
+    case 'set_http_settings':
+      mockHttpSettings = {
+        enabled: Boolean(args?.enabled),
+        host: String(args?.host ?? '127.0.0.1'),
+        port: Number(args?.port ?? 9999),
+      };
+      return null;
+
+    case 'get_lan_ip':
+      return '192.168.0.42';
+
+    case 'setup_orchestration':
+      return `${String(args?.projectPath ?? 'C:\\Users\\dev\\project')}\\.mcp.json`;
+
+    case 'check_orchestration':
+      return { available: true, path: 'C:\\Users\\dev\\project\\.mcp.json' };
 
     case 'diagnose_provider': {
       const backend = (args?.backend as string) ?? 'claude-code';
@@ -724,9 +936,12 @@ function makeStateEvent(sessionId: number, status: string, extraTokens?: Partial
     pendingApproval: null,
     miniLog: [],
     gitBranch: null,
-    subagents: [],
+    subagents: session?.subagents ?? [],
     model: session?.model ?? null,
     contextWindow: 200_000,
+    attention: null,
+    rateLimit: [],
+    costUsd: null,
   };
 }
 

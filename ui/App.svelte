@@ -38,6 +38,7 @@
   import type { ClaudeCheck } from './lib/tauri';
   import ChangelogModal from './components/ChangelogModal.svelte';
   import ToastContainer from './components/ToastContainer.svelte';
+  import Modal from './components/shared/Modal.svelte';
   import { checkUpdate } from './lib/tauri';
   import { installUpdate } from './lib/tauri';
   import type { UpdateInfo } from './lib/types';
@@ -59,6 +60,7 @@
   let appVersion = '';
   let pendingUpdate: UpdateInfo | null = null;
   let updateToastId: string | null = null;
+  let showMobileBetaModal = false;
 
   const CHANGELOG_VERSION_KEY = 'orbit:lastSeenChangelogVersion';
 
@@ -273,11 +275,18 @@
     />
   {/if}
 
-  {#if isMobile}
-    <div class="mobile-beta-banner">
-      <span class="mobile-beta-pill">mobile beta</span>
-      <p>Phone access is in testing. Some screens and actions may not work as expected yet.</p>
-    </div>
+  {#if isMobile && showMobileBetaModal}
+    <Modal
+      title="Mobile Beta"
+      width="360px"
+      zIndex={260}
+      on:close={() => (showMobileBetaModal = false)}
+    >
+      <div class="mobile-beta-modal">
+        <span class="mobile-beta-pill">mobile beta</span>
+        <p>Phone access is in testing. Some screens and actions may not work as expected yet.</p>
+      </div>
+    </Modal>
   {/if}
 
   <div class="layout" class:mobile={isMobile}>
@@ -295,6 +304,13 @@
           </svg>
         </button>
         <span class="mobile-title">orbit</span>
+        <button
+          class="mobile-beta-badge"
+          on:click={() => (showMobileBetaModal = true)}
+          aria-label="Show mobile beta notice"
+        >
+          mobile beta
+        </button>
       </div>
       {#if $sidebarVisible}
         <button
@@ -339,19 +355,18 @@
 <ToastContainer />
 
 <style>
-  .mobile-beta-banner {
+  .mobile-beta-modal {
     display: flex;
-    gap: 12px;
+    gap: var(--sp-4);
     align-items: flex-start;
-    margin: 10px 10px 0;
-    padding: 12px 14px;
-    border-radius: 12px;
-    border: 1px solid rgba(245, 166, 35, 0.28);
+    padding: var(--sp-4) var(--sp-5);
+    border: 1px solid rgba(245, 166, 35, 0.24);
+    border-radius: var(--radius-md);
     background: rgba(245, 166, 35, 0.08);
   }
-  .mobile-beta-banner p {
+  .mobile-beta-modal p {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--sm);
     line-height: 1.5;
     color: var(--t1);
   }
@@ -364,6 +379,24 @@
     font-size: 10px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+  }
+  .mobile-beta-badge {
+    flex-shrink: 0;
+    margin-left: auto;
+    border: 1px solid rgba(245, 166, 35, 0.24);
+    border-radius: 999px;
+    background: rgba(245, 166, 35, 0.08);
+    color: var(--warning, #f5a623);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+    padding: 6px 8px;
+    cursor: pointer;
+  }
+  .mobile-beta-badge:hover {
+    background: rgba(245, 166, 35, 0.14);
+    border-color: rgba(245, 166, 35, 0.36);
   }
   .layout {
     display: flex;
